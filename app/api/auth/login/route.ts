@@ -101,14 +101,13 @@ export async function POST(request: NextRequest) {
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     })
-    
-    console.log('Token set in response:', { tokenLength: jwtToken.length, cookie: response.cookies.get('token') })
 
     response.cookies.set('auth_token', JSON.stringify(userData), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
+      path: '/',
     })
 
     return response
