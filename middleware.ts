@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
+  if (pathname === '/' || pathname === '/home') {
+    return NextResponse.redirect(new URL('/client', request.url))
+  }
+  
   let user: any = null
   
   const authToken = request.cookies.get('auth_token')?.value
@@ -61,5 +65,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/seller/:path*', '/client/:path*'],
+  matcher: ['/', '/home', '/admin/:path*', '/seller/:path*', '/client/:path*'],
 }
