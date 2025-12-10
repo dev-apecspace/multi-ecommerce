@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Heart, User, ShoppingCart, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 interface MobileMenuProps {
   onClose: () => void
@@ -14,6 +14,7 @@ interface MobileMenuProps {
 export function MobileMenu({ onClose, onLogin }: MobileMenuProps) {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const categories = [
     { label: "Thời trang nam", href: "/client/category/thoi-trang-nam" },
     { label: "Thời trang nữ", href: "/client/category/thoi-trang-nu" },
@@ -79,8 +80,8 @@ export function MobileMenu({ onClose, onLogin }: MobileMenuProps) {
               variant="outline"
               size="sm"
               onClick={() => {
-                onLogin()
                 onClose()
+                router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
               }}
               className="flex flex-col items-center gap-1 h-auto py-2"
             >

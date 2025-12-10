@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 import { products } from "@/lib/mockdata"
 import { generateSlug } from "@/lib/utils"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 const categories = [
   { label: "Thời trang nam", href: "/client/category/thoi-trang-nam" },
@@ -35,6 +35,7 @@ const categories = [
 
 export function Navbar() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, logout } = useAuth()
   const { cartCount } = useCart()
   const [searchQuery, setSearchQuery] = useState("")
@@ -165,7 +166,7 @@ export function Navbar() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  onClick={() => user ? setShowProfileDropdown(!showProfileDropdown) : setAuthModalOpen(true)}
+                  onClick={() => user ? setShowProfileDropdown(!showProfileDropdown) : router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)}
                 >
                   <User className="h-5 w-5" />
                 </Button>

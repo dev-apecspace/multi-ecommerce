@@ -3,14 +3,41 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter, usePathname } from "next/navigation"
 import { Star, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatPrice, generateSlug } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
 
 export function RecommendedProducts() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user } = useAuth()
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  const handleAddToCart = (e: React.MouseEvent, product: any) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+    
+    router.push(`/client/product/${product.slug || generateSlug(product.name)}`)
+  }
+
+  const handleAddToFavorite = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+  }
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -77,10 +104,19 @@ export function RecommendedProducts() {
                   </p>
 
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" className="flex-1 h-7 text-xs">
+                    <Button 
+                      size="sm" 
+                      className="flex-1 h-7 text-xs"
+                      onClick={(e) => handleAddToCart(e, product)}
+                    >
                       Thêm
                     </Button>
-                    <Button size="sm" variant="outline" className="w-7 h-7 p-0 bg-transparent">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="w-7 h-7 p-0 bg-transparent"
+                      onClick={handleAddToFavorite}
+                    >
                       <Heart className="h-3 w-3" />
                     </Button>
                   </div>
