@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS "Campaign" (
   discountValue FLOAT NOT NULL, -- percentage (0-100) or fixed amount
   "startDate" TIMESTAMP NOT NULL,
   "endDate" TIMESTAMP NOT NULL,
-  status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'active', 'ended', 'inactive'
+  status VARCHAR(50) DEFAULT 'draft', -- 'draft' (Khởi tạo), 'upcoming', 'active', 'ended'
   budget FLOAT, -- optional budget limit
   "createdBy" INT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
   "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -90,5 +90,25 @@ BEGIN
     ALTER TABLE "Campaign"
       ALTER COLUMN "discountValue" SET NOT NULL,
       ALTER COLUMN "discountValue" SET DEFAULT 0;
+  END IF;
+END $$;
+
+-- Normalize campaign status values and enforce the four valid states
+DO $$
+BEGIN
+  -- Set default to the new initial state
+  ALTER TABLE "Campaign" ALTER COLUMN status SET DEFAULT 'draft';
+
+  -- Backfill/normalize existing records
+  UPDATE "Campaign" SET status = 'draft' WHERE status IS NULL OR status IN ('pending', 'inactive');
+  -- Keep explicit upcoming/active/ended as-is; any other stray values go to ended
+  UPDATE "Campaign" SET status = 'ended' WHERE status NOT IN ('draft', 'upcoming', 'active', 'ended');
+
+  -- Add a check constraint if it doesn't already exist
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'campaign_status_check'
+  ) THEN
+    ALTER TABLE "Campaign"
+      ADD CONSTRAINT campaign_status_check CHECK (status IN ('draft', 'upcoming', 'active', 'ended'));
   END IF;
 END $$;

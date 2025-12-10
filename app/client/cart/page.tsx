@@ -16,9 +16,20 @@ interface CartItem {
   id: number
   quantity: number
   variantId: number | null
+  price: number // Base unit price (variant or product)
+  originalPrice?: number // Original unit price (variant or product)
+  salePrice?: number | null // Discounted price from campaign
+  finalPrice: number // Final price (unit price * quantity)
+  appliedCampaign?: {
+    id: number
+    name: string
+    type: string
+    discountValue: number
+  } | null
   Product: {
     id: number
     name: string
+    slug: string
     price: number
     originalPrice?: number
     stock: number
@@ -31,6 +42,8 @@ interface CartItem {
     sku?: string
     barcode?: string
     image?: string
+    price?: number
+    originalPrice?: number
   } | null
 }
 
@@ -127,8 +140,9 @@ export default function CartPage() {
   }, {} as Record<number, { vendor: { id: number; name: string }; items: CartItem[] }>)
 
   const selectedItemsData = items.filter((item) => selectedItems.includes(item.id))
-  const subtotal = selectedItemsData.reduce((sum, item) => sum + item.Product.price * item.quantity, 0)
-  const originalSubtotal = selectedItemsData.reduce((sum, item) => sum + (item.Product.originalPrice || item.Product.price) * item.quantity, 0)
+  // Use finalPrice which already includes quantity and campaign discounts
+  const subtotal = selectedItemsData.reduce((sum, item) => sum + item.finalPrice, 0)
+  const originalSubtotal = selectedItemsData.reduce((sum, item) => sum + (item.originalPrice ?? item.price) * item.quantity, 0)
   const savings = originalSubtotal - subtotal
   const shipping = subtotal > 0 ? 0 : 0
   const total = subtotal + shipping
@@ -143,7 +157,8 @@ export default function CartPage() {
       productId: item.Product.id,
       productName: item.Product.name,
       quantity: item.quantity,
-      price: item.Product.price,
+      price: item.salePrice ?? item.price, // Use campaign price if available, otherwise use base price
+      originalPrice: item.originalPrice,
       image: item.ProductVariant?.image || "/placeholder.svg",
       variantId: item.variantId,
       vendorId: item.Product.vendorId,
@@ -223,22 +238,33 @@ export default function CartPage() {
                           onCheckedChange={() => toggleSelectItem(item.id)}
                         />
 
-                        <div className="relative w-20 h-20 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
+                        <Link href={`/client/product/${item.Product.slug}`} className="relative w-20 h-20 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
                           <Image src={item.ProductVariant?.image || "/placeholder.svg"} alt={item.Product.name} fill className="object-cover" />
-                        </div>
+                        </Link>
 
                         <div className="flex-1">
-                          <h3 className="font-medium mb-1">{item.Product.name}</h3>
+                          <Link href={`/client/product/${item.Product.slug}`}>
+                            <h3 className="font-medium mb-1 hover:text-primary transition-colors cursor-pointer">{item.Product.name}</h3>
+                          </Link>
                           {item.ProductVariant && (
                             <p className="text-xs text-muted-foreground mb-1">
                               Phiên bản: <span className="font-medium">{item.ProductVariant.name}</span>
                             </p>
                           )}
                           <div className="flex items-baseline gap-2">
-                            <span className="font-bold text-primary">{item.Product.price.toLocaleString('vi-VN')}₫</span>
-                            {item.Product.originalPrice && (
+                            <span className="font-bold text-primary">
+                              {(item.salePrice ?? item.price).toLocaleString('vi-VN')}₫
+                            </span>
+                            {(item.originalPrice && (item.originalPrice > (item.salePrice ?? item.price))) && (
                               <span className="text-xs text-muted-foreground line-through">
-                                {item.Product.originalPrice.toLocaleString('vi-VN')}₫
+                                {item.originalPrice.toLocaleString('vi-VN')}₫
+                              </span>
+                            )}
+                            {item.appliedCampaign && (
+                              <span className="text-xs text-orange-600 font-medium">
+                                -{item.appliedCampaign.type === 'percentage' 
+                                  ? `${item.appliedCampaign.discountValue}%` 
+                                  : `${item.appliedCampaign.discountValue.toLocaleString('vi-VN')}₫`}
                               </span>
                             )}
                           </div>

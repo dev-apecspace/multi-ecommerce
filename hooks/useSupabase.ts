@@ -521,31 +521,31 @@ export function useAdminVendors(status?: string) {
   return { ...state, fetchVendors, approveVendor, rejectVendor }
 }
 
-export function useAdminStatistics() {
-  const [state, setState] = useState<FetchState<any>>({
-    data: null,
-    loading: false,
-    error: null,
-  })
+// export function useAdminStatistics() {
+//   const [state, setState] = useState<FetchState<any>>({
+//     data: null,
+//     loading: false,
+//     error: null,
+//   })
 
-  const fetchStatistics = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true }))
-    try {
-      const response = await fetch('/api/admin/statistics')
-      if (!response.ok) throw new Error('Failed to fetch statistics')
-      const data = await response.json()
-      setState({ data, loading: false, error: null })
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }))
-    }
-  }, [])
+//   const fetchStatistics = useCallback(async () => {
+//     setState((prev) => ({ ...prev, loading: true }))
+//     try {
+//       const response = await fetch('/api/admin/statistics')
+//       if (!response.ok) throw new Error('Failed to fetch statistics')
+//       const data = await response.json()
+//       setState({ data, loading: false, error: null })
+//     } catch (error) {
+//       setState((prev) => ({
+//         ...prev,
+//         loading: false,
+//         error: error instanceof Error ? error.message : 'Unknown error',
+//       }))
+//     }
+//   }, [])
 
-  return { ...state, fetchStatistics }
-}
+//   return { ...state, fetchStatistics }
+// }
 
 export function useSellerDashboard(vendorId: number | null) {
   const [state, setState] = useState<FetchState<any>>({
@@ -745,4 +745,59 @@ export function useSellerGuides(category?: string) {
   }, [category])
 
   return { ...state, fetchGuides }
+}
+
+export function useAdminStatistics() {
+  const [state, setState] = useState<FetchState<any>>({
+    data: null,
+    loading: false,
+    error: null,
+  })
+
+  const fetchStatistics = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }))
+    try {
+      const response = await fetch('/api/admin/statistics')
+      if (!response.ok) throw new Error('Failed to fetch statistics')
+      const data = await response.json()
+      setState({ data, loading: false, error: null })
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }))
+    }
+  }, [])
+
+  return { ...state, fetchStatistics }
+}
+
+export function useAdminReports(type?: string, reportStatus?: string) {
+  const [state, setState] = useState<FetchState<any[]>>({
+    data: [],
+    loading: false,
+    error: null,
+  })
+
+  const fetchReports = useCallback(async () => {
+    setState((prev) => ({ ...prev, loading: true }))
+    try {
+      const params = new URLSearchParams()
+      if (type) params.append('type', type)
+      if (reportStatus) params.append('status', reportStatus)
+      const response = await fetch(`/api/admin/reports?${params}`)
+      if (!response.ok) throw new Error('Failed to fetch reports')
+      const data = await response.json()
+      setState({ data, loading: false, error: null })
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }))
+    }
+  }, [type, reportStatus])
+
+  return { ...state, fetchReports }
 }

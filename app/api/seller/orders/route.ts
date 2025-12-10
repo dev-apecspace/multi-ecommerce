@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
         shippingCost,
         date,
         paymentMethod,
+        paymentStatus,
         shippingAddress,
         estimatedDelivery,
         User(id, name, email, phone),
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
       shippingCost: order.shippingCost,
       date: order.date,
       paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
       shippingAddress: order.shippingAddress,
       estimatedDelivery: order.estimatedDelivery,
       User: order.User,
@@ -92,15 +94,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    // Verify order belongs to this vendor
+    // Verify order belongs to this vendor and check payment status
     const { data: orderData, error: orderError } = await supabase
       .from('Order')
-      .select('id, vendorId')
+      .select('id, vendorId, paymentMethod, paymentStatus')
       .eq('id', parseInt(orderId))
       .single()
 
     if (orderError || !orderData || orderData.vendorId !== parseInt(vendorId)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // If trying to approve/process order with bank transfer, check payment status
+    if ((status === 'processing' || status === 'shipped') && orderData.paymentMethod === 'bank') {
+      if (orderData.paymentStatus !== 'paid') {
+        return NextResponse.json({ 
+          error: 'Không thể duyệt đơn hàng. Vui lòng xác nhận thanh toán trước khi duyệt đơn.' 
+        }, { status: 400 })
+      }
     }
 
     const updateData: any = { status }
@@ -120,6 +131,7 @@ export async function PATCH(request: NextRequest) {
         shippingCost,
         date,
         paymentMethod,
+        paymentStatus,
         shippingAddress,
         estimatedDelivery,
         User(id, name, email, phone),
@@ -150,6 +162,7 @@ export async function PATCH(request: NextRequest) {
       shippingCost: order.shippingCost,
       date: order.date,
       paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
       shippingAddress: order.shippingAddress,
       estimatedDelivery: order.estimatedDelivery,
       User: order.User,

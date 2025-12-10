@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Star, Shield, Heart, HeartFilled } from "lucide-react"
+import { Star, Shield, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -110,7 +110,7 @@ export default function ShopsPage() {
                         className="p-2 bg-white dark:bg-slate-900 rounded-full shadow hover:shadow-md transition-shadow"
                       >
                         {favorites.includes(shop.id) ? (
-                          <HeartFilled className="h-5 w-5 text-red-500" />
+                          <Heart className="h-5 w-5 text-red-500 fill-red-500" />
                         ) : (
                           <Heart className="h-5 w-5 text-gray-400" />
                         )}
