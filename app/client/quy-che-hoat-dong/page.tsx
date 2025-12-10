@@ -1,26 +1,26 @@
 import { Card } from "@/components/ui/card"
 
 export const metadata = {
-  title: "Quy chế hoạt động - Sàn TMĐT",
-  description: "Quy chế hoạt động của Sàn TMĐT - sàn thương mại điện tử hàng đầu Việt Nam",
+  title: "Quy chế hoạt động - Sàn TMĐT APECSPACE",
+  description: "Quy chế hoạt động của Sàn TMĐT APECSPACE - sàn thương mại điện tử hàng đầu Việt Nam",
 }
 
 export default function OperatingRegulationsPage() {
   return (
     <main className="container-viewport py-12">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Quy chế hoạt động Sàn TMĐT</h1>
+        <h1 className="text-4xl font-bold mb-8">Quy chế hoạt động Sàn TMĐT APECSPACE</h1>
 
         <Card className="p-8 space-y-8">
           <section>
             <h2 className="text-2xl font-bold mb-4">I. Định nghĩa</h2>
             <div className="space-y-3 text-foreground/80 leading-relaxed">
               <p>
-                1. Sàn TMĐT (Sàn Thương mại Điện tử) là nền tảng trực tuyến kết nối các bên mua và bán hàng hóa, dịch
+                1. Sàn TMĐT APECSPACE (Sàn Thương mại Điện tử) là nền tảng trực tuyến kết nối các bên mua và bán hàng hóa, dịch
                 vụ.
               </p>
-              <p>2. Người bán: Là cá nhân hoặc tổ chức có đăng ký kinh doanh hợp pháp trên Sàn TMĐT.</p>
-              <p>3. Người mua: Là người tiêu dùng truy cập và mua hàng trên Sàn TMĐT.</p>
+              <p>2. Người bán: Là cá nhân hoặc tổ chức có đăng ký kinh doanh hợp pháp trên Sàn TMĐT APECSPACE.</p>
+              <p>3. Người mua: Là người tiêu dùng truy cập và mua hàng trên Sàn TMĐT APECSPACE.</p>
             </div>
           </section>
 
@@ -31,9 +31,9 @@ export default function OperatingRegulationsPage() {
                 <strong>Quyền:</strong>
               </p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Được bán hàng hóa, dịch vụ hợp pháp trên Sàn TMĐT</li>
+                <li>Được bán hàng hóa, dịch vụ hợp pháp trên Sàn TMĐT APECSPACE</li>
                 <li>Được nhận doanh thu từ bán hàng trừ hoa hồng của Sàn</li>
-                <li>Được hỗ trợ kỹ thuật từ Sàn TMĐT</li>
+                <li>Được hỗ trợ kỹ thuật từ Sàn TMĐT APECSPACE</li>
               </ul>
               <p className="mt-4">
                 <strong>Trách nhiệm:</strong>
@@ -72,7 +72,7 @@ export default function OperatingRegulationsPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">IV. Chính sách hoa hồng</h2>
             <div className="space-y-3 text-foreground/80 leading-relaxed">
-              <p>Sàn TMĐT tính hoa hồng 5% từ mỗi giao dịch thành công.</p>
+              <p>Sàn TMĐT APECSPACE tính hoa hồng 5% từ mỗi giao dịch thành công.</p>
               <p>Hoa hồng được tính trên giá cuối cùng mà người mua thanh toán (sau khi áp dụng khuyến mãi).</p>
             </div>
           </section>
@@ -80,7 +80,7 @@ export default function OperatingRegulationsPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">V. Xử lý vi phạm</h2>
             <div className="space-y-3 text-foreground/80 leading-relaxed">
-              <p>Sàn TMĐT có quyền:</p>
+              <p>Sàn TMĐT APECSPACE có quyền:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Cảnh báo</li>
                 <li>Tạm khóa tài khoản</li>

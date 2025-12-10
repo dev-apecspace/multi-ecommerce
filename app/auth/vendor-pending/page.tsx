@@ -24,7 +24,7 @@ export default function VendorPendingPage() {
 
           <h1 className="text-2xl font-bold mb-4">Đang chờ duyệt</h1>
           <p className="text-muted-foreground mb-6">
-            Cảm ơn bạn đã đăng ký bán hàng trên Sàn TMĐT. Đơn đăng ký của bạn đang được chúng tôi xem xét kỹ lưỡng.
+            Cảm ơn bạn đã đăng ký bán hàng trên Sàn TMĐT APECSPACE. Đơn đăng ký của bạn đang được chúng tôi xem xét kỹ lưỡng.
           </p>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">

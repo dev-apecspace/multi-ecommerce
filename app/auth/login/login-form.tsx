@@ -51,7 +51,7 @@ export default function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="bg-card rounded-lg border border-border p-8">
-          <h1 className="text-3xl font-bold text-center mb-2">Sàn TMĐT</h1>
+          <h1 className="text-3xl font-bold text-center mb-2">Sàn TMĐT APECSPACE</h1>
           <p className="text-center text-muted-foreground mb-8">
             {accountType === 'vendor' ? 'Đăng nhập Nhà bán hàng' : 'Đăng nhập'}
           </p>

@@ -52,7 +52,7 @@ export function AdminSidebar() {
   return (
     <aside className="w-64 bg-white dark:bg-slate-950 border-r border-border min-h-screen p-4 sticky top-0 hidden md:flex flex-col">
       <Link href="/" className="text-2xl font-bold text-orange-600 dark:text-orange-500 mb-2 block">
-        Sàn TMĐT
+        Sàn TMĐT APECSPACE
       </Link>
       <div className="text-xs text-muted-foreground mb-6">Admin Dashboard</div>
 

@@ -42,7 +42,7 @@ export default function SellerRegisterPage() {
         <div className="max-w-2xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">Đăng ký bán hàng</h1>
           <p className="text-muted-foreground mb-8">
-            Trở thành người bán trên Sàn TMĐT và kiếm tiền từ cửa hàng của bạn
+            Trở thành người bán trên Sàn TMĐT APECSPACE và kiếm tiền từ cửa hàng của bạn
           </p>
 
           {/* Steps */}

@@ -9,13 +9,13 @@ const geist = Geist({ subsets: ["latin"] })
 const geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Sàn TMĐT - Mua sắm online giá rẻ",
+  title: "Sàn TMĐT APECSPACE - Mua sắm online giá rẻ",
   description:
     "Sàn thương mại điện tử hàng đầu Việt Nam. Mua bán online hàng triệu sản phẩm từ các shop và thương nhân uy tín.",
   keywords: "mua sắm online, thương mại điện tử, shop online, bán hàng online, giá rẻ",
   generator: "v0.app",
   openGraph: {
-    title: "Sàn TMĐT - Mua sắm online giá rẻ",
+    title: "Sàn TMĐT APECSPACE - Mua sắm online giá rẻ",
     description:
       "Sàn thương mại điện tử hàng đầu Việt Nam. Mua bán online hàng triệu sản phẩm từ các shop và thương nhân uy tín.",
     type: "website",

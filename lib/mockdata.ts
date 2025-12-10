@@ -131,9 +131,9 @@ export const shops = [
 ]
 
 export const jobs = [
-  { id: 1, title: "Lập trình viên Full Stack", company: "Sàn TMĐT", location: "Hà Nội", salary: "15-20 triệu", type: "full-time", description: "Tuyển lập trình viên fullstack có kinh nghiệm React, Node.js", requirements: ["3+ năm kinh nghiệm", "Thành thạo React, Node.js", "Có kinh nghiệm làm việc với cơ sở dữ liệu"] },
-  { id: 2, title: "UX/UI Designer", company: "Sàn TMĐT", location: "TP.HCM", salary: "12-18 triệu", type: "full-time", description: "Thiết kế giao diện người dùng cho ứng dụng web/mobile", requirements: ["2+ năm kinh nghiệm", "Thành thạo Figma, Adobe XD", "Hiểu biết về UX/UI"] },
-  { id: 3, title: "Chuyên viên Marketing", company: "Sàn TMĐT", location: "Hà Nội", salary: "10-15 triệu", type: "full-time", description: "Quản lý chiến dịch marketing digital", requirements: ["1+ năm kinh nghiệm", "Kỹ năng digital marketing", "Thành thạo social media"] },
+  { id: 1, title: "Lập trình viên Full Stack", company: "Sàn TMĐT APECSPACE", location: "Hà Nội", salary: "15-20 triệu", type: "full-time", description: "Tuyển lập trình viên fullstack có kinh nghiệm React, Node.js", requirements: ["3+ năm kinh nghiệm", "Thành thạo React, Node.js", "Có kinh nghiệm làm việc với cơ sở dữ liệu"] },
+  { id: 2, title: "UX/UI Designer", company: "Sàn TMĐT APECSPACE", location: "TP.HCM", salary: "12-18 triệu", type: "full-time", description: "Thiết kế giao diện người dùng cho ứng dụng web/mobile", requirements: ["2+ năm kinh nghiệm", "Thành thạo Figma, Adobe XD", "Hiểu biết về UX/UI"] },
+  { id: 3, title: "Chuyên viên Marketing", company: "Sàn TMĐT APECSPACE", location: "Hà Nội", salary: "10-15 triệu", type: "full-time", description: "Quản lý chiến dịch marketing digital", requirements: ["1+ năm kinh nghiệm", "Kỹ năng digital marketing", "Thành thạo social media"] },
 ]
 
 export const adminPendingVendors = [
