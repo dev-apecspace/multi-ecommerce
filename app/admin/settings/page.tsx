@@ -19,7 +19,7 @@ export default function AdminSettingsPage() {
           <CardContent className="space-y-4">
             <div>
               <Label>Tên cửa hàng</Label>
-              <Input defaultValue="Sàn TMĐT" />
+              <Input defaultValue="Sàn TMĐT APECSPACE" />
             </div>
             <div>
               <Label>Email hỗ trợ</Label>

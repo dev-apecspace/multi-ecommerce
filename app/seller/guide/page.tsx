@@ -9,7 +9,7 @@ export default function SellerGuidePage() {
     <main className="container-viewport py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Hướng dẫn bán hàng</h1>
-        <p className="text-muted-foreground">Tất cả những gì bạn cần biết để bán thành công trên Sàn TMĐT</p>
+        <p className="text-muted-foreground">Tất cả những gì bạn cần biết để bán thành công trên Sàn TMĐT APECSPACE</p>
       </div>
 
       <Tabs defaultValue="getting-started">

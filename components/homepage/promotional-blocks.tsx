@@ -46,7 +46,7 @@ const blocks = [
   },
   {
     id: 6,
-    title: "Giftcard Sàn TMĐT",
+    title: "Giftcard Sàn TMĐT APECSPACE",
     subtitle: "Tặng người thân",
     image: "/gift-card-assortment.png",
     link: "/giftcards",

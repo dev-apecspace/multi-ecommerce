@@ -1,21 +1,21 @@
 import { Card } from "@/components/ui/card"
 
 export const metadata = {
-  title: "Giới thiệu - Sàn TMĐT",
-  description: "Thông tin về Sàn TMĐT - sàn thương mại điện tử hàng đầu Việt Nam",
+  title: "Giới thiệu - Sàn TMĐT APECSPACE",
+  description: "Thông tin về Sàn TMĐT APECSPACE - sàn thương mại điện tử hàng đầu Việt Nam",
 }
 
 export default function AboutPage() {
   return (
     <main className="container-viewport py-12">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Giới thiệu Sàn TMĐT</h1>
+        <h1 className="text-4xl font-bold mb-8">Giới thiệu Sàn TMĐT APECSPACE</h1>
 
         <Card className="p-8 space-y-6">
           <section>
             <h2 className="text-2xl font-bold mb-4">Về chúng tôi</h2>
             <p className="text-foreground/80 leading-relaxed">
-              Sàn TMĐT là nền tảng thương mại điện tử hàng đầu Việt Nam, nơi kết nối hàng triệu người mua và người bán.
+              Sàn TMĐT APECSPACE là nền tảng thương mại điện tử hàng đầu Việt Nam, nơi kết nối hàng triệu người mua và người bán.
               Chúng tôi cam kết đảm bảo chất lượng sản phẩm, an toàn giao dịch và dịch vụ khách hàng tốt nhất.
             </p>
           </section>
@@ -31,7 +31,7 @@ export default function AboutPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">Lịch sử</h2>
             <p className="text-foreground/80 leading-relaxed">
-              Được thành lập năm 2025, Sàn TMĐT đã phát triển thành một trong những sàn giao dịch điện tử uy tín nhất
+              Được thành lập năm 2025, Sàn TMĐT APECSPACE đã phát triển thành một trong những sàn giao dịch điện tử uy tín nhất
               tại Việt Nam với hơn 1 triệu sản phẩm từ hàng ngàn người bán.
             </p>
           </section>

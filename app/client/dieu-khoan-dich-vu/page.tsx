@@ -1,8 +1,8 @@
 import { Card } from "@/components/ui/card"
 
 export const metadata = {
-  title: "Điều khoản dịch vụ - Sàn TMĐT",
-  description: "Điều khoản dịch vụ của Sàn TMĐT",
+  title: "Điều khoản dịch vụ - Sàn TMĐT APECSPACE",
+  description: "Điều khoản dịch vụ của Sàn TMĐT APECSPACE",
 }
 
 export default function TermsOfServicePage() {
@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">1. Chấp nhận điều khoản</h2>
             <p className="text-foreground/80 leading-relaxed">
-              Bằng cách truy cập và sử dụng Sàn TMĐT, bạn chấp nhận tuân thủ các điều khoản này. Nếu bạn không đồng ý
+              Bằng cách truy cập và sử dụng Sàn TMĐT APECSPACE, bạn chấp nhận tuân thủ các điều khoản này. Nếu bạn không đồng ý
               với bất kỳ phần nào, bạn không được phép sử dụng trang web.
             </p>
           </section>
@@ -42,7 +42,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">4. Sản phẩm và dịch vụ</h2>
             <p className="text-foreground/80 leading-relaxed">
-              Sàn TMĐT cung cấp nền tảng để người bán và người mua giao dịch. Chúng tôi không bán sản phẩm trực tiếp.
+              Sàn TMĐT APECSPACE cung cấp nền tảng để người bán và người mua giao dịch. Chúng tôi không bán sản phẩm trực tiếp.
               Chúng tôi không đảm bảo chất lượng, độ chính xác hoặc tính hợp pháp của bất kỳ sản phẩm nào.
             </p>
           </section>
@@ -50,7 +50,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-bold mb-4">5. Giới hạn trách nhiệm</h2>
             <p className="text-foreground/80 leading-relaxed">
-              Sàn TMĐT không chịu trách nhiệm cho bất kỳ tổn thất hoặc thiệt hại nào phát sinh từ việc sử dụng trang
+              Sàn TMĐT APECSPACE không chịu trách nhiệm cho bất kỳ tổn thất hoặc thiệt hại nào phát sinh từ việc sử dụng trang
               web, bao gồm các tổn thất gián tiếp hoặc không dự đoán được.
             </p>
           </section>

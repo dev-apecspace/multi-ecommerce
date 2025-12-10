@@ -15,7 +15,7 @@ export default function CareerPage() {
     <main className="bg-gradient-to-b from-white to-gray-50 dark:from-slate-950 dark:to-slate-900">
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white py-16">
         <div className="container-viewport">
-          <h1 className="text-4xl font-bold mb-4">Cơ hội nghề nghiệp tại Sàn TMĐT</h1>
+          <h1 className="text-4xl font-bold mb-4">Cơ hội nghề nghiệp tại Sàn TMĐT APECSPACE</h1>
           <p className="text-lg opacity-90">Gia nhập đội ngũ của chúng tôi và hình dung tương lai thương mại điện tử</p>
         </div>
       </div>

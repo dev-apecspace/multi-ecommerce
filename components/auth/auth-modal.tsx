@@ -64,7 +64,7 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Sàn TMĐT</DialogTitle>
+          <DialogTitle>Sàn TMĐT APECSPACE</DialogTitle>
           <DialogClose />
         </DialogHeader>
 
@@ -156,7 +156,7 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
                 {error}
               </div>
             )}
-            <p className="text-sm text-muted-foreground mb-4">Tạo tài khoản Sàn TMĐT của bạn</p>
+            <p className="text-sm text-muted-foreground mb-4">Tạo tài khoản Sàn TMĐT APECSPACE của bạn</p>
             <div className="space-y-3">
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />

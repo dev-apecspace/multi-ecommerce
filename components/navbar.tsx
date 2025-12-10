@@ -80,7 +80,7 @@ export function Navbar() {
         {/* Top Banner */}
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs py-2">
           <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
-            <span>🎁 Chào mừng đến Sàn TMĐT - Mua sắm online giá rẻ</span>
+            <span>🎁 Chào mừng đến Sàn TMĐT APECSPACE - Mua sắm online giá rẻ</span>
             <div className="hidden md:flex items-center gap-4">
               <Link href="/seller" className="hover:underline">
                 Bán hàng cùng chúng tôi
@@ -100,7 +100,7 @@ export function Navbar() {
           <div className="flex items-center justify-between gap-4">
             {/* Logo */}
             <Link href="/client" className="flex-shrink-0">
-              <div className="text-2xl font-bold text-orange-600 dark:text-orange-500">Sàn TMĐT</div>
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-500">Sàn TMĐT APECSPACE</div>
             </Link>
 
             {/* Search Bar - 50% width on desktop */}

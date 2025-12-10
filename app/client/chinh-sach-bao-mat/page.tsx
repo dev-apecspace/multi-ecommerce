@@ -1,8 +1,8 @@
 import { Card } from "@/components/ui/card"
 
 export const metadata = {
-  title: "Chính sách bảo mật - Sàn TMĐT",
-  description: "Chính sách bảo mật thông tin cá nhân trên Sàn TMĐT",
+  title: "Chính sách bảo mật - Sàn TMĐT APECSPACE",
+  description: "Chính sách bảo mật thông tin cá nhân trên Sàn TMĐT APECSPACE",
 }
 
 export default function PrivacyPage() {

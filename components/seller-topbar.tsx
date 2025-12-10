@@ -23,7 +23,7 @@ export function SellerTopBar() {
     <div className="h-16 bg-white dark:bg-slate-950 border-b border-border flex items-center justify-between px-6 sticky top-0 z-40">
       <div className="flex items-center gap-3">
         <Link href="/seller" className="text-xl font-bold text-orange-600 dark:text-orange-500">
-          Sàn TMĐT
+          Sàn TMĐT APECSPACE
         </Link>
         <div className="text-sm text-muted-foreground">| {user?.name || "Shop Name"}</div>
       </div>

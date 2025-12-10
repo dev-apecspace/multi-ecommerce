@@ -9,7 +9,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-8">
           {/* About */}
           <div>
-            <h3 className="font-bold text-lg mb-4">Về Sàn TMĐT</h3>
+            <h3 className="font-bold text-lg mb-4">Về Sàn TMĐT APECSPACE</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
                 <Link href="/client/gioi-thieu" className="hover:text-white transition">
@@ -111,7 +111,7 @@ export function Footer() {
         {/* Bottom Footer */}
         <div className="border-t border-gray-700 pt-8">
           <div className="text-center text-sm text-gray-400 space-y-2">
-            <p>© 2025 Sàn TMĐT. Tất cả các quyền được bảo lưu.</p>
+            <p>© 2025 Sàn TMĐT APECSPACE. Tất cả các quyền được bảo lưu.</p>
             <p>Giấy phép ĐKKD số 0123456789 do Sở KH&ĐT cấp</p>
           </div>
         </div>
