@@ -24,13 +24,14 @@ export async function GET(request: NextRequest) {
         Product!inner(
           id,
           name,
+          slug,
           price,
           originalPrice,
           stock,
           vendorId,
           Vendor!inner(id, name)
         ),
-        ProductVariant(id, name, sku, barcode, image)
+        ProductVariant(id, name, sku, barcode, image, price, originalPrice)
       `)
       .eq('userId', parseInt(userId))
 
@@ -38,7 +39,78 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ data })
+    // Fetch active/upcoming campaigns
+    const now = new Date().toISOString()
+    const { data: campaigns } = await supabase
+      .from('Campaign')
+      .select('*')
+      .in('status', ['active', 'upcoming'])
+      .gte('endDate', now)
+
+    let campaignMap: Map<string, any[]> = new Map()
+    if (campaigns && campaigns.length > 0 && data && data.length > 0) {
+      const { data: campaignProducts } = await supabase
+        .from('CampaignProduct')
+        .select('*')
+        .eq('status', 'approved')
+        .in(
+          'campaignId',
+          campaigns.map((c) => c.id)
+        )
+        .in(
+          'productId',
+          Array.from(new Set(data.map((item: any) => item.Product.id)))
+        )
+
+      campaignProducts?.forEach((cp) => {
+        const key = `${cp.productId}-${cp.variantId || 'null'}`
+        if (!campaignMap.has(key)) {
+          campaignMap.set(key, [])
+        }
+        const campaign = campaigns.find((c) => c.id === cp.campaignId)
+        if (campaign) {
+          campaignMap.get(key)!.push(campaign)
+        }
+      })
+    }
+
+    const computeDiscountPrice = (base: number, campaign: any | undefined) => {
+      if (!campaign) return base
+      if (campaign.type === 'percentage') return Math.max(0, base - (base * campaign.discountValue) / 100)
+      if (campaign.type === 'fixed') return Math.max(0, base - campaign.discountValue)
+      return base
+    }
+
+    const responseData = (data || []).map((item: any) => {
+      const product = item.Product
+      const variant = item.ProductVariant
+      const baseUnit = variant?.price ?? product.price
+      const originalUnit = variant?.originalPrice ?? product.originalPrice ?? baseUnit
+      const key = `${product.id}-${variant?.id || 'null'}`
+      const campaignsForItem = campaignMap.get(key) || []
+      // pick best campaign (max discount)
+      let applied = null
+      let bestPrice = baseUnit
+      campaignsForItem.forEach((c) => {
+        const price = computeDiscountPrice(baseUnit, c)
+        if (price < bestPrice) {
+          bestPrice = price
+          applied = c
+        }
+      })
+      const saleUnit = applied ? bestPrice : null
+      const finalUnit = saleUnit ?? baseUnit
+      return {
+        ...item,
+        price: baseUnit,
+        originalPrice: originalUnit,
+        salePrice: saleUnit,
+        finalPrice: finalUnit * item.quantity,
+        appliedCampaign: applied,
+      }
+    })
+
+    return NextResponse.json({ data: responseData })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

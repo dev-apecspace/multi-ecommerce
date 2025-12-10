@@ -43,6 +43,7 @@ interface Order {
   shippingCost: number
   date: string
   paymentMethod: string
+  paymentStatus?: string
   shippingAddress: string
   estimatedDelivery: string
   User: { id: number; name: string; email: string; phone: string }
@@ -108,6 +109,39 @@ export default function SellerOrdersPage() {
     ? allOrders 
     : allOrders.filter(o => o.status === activeTab)
 
+  const handleConfirmPayment = async () => {
+    if (!selectedOrder || !vendorId) return
+
+    setUpdating(true)
+    try {
+      const response = await fetch(`/api/orders/${selectedOrder.id}/confirm-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast({ title: 'Thành công', description: 'Đã xác nhận thanh toán' })
+        
+        // Refresh orders list
+        await fetchOrders()
+        
+        // Update selected order with paymentStatus = 'paid'
+        setSelectedOrder(prev => prev ? {
+          ...prev,
+          paymentStatus: 'paid'
+        } : null)
+      } else {
+        const error = await response.json()
+        toast({ title: 'Lỗi', description: error.error || 'Không thể xác nhận thanh toán', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Lỗi', description: 'Không thể xác nhận thanh toán', variant: 'destructive' })
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   const handleApproveOrder = async () => {
     if (!selectedOrder || !vendorId) return
 
@@ -129,7 +163,8 @@ export default function SellerOrdersPage() {
         setSelectedOrder(null)
         await fetchOrders()
       } else {
-        toast({ title: 'Lỗi', description: 'Không thể duyệt đơn hàng', variant: 'destructive' })
+        const error = await response.json()
+        toast({ title: 'Lỗi', description: error.error || 'Không thể duyệt đơn hàng', variant: 'destructive' })
       }
     } catch (error) {
       toast({ title: 'Lỗi', description: 'Không thể duyệt đơn hàng', variant: 'destructive' })
@@ -419,22 +454,73 @@ export default function SellerOrdersPage() {
                 </div>
               </div>
 
+              {/* Payment Info */}
+              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                <p className="text-sm font-semibold mb-2">Thông tin thanh toán</p>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Phương thức:</span>{' '}
+                    {selectedOrder.paymentMethod === 'cod' ? 'Thanh toán khi nhận hàng (COD)' :
+                     selectedOrder.paymentMethod === 'bank' ? 'Chuyển khoản ngân hàng' :
+                     selectedOrder.paymentMethod === 'wallet' ? 'Ví điện tử' :
+                     selectedOrder.paymentMethod}
+                  </p>
+                  {selectedOrder.paymentStatus && (
+                    <p>
+                      <span className="text-muted-foreground">Trạng thái thanh toán:</span>{' '}
+                      <span className={`font-medium ${
+                        selectedOrder.paymentStatus === 'paid' ? 'text-green-600' :
+                        selectedOrder.paymentStatus === 'pending' ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' :
+                         selectedOrder.paymentStatus === 'pending' ? 'Chờ thanh toán' :
+                         selectedOrder.paymentStatus}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {/* Shipping Address */}
               <div>
                 <p className="text-sm font-semibold mb-2">Địa chỉ giao hàng</p>
                 <p className="text-sm text-muted-foreground">{formatShippingAddress(selectedOrder.shippingAddress)}</p>
               </div>
 
+              {/* Payment Confirmation for Bank Transfer */}
+              {selectedOrder.paymentMethod === 'bank' && selectedOrder.paymentStatus === 'pending' && (
+                <div className="border-t pt-4">
+                  <div className="bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg mb-3">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Lưu ý:</strong> Đơn hàng này thanh toán bằng chuyển khoản. Vui lòng xác nhận thanh toán trước khi duyệt đơn.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleConfirmPayment}
+                    disabled={updating}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {updating ? 'Đang xử lý...' : '✓ Xác nhận thanh toán'}
+                  </Button>
+                </div>
+              )}
+
               {/* Status Update Actions */}
               {selectedOrder.status === 'pending' && (
                 <div className="border-t pt-4 space-y-2">
                   <Button 
                     onClick={handleApproveOrder}
-                    disabled={updating}
+                    disabled={updating || (selectedOrder.paymentMethod === 'bank' && selectedOrder.paymentStatus !== 'paid')}
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
                     {updating ? 'Đang xử lý...' : '✓ Duyệt đơn'}
                   </Button>
+                  {selectedOrder.paymentMethod === 'bank' && selectedOrder.paymentStatus !== 'paid' && (
+                    <p className="text-xs text-yellow-600 text-center">
+                      Vui lòng xác nhận thanh toán trước khi duyệt đơn
+                    </p>
+                  )}
                   <Button 
                     onClick={handleRejectOrder}
                     disabled={updating}

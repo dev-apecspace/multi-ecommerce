@@ -36,6 +36,58 @@ export async function GET(request: NextRequest) {
     if (data && data.length > 0) {
       enrichedData = await Promise.all(
         data.map(async (vendor: any) => {
+          // Get UserProfile for avatar
+          let avatar = vendor.vendorLogo || null
+          if (vendor.userId) {
+            const { data: userProfile } = await supabase
+              .from('UserProfile')
+              .select('avatar, vendorLogo')
+              .eq('userId', vendor.userId)
+              .maybeSingle()
+            
+            if (userProfile) {
+              avatar = userProfile.vendorLogo || userProfile.avatar || vendor.vendorLogo || null
+            }
+          }
+
+          // Get product IDs for this vendor
+          const { data: vendorProducts } = await supabase
+            .from('Product')
+            .select('id')
+            .eq('vendorId', vendor.id)
+          
+          // Calculate rating from reviews (via products)
+          let calculatedRating = vendor.rating || 0
+          let reviewsCount = 0
+          
+          if (vendorProducts && vendorProducts.length > 0) {
+            const productIds = vendorProducts.map((p: any) => p.id)
+            const { data: reviews } = await supabase
+              .from('Review')
+              .select('rating')
+              .in('productId', productIds)
+            
+            if (reviews && reviews.length > 0) {
+              const totalRating = reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0)
+              reviewsCount = reviews.length
+              calculatedRating = totalRating / reviewsCount
+            }
+          }
+
+          // Get followers count (check if VendorFollow table exists, otherwise use vendor.followers)
+          let followersCount = vendor.followers || 0
+          try {
+            const { count } = await supabase
+              .from('VendorFollow')
+              .select('*', { count: 'exact', head: true })
+              .eq('vendorId', vendor.id)
+            if (count !== null) {
+              followersCount = count
+            }
+          } catch (e) {
+            // VendorFollow table might not exist, use vendor.followers
+          }
+
           const { data: shopData } = await supabase
             .from('Shop')
             .select('*')
@@ -56,6 +108,11 @@ export async function GET(request: NextRequest) {
           
           return {
             ...vendor,
+            logo: avatar,
+            avatar: avatar,
+            rating: calculatedRating,
+            reviews_count: reviewsCount,
+            followers_count: followersCount || vendor.followers || 0,
             Shop: {
               ...shop,
               ShopDetail: shopDetail,

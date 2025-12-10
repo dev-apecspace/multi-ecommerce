@@ -44,6 +44,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         const prod = result.data?.[0]
         console.log('Product data:', prod)
         if (prod) {
+          // Compute display pricing from variants (prefer salePrice if available)
+          const variantPrices = (prod.ProductVariant || []).map((v: any) => ({
+            sale: v.salePrice ?? v.price,
+            base: v.originalPrice ?? v.price,
+          }))
+          const minVariantSale = variantPrices.length ? Math.min(...variantPrices.map((p) => p.sale)) : null
+          const minVariantBase = variantPrices.length ? Math.min(...variantPrices.map((p) => p.base)) : null
+
           const productData = {
             ...prod,
             images: prod.media?.map((img: any) => img.url) || [prod.image || "/placeholder.svg"],
@@ -56,14 +64,23 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               name: prod.Vendor?.name || "Shop",
               vendorId: prod.vendorId,
               vendorSlug: prod.Vendor?.slug || '',
-              rating: 4.9,
-              followers: 125000,
-              verified: true,
-              verified_badge: "Xác thực",
+              avatar: prod.Vendor?.logo || prod.Vendor?.avatar || null,
+              rating: prod.Vendor?.rating || 0,
+              followers: prod.Vendor?.followers_count || prod.Vendor?.followers || 0,
+              verified: prod.Vendor?.status === 'approved',
+              verified_badge: prod.Vendor?.status === 'approved' ? "Xác thực" : "Chưa xác thực",
               responseTime: "Trả lời trong 1 giờ",
             },
-            variants: prod.ProductVariant || []
+            variants: prod.ProductVariant || [],
           }
+          // Set product-level price/salePrice: always prefer min variant sale if available
+          const basePrice = prod.originalPrice ?? minVariantBase ?? prod.price
+          const salePriceFromVariants = minVariantSale !== null ? minVariantSale : null
+
+          productData.originalPrice = basePrice ?? prod.price
+          productData.salePrice = prod.salePrice ?? salePriceFromVariants ?? null
+          productData.price = productData.salePrice ?? basePrice ?? prod.price
+
           console.log('Setting product with variants:', productData.variants)
           setProduct(productData)
           if (prod.id) {
@@ -247,13 +264,18 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     )
   }
 
-  const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const effectivePrice = product.salePrice ?? product.price
+  const effectiveOriginal = product.originalPrice || product.price
+  const discount =
+    effectiveOriginal && effectiveOriginal > effectivePrice
+      ? Math.round(((effectiveOriginal - effectivePrice) / effectiveOriginal) * 100)
+      : 0
 
   const displayProduct = {
     id: product.id,
     name: product.name || "Sản phẩm",
-    price: product.price || 0,
-    originalPrice: product.originalPrice || product.price,
+    price: effectivePrice || 0,
+    originalPrice: effectiveOriginal || effectivePrice,
     rating: product.rating || 4.8,
     reviews: product.reviews || 0,
     sold: product.sold || 0,
@@ -365,12 +387,16 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-4">
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl font-bold text-primary">{displayProduct.price.toLocaleString("vi-VN")}₫</span>
-                    <span className="text-lg text-muted-foreground line-through">
-                      {displayProduct.originalPrice.toLocaleString("vi-VN")}₫
-                    </span>
-                    <span className="text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">
-                      -{discount}%
-                    </span>
+                    {displayProduct.originalPrice > displayProduct.price && (
+                      <>
+                        <span className="text-lg text-muted-foreground line-through">
+                          {displayProduct.originalPrice.toLocaleString("vi-VN")}₫
+                        </span>
+                        <span className="text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">
+                          -{discount}%
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -460,9 +486,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               <CardContent className="p-0 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center text-2xl font-bold">
-                      {displayProduct.seller.name.charAt(0)}
-                    </div>
+                    {displayProduct.seller.avatar ? (
+                      <img 
+                        src={displayProduct.seller.avatar} 
+                        alt={displayProduct.seller.name}
+                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center text-2xl font-bold">
+                        {displayProduct.seller.name.charAt(0)}
+                      </div>
+                    )}
                     <div>
                       <p className="font-bold flex items-center gap-2">
                         {displayProduct.seller.name}
@@ -558,9 +592,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             productId={product.id}
             productName={product.name}
             productImage={product.image || "/placeholder.svg"}
-            price={product.price}
-            originalPrice={product.originalPrice}
-            variants={product.variants || []}
+            price={effectivePrice}
+            originalPrice={product.originalPrice || product.price}
+            salePrice={product.salePrice}
+            variants={(product.variants || []).map((v: any) => ({
+              ...v,
+              salePrice: v.salePrice ?? v.price,
+            }))}
             attributes={product.ProductAttribute || []}
             onConfirm={handleVariantConfirm}
             isLoading={isAddingToCart}

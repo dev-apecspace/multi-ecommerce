@@ -16,6 +16,7 @@ import {
   ChevronDown,
   FileText,
   Lock,
+  Tag,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 const sellerLinks = [
   { href: "/seller", label: "Tổng quan", icon: LayoutGrid, restricted: false },
+  { href: "/seller/promotions", label: "Chương trình khuyến mãi", icon: Tag, restricted: true },
   {
     href: "/seller/products",
     label: "Sản phẩm của tôi",
@@ -39,10 +41,9 @@ const sellerLinks = [
   { href: "/seller/wallet", label: "Ví tiền & Doanh thu", icon: Wallet, restricted: true },
   { href: "/seller/withdraw", label: "Yêu cầu rút tiền", icon: Download, restricted: true },
   { href: "/seller/documents", label: "Tài liệu shop", icon: FileText, restricted: false },
-  { href: "/seller/profile", label: "Hồ sơ shop", icon: User, restricted: false },
+  { href: "/seller/settings", label: "Hồ sơ & Cài đặt shop", icon: Settings, restricted: false },
   { href: "/seller/chat", label: "Chat với khách", icon: MessageSquare, restricted: true },
   { href: "/seller/reviews", label: "Đánh giá shop", icon: Star, restricted: true },
-  { href: "/seller/settings", label: "Cài đặt shop", icon: Settings, restricted: false },
 ]
 
 export function SellerSidebar() {

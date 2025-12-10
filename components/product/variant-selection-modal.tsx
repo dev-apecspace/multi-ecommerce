@@ -23,6 +23,7 @@ interface Variant {
   name: string
   description?: string
   price: number
+  salePrice?: number | null
   originalPrice?: number
   image?: string
   stock: number
@@ -46,6 +47,7 @@ interface VariantSelectionModalProps {
   productName: string
   productImage: string
   price: number
+  salePrice?: number | null
   originalPrice?: number
   variants: Variant[]
   attributes?: ProductAttribute[]
@@ -60,6 +62,7 @@ export function VariantSelectionModal({
   productName,
   productImage,
   price,
+  salePrice,
   originalPrice,
   variants,
   attributes = [],
@@ -144,14 +147,14 @@ export function VariantSelectionModal({
   }
 
   const selectedVariantData = variants.find((v) => v.id === selectedVariant)
-  const discount = selectedVariantData?.originalPrice
-    ? Math.round(((selectedVariantData.originalPrice - selectedVariantData.price) / selectedVariantData.originalPrice) * 100)
-    : originalPrice
-    ? Math.round(((originalPrice - price) / originalPrice) * 100)
-    : 0
-  
-  const displayPrice = selectedVariantData?.price ?? price
-  const displayOriginalPrice = selectedVariantData?.originalPrice ?? originalPrice
+  const variantPrice = selectedVariantData?.salePrice ?? selectedVariantData?.price
+  const basePrice = salePrice ?? price
+  const displayPrice = variantPrice ?? basePrice
+  const displayOriginalPrice = selectedVariantData?.originalPrice ?? originalPrice ?? basePrice
+  const discount =
+    displayOriginalPrice && displayOriginalPrice > displayPrice
+      ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)
+      : 0
   const displayImage = selectedVariantData?.image || productImage
 
   const content = (

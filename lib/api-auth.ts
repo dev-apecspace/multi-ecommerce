@@ -35,6 +35,10 @@ export function isVendor(auth: AuthPayload | null): boolean {
   return auth?.role === 'vendor' && !!auth.vendorId
 }
 
+export function isAdmin(auth: AuthPayload | null): boolean {
+  return auth?.role === 'admin'
+}
+
 export function unauthorizedResponse() {
   return NextResponse.json(
     { error: 'Unauthorized' },

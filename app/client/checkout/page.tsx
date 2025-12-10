@@ -63,6 +63,12 @@ export default function CheckoutPage() {
     paymentMethod: "cod",
   })
   const [isEditingManually, setIsEditingManually] = useState(false)
+  const [vendorBankingInfo, setVendorBankingInfo] = useState<Record<number, {
+    vendorName: string
+    bankAccount: string | null
+    bankName: string | null
+    bankBranch: string | null
+  }>>({})
 
   useEffect(() => {
     if (user?.id) {
@@ -142,6 +148,44 @@ export default function CheckoutPage() {
       }))
     }
   }, [user])
+
+  // Fetch banking info for all vendors when cartItems change
+  useEffect(() => {
+    const fetchBankingInfo = async () => {
+      const uniqueVendorIds = [...new Set(cartItems.map(item => item.vendorId))]
+      const bankingInfo: Record<number, {
+        vendorName: string
+        bankAccount: string | null
+        bankName: string | null
+        bankBranch: string | null
+      }> = {}
+
+      await Promise.all(
+        uniqueVendorIds.map(async (vendorId) => {
+          try {
+            const response = await fetch(`/api/vendors/${vendorId}/banking`)
+            if (response.ok) {
+              const data = await response.json()
+              bankingInfo[vendorId] = {
+                vendorName: data.vendorName,
+                bankAccount: data.bankAccount,
+                bankName: data.bankName,
+                bankBranch: data.bankBranch,
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to fetch banking info for vendor ${vendorId}:`, error)
+          }
+        })
+      )
+
+      setVendorBankingInfo(bankingInfo)
+    }
+
+    if (cartItems.length > 0) {
+      fetchBankingInfo()
+    }
+  }, [cartItems])
 
   const handleSelectAddress = (address: Address) => {
     setSelectedAddressId(address.id)
@@ -389,6 +433,60 @@ export default function CheckoutPage() {
                           <div className="text-sm text-muted-foreground">Chuyển khoản trước khi giao hàng</div>
                         </Label>
                       </div>
+                      {formData.paymentMethod === "bank" && (
+                        <div className="mt-4 space-y-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <p className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                            Thông tin chuyển khoản:
+                          </p>
+                          {Object.entries(
+                            cartItems.reduce((acc, item) => {
+                              if (!acc[item.vendorId]) {
+                                acc[item.vendorId] = { vendorName: item.vendorName, items: [] }
+                              }
+                              acc[item.vendorId].items.push(item)
+                              return acc
+                            }, {} as Record<number, { vendorName: string; items: CheckoutItem[] }>)
+                          ).map(([vendorId, { vendorName }]) => {
+                            const banking = vendorBankingInfo[Number(vendorId)]
+                            if (!banking || !banking.bankAccount || !banking.bankName) {
+                              return (
+                                <div key={vendorId} className="p-3 bg-yellow-50 dark:bg-yellow-950 rounded border border-yellow-200 dark:border-yellow-800">
+                                  <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                                    {vendorName}
+                                  </p>
+                                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                    Chưa có thông tin ngân hàng. Vui lòng liên hệ shop để được hướng dẫn thanh toán.
+                                  </p>
+                                </div>
+                              )
+                            }
+                            return (
+                              <div key={vendorId} className="p-3 bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700">
+                                <p className="text-sm font-bold text-orange-600 mb-2">{vendorName}</p>
+                                <div className="space-y-1 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Ngân hàng:</span>
+                                    <span className="font-medium">{banking.bankName}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Số tài khoản:</span>
+                                    <span className="font-medium font-mono">{banking.bankAccount}</span>
+                                  </div>
+                                  {banking.bankBranch && (
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Chi nhánh:</span>
+                                      <span className="font-medium">{banking.bankBranch}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                            Vui lòng chuyển khoản đúng số tiền và ghi chú mã đơn hàng sau khi đặt hàng.
+                          </p>
+                        </div>
+                      )}
                       <div className="flex items-center space-x-2 p-3 border rounded-lg">
                         <RadioGroupItem value="wallet" id="wallet" />
                         <Label htmlFor="wallet" className="flex-1 cursor-pointer">
@@ -425,6 +523,27 @@ export default function CheckoutPage() {
                             ? "Chuyển khoản ngân hàng"
                             : "Ví điện tử"}
                       </p>
+                      {formData.paymentMethod === "bank" && (
+                        <div className="mt-3 space-y-2">
+                          {Object.entries(
+                            cartItems.reduce((acc, item) => {
+                              if (!acc[item.vendorId]) {
+                                acc[item.vendorId] = { vendorName: item.vendorName, items: [] }
+                              }
+                              acc[item.vendorId].items.push(item)
+                              return acc
+                            }, {} as Record<number, { vendorName: string; items: CheckoutItem[] }>)
+                          ).map(([vendorId, { vendorName }]) => {
+                            const banking = vendorBankingInfo[Number(vendorId)]
+                            if (!banking || !banking.bankAccount || !banking.bankName) return null
+                            return (
+                              <div key={vendorId} className="p-2 bg-blue-50 dark:bg-blue-950 rounded text-xs">
+                                <p className="font-medium">{vendorName}: {banking.bankName} - {banking.bankAccount}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
