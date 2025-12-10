@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
+      path: '/',
     })
 
     response.cookies.set('auth_token', JSON.stringify(userData), {
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
+      path: '/',
     })
 
     return response
