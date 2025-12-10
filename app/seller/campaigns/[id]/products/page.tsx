@@ -312,7 +312,9 @@ export default function CampaignProductsPage() {
   }
 
   const selectedProduct = products.find((p) => p.id === parseInt(formData.productId))
-  const selectedVariants = selectedProduct?.ProductVariant || []
+  const selectedVariants = editingProductId 
+    ? selectedProduct?.ProductVariant.filter(v => formData.variantIds.includes(v.id.toString())) || []
+    : selectedProduct?.ProductVariant || []
 
   if (loading) return <div className="p-6 text-center">Đang tải...</div>
 

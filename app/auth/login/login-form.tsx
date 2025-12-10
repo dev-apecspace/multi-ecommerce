@@ -18,6 +18,7 @@ export default function LoginForm() {
   const [localError, setLocalError] = useState('')
 
   const accountType = searchParams.get('type') || 'customer'
+  const callback = searchParams.get('callback')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,12 +31,15 @@ export default function LoginForm() {
 
     try {
       const userData = await login(email, password)
-      if (userData.role === 'admin') {
-        router.push('/admin')
+      
+      if (callback) {
+        router.replace(callback)
+      } else if (userData.role === 'admin') {
+        router.replace('/admin')
       } else if (userData.role === 'vendor') {
-        router.push('/seller')
+        router.replace('/seller')
       } else {
-        router.push('/client')
+        router.replace('/client')
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Đăng nhập thất bại'

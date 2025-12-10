@@ -51,13 +51,28 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith('/client')) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
-    }
+  const protectedClientRoutes = [
+    '/client/cart',
+    '/client/checkout',
+    '/client/favorites',
+    '/client/account',
+    '/client/order-history',
+    '/client/orders',
+  ]
 
-    if (user.role !== 'customer' && user.role !== 'admin') {
-      return NextResponse.redirect(new URL('/seller', request.url))
+  if (pathname.startsWith('/client')) {
+    const isProtectedRoute = protectedClientRoutes.some(route =>
+      pathname === route || pathname.startsWith(route + '/')
+    )
+
+    if (isProtectedRoute) {
+      if (!user) {
+        return NextResponse.redirect(new URL('/auth/login', request.url))
+      }
+
+      if (user.role !== 'customer' && user.role !== 'admin') {
+        return NextResponse.redirect(new URL('/seller', request.url))
+      }
     }
   }
 

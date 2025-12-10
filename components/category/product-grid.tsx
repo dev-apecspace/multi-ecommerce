@@ -1,5 +1,6 @@
 "use client"
 import Link from "next/link"
+import { useRouter, usePathname } from "next/navigation"
 import { Star, Heart, HeartPulse as HeartFilled } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,6 +9,7 @@ import { useState, useEffect } from "react"
 import { generateSlug } from "@/lib/utils"
 import { VariantSelectionModal } from "@/components/product/variant-selection-modal"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth-context"
 
 interface ProductGridProps {
   category?: string
@@ -18,6 +20,9 @@ interface ProductGridProps {
 }
 
 export function ProductGrid({ category = "all", subcategory, filters, sortBy = "relevant", onSortChange }: ProductGridProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [favorites, setFavorites] = useState<string[]>([])
   const [products, setProducts] = useState<any[]>([])
@@ -59,6 +64,11 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
   }, [category])
 
   const toggleFavorite = (id: string) => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+    
     setFavorites((prev) => (prev.includes(id) ? prev.filter((fav) => fav !== id) : [...prev, id]))
   }
 
@@ -66,11 +76,12 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     e.preventDefault()
     e.stopPropagation()
     
-    if (!product.ProductVariant || product.ProductVariant.length === 0) {
-      openVariantModal(product)
-    } else {
-      openVariantModal(product)
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
     }
+    
+    openVariantModal(product)
   }
 
   const openVariantModal = (product: any) => {
@@ -79,24 +90,20 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
   }
 
   const handleVariantConfirm = async (variantId: number, quantity: number) => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
     try {
       setIsAddingToCart(true)
-      const userId = localStorage.getItem('userId')
-      
-      if (!userId) {
-        toast({
-          title: 'Lỗi',
-          description: 'Vui lòng đăng nhập để thêm vào giỏ hàng',
-          variant: 'destructive'
-        })
-        return
-      }
+      const userId = user.id
 
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: parseInt(userId),
+          userId: typeof userId === 'string' ? parseInt(userId) : userId,
           productId: selectedProduct.id,
           quantity: quantity,
           variantId: variantId

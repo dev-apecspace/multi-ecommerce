@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useReviews } from "@/hooks/useSupabase"
 import { useToast } from "@/hooks/use-toast"
 import { VariantSelectionModal } from "@/components/product/variant-selection-modal"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 
@@ -20,6 +20,7 @@ interface ProductDetailPageProps {
 
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
   const { user } = useAuth()
   const { addToCart } = useCart()
@@ -102,6 +103,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : []
 
   const handleBuyNow = () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
     if (product?.variants && product.variants.length > 0) {
       setAction('buy')
       setVariantModalOpen(true)
@@ -122,6 +128,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   }
 
   const handleAddToCart = async () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
     console.log('handleAddToCart clicked, product:', product)
     console.log('product.variants:', product?.variants)
     if (product?.variants && product.variants.length > 0) {
@@ -131,17 +142,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     } else {
       console.log('No variants, adding to cart directly')
       setIsAddingToCart(true)
-      
-      if (!user) {
-        console.log('User not logged in')
-        toast({
-          title: 'Lỗi',
-          description: 'Vui lòng đăng nhập trước',
-          variant: 'destructive'
-        })
-        setIsAddingToCart(false)
-        return
-      }
 
       const userId = user.id
       console.log('userId from auth context:', userId)
@@ -191,17 +191,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   }
 
   const handleVariantConfirm = async (variantId: number, qty: number) => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
     try {
       setIsAddingToCart(true)
-
-      if (!user) {
-        toast({
-          title: 'Lỗi',
-          description: 'Vui lòng đăng nhập trước',
-          variant: 'destructive'
-        })
-        return
-      }
 
       const userId = user.id
 
