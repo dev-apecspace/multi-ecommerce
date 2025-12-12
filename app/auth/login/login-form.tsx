@@ -32,15 +32,17 @@ export default function LoginForm() {
     try {
       const userData = await login(email, password)
       
-      if (callback) {
-        router.replace(callback)
-      } else if (userData.role === 'admin') {
-        router.replace('/admin')
+      let redirectUrl = '/client'
+      
+      if (userData.role === 'admin') {
+        redirectUrl = '/admin'
       } else if (userData.role === 'vendor') {
-        router.replace('/seller')
-      } else {
-        router.replace('/client')
+        redirectUrl = '/seller'
+      } else if (callback) {
+        redirectUrl = callback
       }
+      
+      router.replace(redirectUrl)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Đăng nhập thất bại'
       setLocalError(message)

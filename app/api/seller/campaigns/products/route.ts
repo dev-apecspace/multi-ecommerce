@@ -16,17 +16,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Campaign ID and Vendor ID are required' }, { status: 400 })
     }
 
-    // Ensure vendor registration exists (upsert pending)
-    await supabase
-      .from('CampaignVendorRegistration')
-      .upsert({
-        campaignId,
-        vendorId,
-        status: 'pending',
-        registeredAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, { onConflict: 'campaignId,vendorId' })
-
     // Verify campaign exists (but allow viewing products regardless of status)
     const { data: campaign, error: campaignError } = await supabase
       .from('Campaign')
@@ -44,7 +33,7 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        Product(id, name, slug, price, originalPrice),
+        Product(id, name, slug, price, originalPrice, taxApplied, taxRate, taxIncluded),
         ProductVariant(id, name, price, originalPrice)
       `
       )
@@ -95,16 +84,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if vendor is registered for this campaign
-    const { data: registration, error: regError } = await supabase
+    // Auto-create vendor registration if it doesn't exist (when adding first product)
+    const { data: registration } = await supabase
       .from('CampaignVendorRegistration')
       .select('*')
       .eq('campaignId', campaignId)
       .eq('vendorId', vendorId)
       .single()
 
-    if (regError || !registration) {
-      return NextResponse.json({ error: 'Vendor is not registered for this campaign' }, { status: 403 })
+    if (!registration) {
+      // Only allow auto-registration in draft/upcoming states
+      const { error: createRegError } = await supabase
+        .from('CampaignVendorRegistration')
+        .insert([
+          {
+            campaignId,
+            vendorId,
+            status: 'pending',
+            registeredAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ])
+
+      if (createRegError) {
+        return NextResponse.json({ error: 'Failed to auto-register vendor for campaign' }, { status: 400 })
+      }
     }
 
     // Check if product already registered
@@ -118,6 +123,44 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json({ error: 'Product is already registered for this campaign' }, { status: 400 })
+    }
+
+    // Check for overlapping campaigns
+    const { data: otherCampaigns } = await supabase
+      .from('CampaignProduct')
+      .select(`
+        campaignId,
+        Campaign (
+          id,
+          name,
+          startDate,
+          endDate,
+          status
+        )
+      `)
+      .eq('productId', productId)
+      .eq('variantId', variantId || null)
+      .neq('campaignId', campaignId)
+
+    if (otherCampaigns && otherCampaigns.length > 0) {
+      const currentStart = new Date(campaign.startDate).getTime()
+      const currentEnd = new Date(campaign.endDate).getTime()
+
+      const conflictingCampaign = otherCampaigns.find((cp: any) => {
+        if (!cp.Campaign || cp.Campaign.status === 'ended') return false
+        
+        const otherStart = new Date(cp.Campaign.startDate).getTime()
+        const otherEnd = new Date(cp.Campaign.endDate).getTime()
+
+        // Check overlap: (StartA <= EndB) and (EndA >= StartB)
+        return (currentStart <= otherEnd && currentEnd >= otherStart)
+      })
+
+      if (conflictingCampaign) {
+        return NextResponse.json({ 
+          error: `Sản phẩm đã tham gia chương trình "${conflictingCampaign.Campaign.name}" trong thời gian này.` 
+        }, { status: 400 })
+      }
     }
 
     // Verify product exists (ownership is already implied by using seller's own list)

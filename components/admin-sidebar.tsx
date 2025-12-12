@@ -16,27 +16,41 @@ import {
   Image,
   TrendingUp,
   ChevronDown,
+  Percent,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 
-const adminLinks = [
+interface SubItem {
+  href: string
+  label: string
+}
+
+interface AdminLink {
+  href: string
+  label: string
+  icon: any
+  subItems?: SubItem[]
+}
+
+const adminLinks: AdminLink[] = [
   { href: "/admin", label: "Tổng quan sàn", icon: LayoutGrid },
-  { href: "/admin/vendors", label: "Quản lý Vendor", icon: Store },
   { href: "/admin/products", label: "Quản lý sản phẩm", icon: Package },
-  { href: "/admin/orders", label: "Quản lý đơn hàng", icon: ShoppingBag },
   { href: "/admin/categories", label: "Quản lý danh mục", icon: Layers },
-  { href: "/admin/withdraw-requests", label: "Quản lý yêu cầu rút tiền", icon: Download },
+  { href: "/admin/vendors", label: "Quản lý nhà cung cấp", icon: Store },
+  { href: "/admin/orders", label: "Quản lý đơn hàng", icon: ShoppingBag },
   {
     href: "/admin/promotions",
     label: "Quản lý khuyến mãi & Flash Sale",
     icon: Tag,
   },
+  { href: "/admin/vouchers", label: "Quản lý Voucher", icon: Percent },
   { href: "/admin/users", label: "Người dùng khách hàng", icon: Users },
-  { href: "/admin/settings", label: "Cài đặt hệ thống", icon: Settings },
   { href: "/admin/banners", label: "Banner & Quảng cáo", icon: Image },
+  { href: "/admin/withdraw-requests", label: "Quản lý yêu cầu rút tiền", icon: Download },
   { href: "/admin/reports", label: "Báo cáo & Thống kê", icon: TrendingUp },
+  { href: "/admin/settings", label: "Cài đặt hệ thống", icon: Settings },
 ]
 
 export function AdminSidebar() {

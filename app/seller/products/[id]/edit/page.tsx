@@ -58,6 +58,7 @@ interface Product {
   specifications?: string
   shippingInfo?: string
   warranty?: string
+
   status: 'pending' | 'approved' | 'rejected'
   ProductVariant?: ProductVariant[]
 }
@@ -83,6 +84,7 @@ export default function EditProductPage() {
     specifications: "",
     shippingInfo: "",
     warranty: "",
+
   })
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [currentImage, setCurrentImage] = useState<string>("")
@@ -141,6 +143,7 @@ export default function EditProductPage() {
         specifications: product.specifications || "",
         shippingInfo: product.shippingInfo || "",
         warranty: product.warranty || "",
+
       })
       
       const images: ProductImage[] = []
@@ -229,13 +232,20 @@ export default function EditProductPage() {
 
     try {
       setSubmitting(true)
+      const filteredVariants = variants.filter(v => !v.deleted || v.id)
+      const stockToSend = filteredVariants.length > 0 ? 0 : formData.stock
+      
       const response = await fetch(`/api/seller/products/${productId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           ...formData,
-          variants: variants.filter(v => !v.deleted || v.id),
+          stock: stockToSend,
+          variants: filteredVariants,
+          taxApplied: false,
+          taxIncluded: true,
+          taxRate: 0,
           images: productImages.map(img => ({
             id: img.id,
             image: img.image || img.url,
@@ -383,20 +393,35 @@ export default function EditProductPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Kho hàng</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Label>Số lượng</Label>
-              <Input 
-                type="number" 
-                placeholder="0"
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-              />
-            </CardContent>
-          </Card>
+
+
+          {variants.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Kho hàng</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Label>Số lượng</Label>
+                <Input 
+                  type="number" 
+                  placeholder="0"
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                />
+              </CardContent>
+            </Card>
+          )}
+          {variants.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Kho hàng</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">Tổng số lượng: <span className="font-semibold">{variants.reduce((sum, v) => sum + parseInt(String(v.stock) || '0'), 0)}</span></p>
+                <p className="text-xs text-gray-500 mt-2">Quản lý số lượng theo từng phân bản ở phía dưới</p>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

@@ -25,3 +25,13 @@ export function generateSlug(text: string): string {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
 }
+
+export function calculateTotalStock(product: any): number {
+  if (!product) return 0
+  
+  if (product.ProductVariant && product.ProductVariant.length > 0) {
+    return product.ProductVariant.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0)
+  }
+  
+  return product.stock || 0
+}

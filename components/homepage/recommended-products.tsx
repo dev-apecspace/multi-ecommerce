@@ -99,9 +99,24 @@ export function RecommendedProducts() {
 
                   <p className="text-xs text-muted-foreground">Đã bán {(product.sold / 1000).toFixed(1)}k</p>
 
-                  <p className="font-bold text-sm md:text-base text-primary">
-                    {formatPrice(product.price)}
-                  </p>
+                  {(() => {
+                    const taxAmount = (product.taxApplied && product.taxRate && !product.taxIncluded)
+                      ? Math.round(product.price * (product.taxRate / 100))
+                      : 0
+                    const finalPrice = product.price + taxAmount
+                    return (
+                      <>
+                        <p className="font-bold text-sm md:text-base text-primary">
+                          {finalPrice.toLocaleString("vi-VN")}₫
+                        </p>
+                        {product.taxApplied && product.taxRate && !product.taxIncluded && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            (chưa bao gồm thuế {product.taxRate}%)
+                          </p>
+                        )}
+                      </>
+                    )
+                  })()}
 
                   <div className="flex gap-2 pt-1">
                     <Button 

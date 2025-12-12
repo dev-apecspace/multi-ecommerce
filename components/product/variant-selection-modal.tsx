@@ -53,6 +53,9 @@ interface VariantSelectionModalProps {
   attributes?: ProductAttribute[]
   onConfirm: (variantId: number, quantity: number) => Promise<void>
   isLoading?: boolean
+  taxApplied?: boolean
+  taxRate?: number
+  taxIncluded?: boolean
 }
 
 export function VariantSelectionModal({
@@ -68,6 +71,9 @@ export function VariantSelectionModal({
   attributes = [],
   onConfirm,
   isLoading = false,
+  taxApplied = false,
+  taxRate = 0,
+  taxIncluded = true,
 }: VariantSelectionModalProps) {
   const { toast } = useToast()
   const [selectedVariant, setSelectedVariant] = useState<number | null>(null)
@@ -147,14 +153,20 @@ export function VariantSelectionModal({
   }
 
   const selectedVariantData = variants.find((v) => v.id === selectedVariant)
-  const variantPrice = selectedVariantData?.salePrice ?? selectedVariantData?.price
-  const basePrice = salePrice ?? price
-  const displayPrice = variantPrice ?? basePrice
-  const displayOriginalPrice = selectedVariantData?.originalPrice ?? originalPrice ?? basePrice
-  const discount =
-    displayOriginalPrice && displayOriginalPrice > displayPrice
-      ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)
-      : 0
+  const variantOriginalPrice = selectedVariantData?.originalPrice ?? originalPrice ?? price
+  const variantSalePrice = selectedVariantData?.salePrice ?? salePrice
+  const baseOriginalPrice = originalPrice ?? price
+  const baseSalePrice = salePrice
+  
+  const displayOriginalPrice = variantOriginalPrice ?? baseOriginalPrice
+  const discountAmount = variantSalePrice ?? baseSalePrice ? (displayOriginalPrice - (variantSalePrice ?? baseSalePrice)) : 0
+  const displayPrice = variantSalePrice ?? (displayOriginalPrice - discountAmount)
+
+  const discount = displayOriginalPrice && discountAmount > 0
+    ? Math.round((discountAmount / displayOriginalPrice) * 100)
+    : 0
+
+   
   const displayImage = selectedVariantData?.image || productImage
 
   const content = (
@@ -175,7 +187,7 @@ export function VariantSelectionModal({
             <span className="font-bold text-primary">
               {displayPrice.toLocaleString("vi-VN")}₫
             </span>
-            {displayOriginalPrice && (
+            {displayOriginalPrice > displayPrice && (
               <span className="text-xs text-muted-foreground line-through">
                 {displayOriginalPrice.toLocaleString("vi-VN")}₫
               </span>
@@ -186,6 +198,11 @@ export function VariantSelectionModal({
               </span>
             )}
           </div>
+          {taxApplied && taxRate > 0 && taxIncluded && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">
+              (Đã bao gồm thuế {taxRate}%)
+            </p>
+          )}
         </div>
       </div>
 

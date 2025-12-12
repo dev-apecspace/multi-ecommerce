@@ -145,7 +145,12 @@ export default function SellerCampaignsPage() {
     router.push(`/seller/campaigns/${campaignId}/products`)
   }
 
-  const handleViewProducts = async (campaignId: number) => {
+  const handleViewProducts = async (campaignId: number, force?: boolean) => {
+    if (!force && selectedCampaignForProducts === campaignId) {
+      setSelectedCampaignForProducts(null)
+      return
+    }
+
     if (!vendorId) return
 
     try {
@@ -180,7 +185,7 @@ export default function SellerCampaignsPage() {
       })
 
       if (selectedCampaignForProducts) {
-        handleViewProducts(selectedCampaignForProducts)
+        handleViewProducts(selectedCampaignForProducts, true)
       }
     } catch (error) {
       toast({
@@ -343,8 +348,8 @@ export default function SellerCampaignsPage() {
                         variant="outline"
                         className="flex-1"
                       >
-                        Quản lý sản phẩm
-                        <ChevronRight className="h-4 w-4 ml-2" />
+                        {selectedCampaignForProducts === campaign.id ? 'Ẩn sản phẩm' : 'Quản lý sản phẩm'}
+                        <ChevronRight className={`h-4 w-4 ml-2 transition-transform ${selectedCampaignForProducts === campaign.id ? 'rotate-90' : ''}`} />
                       </Button>
                       <Link
                         href={`/seller/campaigns/${campaign.id}/products`}
@@ -356,76 +361,74 @@ export default function SellerCampaignsPage() {
                         </Button>
                       </Link>
                     </div>
+
+                    {selectedCampaignForProducts === campaign.id && (
+                      <div className="mt-6 border-t pt-4">
+                        <h3 className="font-semibold mb-4">Sản phẩm trong chương trình</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border">
+                                <th className="text-left py-3 px-4">Sản phẩm</th>
+                                <th className="text-left py-3 px-4">Số lượng đăng ký</th>
+                                <th className="text-left py-3 px-4">Đã bán</th>
+                                <th className="text-left py-3 px-4">Trạng thái</th>
+                                <th className="text-left py-3 px-4">Hành động</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(campaignProducts.get(campaign.id) || []).length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                                    Chưa có sản phẩm nào trong chương trình này
+                                  </td>
+                                </tr>
+                              ) : (
+                                (campaignProducts.get(campaign.id) || []).map((product) => (
+                                  <tr key={product.id} className="border-b border-border hover:bg-muted">
+                                    <td className="py-3 px-4 font-medium">{product.Product.name}</td>
+                                    <td className="py-3 px-4">{product.quantity}</td>
+                                    <td className="py-3 px-4">{product.purchasedQuantity}</td>
+                                    <td className="py-3 px-4">
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        product.status === 'approved'
+                                          ? 'bg-green-100 text-green-800'
+                                          : product.status === 'pending'
+                                          ? 'bg-yellow-100 text-yellow-800'
+                                          : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {product.status === 'approved'
+                                          ? 'Đã duyệt'
+                                          : product.status === 'pending'
+                                          ? 'Chờ duyệt'
+                                          : 'Bị từ chối'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-red-600 hover:text-red-700"
+                                        onClick={() => handleRemoveProduct(product.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))
             )}
           </div>
 
-          {selectedCampaignForProducts && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Sản phẩm trong chương trình</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4">Sản phẩm</th>
-                        <th className="text-left py-3 px-4">Số lượng đăng ký</th>
-                        <th className="text-left py-3 px-4">Đã bán</th>
-                        <th className="text-left py-3 px-4">Trạng thái</th>
-                        <th className="text-left py-3 px-4">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(campaignProducts.get(selectedCampaignForProducts) || []).length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                            Chưa có sản phẩm nào trong chương trình này
-                          </td>
-                        </tr>
-                      ) : (
-                        (campaignProducts.get(selectedCampaignForProducts) || []).map((product) => (
-                          <tr key={product.id} className="border-b border-border hover:bg-muted">
-                            <td className="py-3 px-4 font-medium">{product.Product.name}</td>
-                            <td className="py-3 px-4">{product.quantity}</td>
-                            <td className="py-3 px-4">{product.purchasedQuantity}</td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                product.status === 'approved'
-                                  ? 'bg-green-100 text-green-800'
-                                  : product.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {product.status === 'approved'
-                                  ? 'Đã duyệt'
-                                  : product.status === 'pending'
-                                  ? 'Chờ duyệt'
-                                  : 'Bị từ chối'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleRemoveProduct(product.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+
         </TabsContent>
       </Tabs>
     </main>

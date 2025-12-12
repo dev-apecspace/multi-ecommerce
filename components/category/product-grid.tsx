@@ -264,12 +264,31 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
                     <p className="text-xs text-muted-foreground">Đã bán {(product.sold / 1000).toFixed(1)}k</p>
 
                     <div className="space-y-1">
-                      <p className="font-bold text-sm md:text-base text-primary">
-                        {product.price.toLocaleString("vi-VN")}₫
-                      </p>
-                      <p className="text-xs text-muted-foreground line-through">
-                        {product.originalPrice.toLocaleString("vi-VN")}₫
-                      </p>
+                      <div>
+                        {(() => {
+                          const taxAmount = (product.taxApplied && product.taxRate && !product.taxIncluded)
+                            ? Math.round(product.price * (product.taxRate / 100))
+                            : 0
+                          const finalPrice = product.price + taxAmount
+                          return (
+                            <>
+                              <p className="font-bold text-sm md:text-base text-primary">
+                                {finalPrice.toLocaleString("vi-VN")}₫
+                              </p>
+                              {product.taxApplied && product.taxRate && !product.taxIncluded && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                  (chưa bao gồm thuế {product.taxRate}%)
+                                </p>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </div>
+                      {product.originalPrice && (
+                        <p className="text-xs text-muted-foreground line-through">
+                          {product.originalPrice.toLocaleString("vi-VN")}₫
+                        </p>
+                      )}
                     </div>
 
                     <Button

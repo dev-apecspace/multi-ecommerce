@@ -199,12 +199,14 @@ export async function GET(request: NextRequest) {
           product.ProductVariant = product.ProductVariant.map((variant: any) => {
             const variantCampaigns = campaignProductMap.get(`${product.id}-${variant.id}`) || []
             const basePrice = variant.price ?? product.price
+            const originalPrice = variant.originalPrice ?? product.originalPrice ?? basePrice
             const best = pickBestCampaign(basePrice, variantCampaigns.length ? variantCampaigns : productCampaigns)
             return {
               ...variant,
               campaigns: variantCampaigns,
               appliedCampaign: best?.campaign || null,
               salePrice: best ? best.salePrice : null,
+              originalPrice: originalPrice,
             }
           })
         }

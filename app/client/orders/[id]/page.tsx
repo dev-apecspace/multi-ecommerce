@@ -11,14 +11,6 @@ import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 
-interface VendorOrder {
-  id: number
-  orderNumber: string
-  status: string
-  total: number
-  Vendor: { id: number; name: string }
-}
-
 interface OrderItem {
   id: number
   quantity: number
@@ -26,7 +18,7 @@ interface OrderItem {
   vendorId: number
   variantId: number | null
   Product: { id: number; name: string }
-  ProductVariant?: { id: number; name: string } | null
+  ProductVariant?: { id: number; name: string; image?: string } | null
 }
 
 interface Order {
@@ -37,7 +29,7 @@ interface Order {
   date: string
   paymentMethod: string
   shippingAddress: string
-  VendorOrder: VendorOrder[]
+  Vendor: { id: number; name: string }
   OrderItem: OrderItem[]
 }
 
@@ -167,28 +159,15 @@ export default function OrderDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Vendor Orders */}
-          {order.VendorOrder && order.VendorOrder.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Đơn hàng theo cửa hàng</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {order.VendorOrder.map((vendorOrder) => (
-                  <div key={vendorOrder.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">{vendorOrder.Vendor.name}</h3>
-                      <Badge className={statusConfig[vendorOrder.status]?.color || statusConfig.pending.color}>
-                        {statusConfig[vendorOrder.status]?.label || vendorOrder.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">Mã: {vendorOrder.orderNumber}</p>
-                    <p className="text-sm font-semibold">Tổng tiền: {vendorOrder.total.toLocaleString('vi-VN')}₫</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+          {/* Vendor Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Nhà bán hàng</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-semibold">{order.Vendor?.name || 'Đang tải...'}</p>
+            </CardContent>
+          </Card>
 
           {/* Order Items */}
           <Card>
@@ -197,25 +176,36 @@ export default function OrderDetailPage({ params }: PageProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.OrderItem.map((item) => (
-                  <div key={item.id} className="flex gap-4 border-b pb-4 last:border-b-0">
-                    <div className="flex-1">
-                      <div className="flex justify-between gap-4">
-                        <div>
-                          <p className="font-medium">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-sm text-muted-foreground">Số lượng: {item.quantity}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{item.price.toLocaleString('vi-VN')}₫ × {item.quantity}</p>
-                          <p className="text-sm font-bold text-orange-600">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                {order.OrderItem.map((item) => {
+                  const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                  return (
+                    <div key={item.id} className="flex gap-4 border-b pb-4 last:border-b-0">
+                      <div className="relative w-20 h-20 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                        <Image
+                          src={displayImage}
+                          alt={item.Product.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between gap-4">
+                          <div>
+                            <p className="font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Số lượng: {item.quantity}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{item.price.toLocaleString('vi-VN')}₫ × {item.quantity}</p>
+                            <p className="text-sm font-bold text-orange-600">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>

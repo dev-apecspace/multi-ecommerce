@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
           originalPrice,
           stock,
           vendorId,
+          taxApplied,
+          taxRate,
           Vendor!inner(id, name)
         ),
         ProductVariant(id, name, sku, barcode, image, price, originalPrice)
@@ -106,6 +108,8 @@ export async function GET(request: NextRequest) {
         originalPrice: originalUnit,
         salePrice: saleUnit,
         finalPrice: finalUnit * item.quantity,
+        taxApplied: product.taxApplied || false,
+        taxRate: product.taxRate || 0,
         appliedCampaign: applied,
       }
     })

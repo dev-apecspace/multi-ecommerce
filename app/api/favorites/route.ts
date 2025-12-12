@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('Favorite')
-      .select('*, Product(id, name, price, image, rating, Vendor(name))')
+      .select('*, Product(id, name, price, rating, Vendor(name))')
       .eq('userId', userId)
       .order('createdAt', { ascending: false })
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('Favorite')
       .insert([body])
-      .select('*, Product(id, name, price, image)')
+      .select('*, Product(id, name, price)')
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Check, MapPin } from "lucide-react"
+import { Check, MapPin, Tag, X } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,13 +14,19 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 import { CheckoutAddressDialog } from "@/components/client/checkout-address-dialog"
+import { computePrice } from "@/lib/price-utils"
 
 interface CheckoutItem {
   id: number
   productId: number
   productName: string
   quantity: number
-  price: number
+  price: number // Sale price if campaign applied, otherwise base price
+  basePrice?: number
+  originalPrice?: number
+  salePrice?: number | null
+  taxApplied?: boolean
+  taxRate?: number
   image: string
   variantId: number | null
   vendorId: number
@@ -69,6 +75,17 @@ export default function CheckoutPage() {
     bankName: string | null
     bankBranch: string | null
   }>>({})
+  const [vendorVouchers, setVendorVouchers] = useState<Record<number, {
+    voucherId: number
+    code: string
+    discountAmount: number
+    discountType: 'percentage' | 'fixed'
+    discountValue: number
+  }>>({})
+  const [voucherInputs, setVoucherInputs] = useState<Record<number, string>>({})
+  const [voucherLoading, setVoucherLoading] = useState<Record<number, boolean>>({})
+  const [publicVouchers, setPublicVouchers] = useState<Record<number, any[]>>({})
+  const [showVoucherList, setShowVoucherList] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     if (user?.id) {
@@ -205,11 +222,153 @@ export default function CheckoutPage() {
     setDialogOpen(open)
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const getVendorSubtotal = (vendorId: number) => {
+    return cartItems
+      .filter(item => item.vendorId === vendorId)
+      .reduce((sum, item) => {
+        const priced = computePrice({
+          basePrice: item.basePrice ?? item.price,
+          originalPrice: item.originalPrice,
+          salePrice: item.salePrice,
+          taxApplied: item.taxApplied,
+          taxRate: item.taxRate,
+        })
+        return sum + (priced.priceWithTax * item.quantity)
+      }, 0)
+  }
+
+  const subtotal = cartItems.reduce((sum, item) => {
+    const priced = computePrice({
+      basePrice: item.basePrice ?? item.price,
+      originalPrice: item.originalPrice,
+      salePrice: item.salePrice,
+      taxApplied: item.taxApplied,
+      taxRate: item.taxRate,
+    })
+    return sum + (priced.priceWithTax * item.quantity)
+  }, 0)
   const shippingCostPerVendor = formData.shippingMethod === "express" ? 30000 : 10000
   const uniqueVendors = new Set(cartItems.map(item => item.vendorId)).size
   const totalShippingCost = shippingCostPerVendor * uniqueVendors
-  const total = subtotal + totalShippingCost
+  
+  const totalVoucherDiscount = Object.values(vendorVouchers).reduce((sum, v) => sum + v.discountAmount, 0)
+  const total = subtotal + totalShippingCost - totalVoucherDiscount
+
+  const handleApplyVoucher = async (vendorId: number) => {
+    const code = voucherInputs[vendorId]?.trim()
+    if (!code) {
+      toast({ title: 'Lỗi', description: 'Vui lòng nhập mã voucher', variant: 'destructive' })
+      return
+    }
+
+    try {
+      setVoucherLoading(prev => ({ ...prev, [vendorId]: true }))
+      const vendorSubtotal = getVendorSubtotal(vendorId)
+
+      const response = await fetch('/api/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          vendorId,
+          orderValue: vendorSubtotal,
+          userId: userId || user?.id,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Mã voucher không hợp lệ')
+      }
+
+      const data = await response.json()
+      setVendorVouchers(prev => ({
+        ...prev,
+        [vendorId]: {
+          voucherId: data.voucherId,
+          code: data.code,
+          discountAmount: data.discountAmount,
+          discountType: data.discountType,
+          discountValue: data.discountValue,
+        },
+      }))
+      toast({ title: 'Thành công', description: `Áp dụng voucher: -${data.discountAmount.toLocaleString('vi-VN')}₫` })
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: error instanceof Error ? error.message : 'Không thể áp dụng voucher',
+        variant: 'destructive',
+      })
+    } finally {
+      setVoucherLoading(prev => ({ ...prev, [vendorId]: false }))
+    }
+  }
+
+  const handleRemoveVoucher = (vendorId: number) => {
+    setVendorVouchers(prev => {
+      const newVouchers = { ...prev }
+      delete newVouchers[vendorId]
+      return newVouchers
+    })
+    setVoucherInputs(prev => ({ ...prev, [vendorId]: '' }))
+  }
+
+  const fetchPublicVouchers = async (vendorId: number) => {
+    try {
+      const response = await fetch(`/api/vouchers/public?vendorId=${vendorId}`)
+      if (!response.ok) throw new Error('Failed to fetch vouchers')
+      const { data } = await response.json()
+      setPublicVouchers(prev => ({ ...prev, [vendorId]: data || [] }))
+    } catch (error) {
+      console.error('Failed to fetch public vouchers:', error)
+    }
+  }
+
+  const handleSelectVoucher = async (vendorId: number, voucher: any) => {
+    try {
+      setVoucherLoading(prev => ({ ...prev, [vendorId]: true }))
+      const vendorSubtotal = getVendorSubtotal(vendorId)
+
+      const response = await fetch('/api/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: voucher.code,
+          vendorId,
+          orderValue: vendorSubtotal,
+          userId: userId || user?.id,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Mã voucher không hợp lệ')
+      }
+
+      const data = await response.json()
+      setVendorVouchers(prev => ({
+        ...prev,
+        [vendorId]: {
+          voucherId: data.voucherId,
+          code: data.code,
+          discountAmount: data.discountAmount,
+          discountType: data.discountType,
+          discountValue: data.discountValue,
+        },
+      }))
+      setShowVoucherList(prev => ({ ...prev, [vendorId]: false }))
+      setVoucherInputs(prev => ({ ...prev, [vendorId]: '' }))
+      toast({ title: 'Thành công', description: `Áp dụng voucher: -${data.discountAmount.toLocaleString('vi-VN')}₫` })
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: error instanceof Error ? error.message : 'Không thể áp dụng voucher',
+        variant: 'destructive',
+      })
+    } finally {
+      setVoucherLoading(prev => ({ ...prev, [vendorId]: false }))
+    }
+  }
 
   const handleSubmit = async () => {
     if (step === "shipping") {
@@ -241,8 +400,12 @@ export default function CheckoutPage() {
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
+              basePrice: item.basePrice,
+              taxApplied: item.taxApplied,
+              taxRate: item.taxRate,
               vendorId: item.vendorId,
-              variantId: item.variantId
+              variantId: item.variantId,
+              voucherId: vendorVouchers[item.vendorId]?.voucherId || null
             })),
             shippingAddress: {
               fullName: formData.fullName,
@@ -254,7 +417,13 @@ export default function CheckoutPage() {
             },
             paymentMethod: formData.paymentMethod,
             shippingMethod: formData.shippingMethod,
-            estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+            estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            vendorVouchers: Object.fromEntries(
+              Object.entries(vendorVouchers).map(([vendorId, voucher]) => [
+                vendorId,
+                { voucherId: voucher.voucherId, discountAmount: voucher.discountAmount }
+              ])
+            )
           })
         })
 
@@ -324,8 +493,7 @@ export default function CheckoutPage() {
       <div className="container-viewport py-6">
         <h1 className="text-3xl font-bold mb-8">Thanh toán</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
             <div className="flex gap-4 mb-8">
               {["shipping", "payment", "review"].map((s, idx) => (
                 <div
@@ -413,8 +581,10 @@ export default function CheckoutPage() {
                 )}
 
                 {step === "payment" && (
-                  <div className="space-y-4">
-                    <p className="font-semibold">Chọn phương thức thanh toán</p>
+                  <div className="space-y-6">
+                    <div>
+                      <p className="font-semibold mb-4">Chọn phương thức thanh toán</p>
+                    </div>
                     <RadioGroup
                       value={formData.paymentMethod}
                       onValueChange={(val) => setFormData({ ...formData, paymentMethod: val })}
@@ -514,6 +684,20 @@ export default function CheckoutPage() {
                         {formData.street}, {formData.ward}, {formData.district}, {formData.city}
                       </p>
                     </div>
+
+                    {Object.keys(vendorVouchers).length > 0 && (
+                      <div className="border-b border-border pb-3">
+                        <p className="font-semibold mb-2">Voucher đã áp dụng</p>
+                        <div className="space-y-2">
+                          {Object.entries(vendorVouchers).map(([vendorId, voucher]) => (
+                            <div key={vendorId} className="flex justify-between text-sm p-2 bg-green-50 dark:bg-green-950 rounded">
+                              <span className="text-green-800 dark:text-green-200 font-medium">{voucher.code}</span>
+                              <span className="text-green-700 dark:text-green-300">-{voucher.discountAmount.toLocaleString('vi-VN')}₫</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="border-b border-border pb-3">
                       <p className="font-semibold mb-2">Phương thức thanh toán</p>
                       <p className="text-sm">
@@ -547,6 +731,176 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {Object.entries(
+                    cartItems.reduce((acc, item) => {
+                      if (!acc[item.vendorId]) {
+                        acc[item.vendorId] = { vendorName: item.vendorName, items: [] }
+                      }
+                      acc[item.vendorId].items.push(item)
+                      return acc
+                    }, {} as Record<number, { vendorName: string; items: CheckoutItem[] }>)
+                  ).map(([vendorId, { vendorName, items: vendorItems }]) => {
+                    const vendorIdNum = Number(vendorId)
+                    const hasVoucher = vendorVouchers[vendorIdNum]
+                    return (
+                      <div key={vendorId} className="pb-4 border-b border-border last:border-b-0 last:pb-0">
+                        <p className="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-950 px-2 py-1 rounded mb-3 inline-block">
+                          {vendorName}
+                        </p>
+                        <div className="space-y-3 mb-4">
+                          {vendorItems.map((item) => (
+                            <div key={item.id} className="flex gap-3">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={item.image || "/placeholder.svg"}
+                                  alt={item.productName}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 flex justify-between text-sm">
+                                <div>
+                                  <p className="font-medium line-clamp-2">{item.productName}</p>
+                                  <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                                </div>
+                                {(() => {
+                                  const priced = computePrice({
+                                    basePrice: item.basePrice ?? item.price,
+                                    originalPrice: item.originalPrice,
+                                    salePrice: item.salePrice,
+                                    taxApplied: item.taxApplied,
+                                    taxRate: item.taxRate,
+                                  })
+                                  return <p className="font-medium text-right">{(priced.priceWithTax * item.quantity).toLocaleString("vi-VN")}₫</p>
+                                })()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {step === "payment" && (
+                          <div className="pt-3 border-t border-border space-y-2">
+                            <p className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
+                              <Tag className="h-3 w-3" /> Voucher
+                            </p>
+                            {hasVoucher ? (
+                              <div className="flex gap-2 items-start">
+                                <div className="flex-1 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded p-2">
+                                  <p className="text-xs font-bold text-green-700 dark:text-green-300">{hasVoucher.code}</p>
+                                  <p className="text-xs text-green-600 dark:text-green-400">-{hasVoucher.discountAmount.toLocaleString('vi-VN')}₫</p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveVoucher(vendorIdNum)}
+                                  className="h-8 w-8 p-0 flex-shrink-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-2">
+                                <div className="flex gap-2 items-end">
+                                  <Input
+                                    placeholder="Nhập mã"
+                                    value={voucherInputs[vendorIdNum] || ''}
+                                    onChange={(e) => setVoucherInputs(prev => ({ ...prev, [vendorIdNum]: e.target.value }))}
+                                    onKeyPress={(e) => {
+                                      if (e.key === 'Enter') handleApplyVoucher(vendorIdNum)
+                                    }}
+                                    className="text-xs h-8"
+                                    disabled={voucherLoading[vendorIdNum]}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleApplyVoucher(vendorIdNum)}
+                                    disabled={voucherLoading[vendorIdNum] || !voucherInputs[vendorIdNum]?.trim()}
+                                    className="h-8 text-xs"
+                                  >
+                                    {voucherLoading[vendorIdNum] ? 'Đang...' : 'Dùng'}
+                                  </Button>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (showVoucherList[vendorIdNum]) {
+                                      setShowVoucherList(prev => ({ ...prev, [vendorIdNum]: false }))
+                                    } else {
+                                      fetchPublicVouchers(vendorIdNum)
+                                      setShowVoucherList(prev => ({ ...prev, [vendorIdNum]: true }))
+                                    }
+                                  }}
+                                  className="w-full h-8 text-xs"
+                                >
+                                  {showVoucherList[vendorIdNum] ? '▼ Ẩn danh sách' : '▶ Xem danh sách shop'}
+                                </Button>
+                                {showVoucherList[vendorIdNum] && (
+                                  <div className="border rounded bg-white dark:bg-slate-700 max-h-40 overflow-y-auto">
+                                    {publicVouchers[vendorIdNum]?.length > 0 ? (
+                                      <div className="divide-y">
+                                        {publicVouchers[vendorIdNum].map(v => (
+                                          <button
+                                            key={v.id}
+                                            onClick={() => handleSelectVoucher(vendorIdNum, v)}
+                                            disabled={voucherLoading[vendorIdNum]}
+                                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 text-xs"
+                                          >
+                                            <p className="font-semibold text-blue-600 dark:text-blue-400">{v.code}</p>
+                                            <p className="text-gray-600 dark:text-gray-300 text-xs">
+                                              Giảm {v.discountValue}{v.discountType === 'percentage' ? '%' : '₫'}
+                                            </p>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="p-3 text-center text-xs text-gray-500">Không có voucher</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {step === "review" && hasVoucher && (
+                          <div className="pt-3 border-t border-border">
+                            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded p-2">
+                              <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
+                                <Tag className="h-3 w-3" /> Voucher
+                              </p>
+                              <p className="text-xs font-bold text-green-700 dark:text-green-300">{hasVoucher.code}</p>
+                              <p className="text-xs text-green-600 dark:text-green-400">-{hasVoucher.discountAmount.toLocaleString('vi-VN')}₫</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="space-y-2 text-sm border-t border-border pt-4">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tạm tính</span>
+                    <span>{subtotal.toLocaleString("vi-VN")}₫</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Vận chuyển ({uniqueVendors} shop)</span>
+                    <span>{totalShippingCost.toLocaleString("vi-VN")}₫</span>
+                  </div>
+                  {totalVoucherDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 dark:text-green-400">
+                      <span className="text-muted-foreground">Giảm giá voucher</span>
+                      <span>-{totalVoucherDiscount.toLocaleString("vi-VN")}₫</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-base border-t border-border pt-3">
+                    <span>Tổng cộng</span>
+                    <span className="text-primary">{total.toLocaleString("vi-VN")}₫</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -560,71 +914,6 @@ export default function CheckoutPage() {
                 {loading ? "Đang xử lý..." : step === "review" ? "Đặt hàng" : "Tiếp tục"}
               </Button>
             </div>
-          </div>
-
-          {/* Order Summary */}
-          <div>
-            <Card className="sticky top-20">
-              <CardHeader>
-                <CardTitle className="text-lg">Tóm tắt đơn hàng</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {Object.entries(
-                    cartItems.reduce((acc, item) => {
-                      if (!acc[item.vendorId]) {
-                        acc[item.vendorId] = { vendorName: item.vendorName, items: [] }
-                      }
-                      acc[item.vendorId].items.push(item)
-                      return acc
-                    }, {} as Record<number, { vendorName: string; items: CheckoutItem[] }>)
-                  ).map(([vendorId, { vendorName, items: vendorItems }]) => (
-                    <div key={vendorId} className="pb-4 border-b border-border last:border-b-0 last:pb-0">
-                      <p className="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-950 px-2 py-1 rounded mb-3 inline-block">
-                        {vendorName}
-                      </p>
-                      <div className="space-y-3">
-                        {vendorItems.map((item) => (
-                          <div key={item.id} className="flex gap-3">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={item.image || "/placeholder.svg"}
-                                alt={item.productName}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <div className="flex-1 flex justify-between text-sm">
-                              <div>
-                                <p className="font-medium line-clamp-2">{item.productName}</p>
-                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                              </div>
-                              <p className="font-medium text-right">{(item.price * item.quantity).toLocaleString("vi-VN")}₫</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-2 text-sm border-t border-border pt-4">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tạm tính</span>
-                    <span>{subtotal.toLocaleString("vi-VN")}₫</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Vận chuyển ({uniqueVendors} shop)</span>
-                    <span>{totalShippingCost.toLocaleString("vi-VN")}₫</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-base border-t border-border pt-3">
-                    <span>Tổng cộng</span>
-                    <span className="text-primary">{total.toLocaleString("vi-VN")}₫</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
 
         <CheckoutAddressDialog
