@@ -47,6 +47,8 @@ interface Product {
   warranty?: string
   shippingInfo?: string
   specifications?: string
+  taxApplied?: boolean
+  taxRate?: number
   createdAt: string
   updatedAt: string
   Category?: { name: string; slug: string }
@@ -365,6 +367,14 @@ export default function ProductDetailPage() {
                   {discount > 0 && (
                     <p className="text-sm text-red-600 font-semibold">Giảm {discount}%</p>
                   )}
+                </div>
+              )}
+              {product.taxApplied && product.taxRate && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Tỷ lệ thuế</p>
+                  <p className="text-sm font-semibold">{product.taxRate}%</p>
+                  <p className="text-sm text-muted-foreground mt-2">Giá sau thuế</p>
+                  <p className="text-lg font-bold text-green-600">{formatPrice(product.price * (1 + product.taxRate / 100))}</p>
                 </div>
               )}
             </CardContent>

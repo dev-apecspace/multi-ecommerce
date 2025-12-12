@@ -68,6 +68,9 @@ export async function PATCH(
     if (body.specifications !== undefined) updateData.specifications = body.specifications
     if (body.shippingInfo !== undefined) updateData.shippingInfo = body.shippingInfo
     if (body.warranty !== undefined) updateData.warranty = body.warranty
+    if (body.taxApplied !== undefined) updateData.taxApplied = body.taxApplied
+    if (body.taxIncluded !== undefined) updateData.taxIncluded = body.taxIncluded
+    if (body.taxRate !== undefined) updateData.taxRate = body.taxRate ? parseFloat(body.taxRate) : 0
 
     if (body.images && Array.isArray(body.images)) {
       const mediaArray = body.images
@@ -132,6 +135,13 @@ export async function PATCH(
               .insert([newVariant])
           }
         }
+      }
+
+      if (variantsToUpsert.length > 0) {
+        await supabase
+          .from('Product')
+          .update({ stock: 0 })
+          .eq('id', productId)
       }
     }
 

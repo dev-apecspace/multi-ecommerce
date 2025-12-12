@@ -13,6 +13,7 @@ import { VariantSelectionModal } from "@/components/product/variant-selection-mo
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
+import { computePrice } from "@/lib/price-utils"
 
 interface ProductDetailPageProps {
   params: Promise<{ slug: string }>
@@ -41,17 +42,22 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       try {
         const response = await fetch(`/api/products?slug=${encodeURIComponent(productSlug)}&limit=1&offset=0`)
         const result = await response.json()
-        console.log('Fetched product result:', result)
         const prod = result.data?.[0]
-        console.log('Product data:', prod)
         if (prod) {
-          // Compute display pricing from variants (prefer salePrice if available)
-          const variantPrices = (prod.ProductVariant || []).map((v: any) => ({
-            sale: v.salePrice ?? v.price,
-            base: v.originalPrice ?? v.price,
+          const variantPrices: Array<{ campaignPrice: number | null; basePrice: number; originalPrice: number | undefined }> = (prod.ProductVariant || []).map((v: any) => ({
+            campaignPrice: v.salePrice ?? null,
+            basePrice: v.price ?? prod.price,
+            originalPrice: v.originalPrice ?? prod.originalPrice,
           }))
-          const minVariantSale = variantPrices.length ? Math.min(...variantPrices.map((p) => p.sale)) : null
-          const minVariantBase = variantPrices.length ? Math.min(...variantPrices.map((p) => p.base)) : null
+
+          const campaignPrices = variantPrices.filter((p) => p.campaignPrice !== null).map((p) => p.campaignPrice!)
+          const minVariantCampaignPrice = campaignPrices.length ? Math.min(...campaignPrices) : null
+
+          const basePrices = variantPrices.map((p) => p.basePrice).filter((p) => typeof p === 'number' && p > 0)
+          const minVariantBasePrice = basePrices.length ? Math.min(...basePrices) : null
+
+          const originalPrices = variantPrices.map((p) => p.originalPrice).filter((p): p is number => typeof p === 'number' && p > 0)
+          const minVariantOriginalPrice = originalPrices.length ? Math.min(...originalPrices) : null
 
           const productData = {
             ...prod,
@@ -74,15 +80,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             },
             variants: prod.ProductVariant || [],
           }
-          // Set product-level price/salePrice: always prefer min variant sale if available
-          const basePrice = prod.originalPrice ?? minVariantBase ?? prod.price
-          const salePriceFromVariants = minVariantSale !== null ? minVariantSale : null
 
-          productData.originalPrice = basePrice ?? prod.price
-          productData.salePrice = prod.salePrice ?? salePriceFromVariants ?? null
-          productData.price = productData.salePrice ?? basePrice ?? prod.price
+          const campaignPrice = minVariantCampaignPrice !== null ? minVariantCampaignPrice : prod.salePrice
+          const basePrice = minVariantBasePrice ?? prod.price
+          const originalPrice = minVariantOriginalPrice ?? prod.originalPrice
 
-          console.log('Setting product with variants:', productData.variants)
+          productData.salePrice = campaignPrice ?? null
+          productData.campaignPrice = campaignPrice ?? null
+          productData.price = basePrice ?? originalPrice
+          productData.originalPrice = originalPrice ?? basePrice
+          productData.taxApplied = prod.taxApplied || false
+          productData.taxIncluded = prod.taxIncluded !== false
+          productData.taxRate = prod.taxRate || 0
+
           setProduct(productData)
           if (prod.id) {
             fetchReviews()
@@ -117,7 +127,12 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         productId: product.id,
         productName: product.name,
         quantity: quantity,
-        price: product.price,
+        price: product.campaignPrice ?? product.price,
+        basePrice: product.price,
+        originalPrice: product.originalPrice,
+        salePrice: product.salePrice,
+        taxApplied: product.taxApplied,
+        taxRate: product.taxRate,
         image: product.image,
         vendorId: product.vendorId,
         vendorName: product.seller.name
@@ -133,19 +148,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       return
     }
 
-    console.log('handleAddToCart clicked, product:', product)
-    console.log('product.variants:', product?.variants)
     if (product?.variants && product.variants.length > 0) {
-      console.log('Has variants, opening modal')
       setAction('cart')
       setVariantModalOpen(true)
     } else {
-      console.log('No variants, adding to cart directly')
       setIsAddingToCart(true)
 
       const userId = user.id
-      console.log('userId from auth context:', userId)
-      
+
       try {
         const payload = {
           userId: typeof userId === 'string' ? parseInt(userId) : userId,
@@ -153,16 +163,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           quantity: quantity,
           variantId: null
         }
-        console.log('Sending to /api/cart:', payload)
         const response = await fetch('/api/cart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
 
-        console.log('Response status:', response.status)
         if (response.ok) {
-          console.log('Cart updated successfully')
           addToCart(quantity)
           toast({
             title: 'Thành công',
@@ -170,7 +177,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           })
         } else {
           const errorData = await response.json().catch(() => ({}))
-          console.error('API error:', errorData)
           toast({
             title: 'Lỗi',
             description: errorData.error || 'Không thể thêm vào giỏ hàng',
@@ -178,7 +184,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           })
         }
       } catch (error) {
-        console.error('Add to cart error:', error)
         toast({
           title: 'Lỗi',
           description: 'Đã xảy ra lỗi',
@@ -202,13 +207,23 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       const userId = user.id
 
       if (action === 'buy') {
+        const selectedVariant = product.variants.find((v: any) => v.id === variantId)
+        const variantCampaignPrice = selectedVariant?.salePrice ?? null
+        const variantBasePrice = selectedVariant?.price ?? product.price
+        const variantOriginalPrice = selectedVariant?.originalPrice ?? product.originalPrice
+
         const checkoutItems = [{
           id: variantId,
           productId: product.id,
           productName: product.name,
           quantity: qty,
-          price: product.price,
-          image: product.image,
+          price: variantCampaignPrice ?? variantBasePrice,
+          basePrice: variantBasePrice,
+          originalPrice: variantOriginalPrice,
+          salePrice: variantCampaignPrice,
+          taxApplied: product.taxApplied,
+          taxRate: product.taxRate,
+          image: selectedVariant?.image || product.image,
           vendorId: product.vendorId,
           vendorName: product.seller.name
         }]
@@ -260,18 +275,57 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     )
   }
 
-  const effectivePrice = product.salePrice ?? product.price
-  const effectiveOriginal = product.originalPrice || product.price
-  const discount =
-    effectiveOriginal && effectiveOriginal > effectivePrice
-      ? Math.round(((effectiveOriginal - effectivePrice) / effectiveOriginal) * 100)
-      : 0
+  // derive canonical prices and display via computePrice
+  const basePrice = (typeof product.price === 'number' && product.price > 0) 
+    ? product.price 
+    : (typeof product.originalPrice === 'number' && product.originalPrice > 0 ? product.originalPrice : 0)
+  
+  const salePrice = (typeof product.salePrice === 'number' && product.salePrice > 0) 
+    ? product.salePrice 
+    : (typeof product.campaignPrice === 'number' && product.campaignPrice > 0 ? product.campaignPrice : null)
+  
+  const originalPrice = (typeof product.originalPrice === 'number' && product.originalPrice > 0) ? product.originalPrice : basePrice
+
+  const priceData = computePrice({
+    basePrice,
+    originalPrice,
+    salePrice,
+    taxApplied: product.taxApplied || false,
+    taxRate: product.taxRate || 0,
+    taxIncluded: product.taxIncluded !== false,
+  })
+
+  // prepare variants list enriched with display prices for modal
+  const variantListForModal = (product.variants || []).map((v: any) => {
+    const variantBase = v.price ?? product.price
+    const variantSale = v.salePrice ?? null
+    const variantOriginal = v.originalPrice ?? product.originalPrice ?? variantBase
+
+    const vd = computePrice({
+      basePrice: variantBase,
+      originalPrice: variantOriginal,
+      salePrice: variantSale,
+      taxApplied: !!product.taxApplied,
+      taxRate: product.taxRate ?? 0,
+      taxIncluded: product.taxIncluded !== false,
+    })
+
+    return {
+      ...v,
+      displayPrice: vd.displayPrice,
+      displayOriginalPrice: vd.displayOriginalPrice,
+      discountPercent: vd.discountPercent,
+    }
+  })
 
   const displayProduct = {
     id: product.id,
     name: product.name || "Sản phẩm",
-    price: effectivePrice || 0,
-    originalPrice: effectiveOriginal || effectivePrice,
+    price: Math.max(0, priceData.displayPrice),
+    originalPrice: Math.max(0, priceData.displayOriginalPrice),
+    taxApplied: product.taxApplied || false,
+    taxIncluded: product.taxIncluded || true,
+    taxRate: product.taxRate || 0,
     rating: product.rating || 4.8,
     reviews: product.reviews || 0,
     sold: product.sold || 0,
@@ -326,13 +380,15 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     fill
                     className="object-cover"
                   />
-                  <div className="absolute top-3 right-3 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
-                    -{discount}%
-                  </div>
+                  {priceData.discountPercent > 0 && (
+                    <div className="absolute top-3 right-3 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
+                      -{priceData.discountPercent}%
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto">
-                  {displayProduct.images.map((img, idx) => (
+                  {displayProduct.images.map((img: string, idx: number) => (
                     <button
                       key={idx}
                       onClick={() => setSelectedImage(idx)}
@@ -383,13 +439,18 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-4">
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl font-bold text-primary">{displayProduct.price.toLocaleString("vi-VN")}₫</span>
-                    {displayProduct.originalPrice > displayProduct.price && (
+                    {displayProduct.taxApplied && displayProduct.taxRate && product.taxIncluded && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        (đã bao gồm thuế)
+                      </span>
+                    )}
+                    {priceData.discountPercent > 0 && (
                       <>
                         <span className="text-lg text-muted-foreground line-through">
                           {displayProduct.originalPrice.toLocaleString("vi-VN")}₫
                         </span>
                         <span className="text-sm font-semibold text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded">
-                          -{discount}%
+                          -{priceData.discountPercent}%
                         </span>
                       </>
                     )}
@@ -531,10 +592,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <Card className="p-6">
                   <CardContent className="p-0">
                     <div className="space-y-3">
-                      {Object.entries(displayProduct.specifications).map(([key, value]) => (
+                      {Object.entries(displayProduct.specifications).map(([key, value]: [string, unknown]) => (
                         <div key={key} className="flex justify-between py-3 border-b border-border last:border-b-0">
                           <span className="font-medium text-muted-foreground">{key}</span>
-                          <span className="font-medium">{value}</span>
+                          <span className="font-medium">{String(value)}</span>
                         </div>
                       ))}
                     </div>
@@ -588,16 +649,16 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             productId={product.id}
             productName={product.name}
             productImage={product.image || "/placeholder.svg"}
-            price={effectivePrice}
-            originalPrice={product.originalPrice || product.price}
-            salePrice={product.salePrice}
-            variants={(product.variants || []).map((v: any) => ({
-              ...v,
-              salePrice: v.salePrice ?? v.price,
-            }))}
+            price={basePrice}
+            salePrice={product.campaignPrice}
+            originalPrice={originalPrice}
+            variants={variantListForModal}
             attributes={product.ProductAttribute || []}
             onConfirm={handleVariantConfirm}
             isLoading={isAddingToCart}
+            taxApplied={product.taxApplied}
+            taxRate={product.taxRate}
+            taxIncluded={product.taxIncluded}
           />
         )}
       </div>

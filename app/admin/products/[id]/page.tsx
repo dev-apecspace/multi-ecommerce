@@ -43,6 +43,8 @@ interface Product {
   price: number
   originalPrice?: number
   stock: number
+  taxApplied?: boolean
+  taxRate?: number
   status: 'pending' | 'approved' | 'rejected'
   specifications?: string
   shippingInfo?: string
@@ -280,9 +282,11 @@ export default function AdminProductDetailPage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Giá bán</p>
+                  <p className="text-sm text-muted-foreground">Giá bán {product.taxApplied && '(sau thuế)'}</p>
                   <p className="font-bold text-lg text-blue-600">
-                    {formatPrice(product.price)}
+                    {product.taxApplied && product.taxRate
+                      ? formatPrice(product.price * (1 + product.taxRate / 100))
+                      : formatPrice(product.price)}
                   </p>
                 </div>
                 <div>
@@ -298,6 +302,30 @@ export default function AdminProductDetailPage() {
                   <p className="font-bold text-lg">{product.stock} sản phẩm</p>
                 </div>
               </div>
+
+              {product.taxApplied && product.taxRate && (
+                <div className="border-t pt-4 mt-4 space-y-2 bg-amber-50 dark:bg-amber-950 p-3 rounded">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Thông tin thuế</p>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Tỷ lệ thuế</p>
+                      <p className="font-semibold">{product.taxRate}%</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Giá trước thuế</p>
+                      <p className="font-semibold">{formatPrice(product.price)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Tiền thuế</p>
+                      <p className="font-semibold text-amber-600 dark:text-amber-400">{formatPrice(product.price * product.taxRate / 100)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Giá sau thuế</p>
+                      <p className="font-semibold text-green-600 dark:text-green-400">{formatPrice(product.price * (1 + product.taxRate / 100))}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

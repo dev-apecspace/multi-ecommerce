@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('Product')
-      .select('*, Category(name, slug), SubCategory(name, slug), ProductVariant(id, name, price, stock)', { count: 'exact' })
+      .select('id, name, slug, price, originalPrice, stock, status, taxApplied, taxRate, taxIncluded, Category(name, slug), SubCategory(name, slug), ProductVariant(id, name, price, stock), CampaignProduct(id, campaignId, variantId, Campaign(id, name, status, startDate, endDate))', { count: 'exact' })
       .eq('vendorId', vendorId)
 
     if (status) {
@@ -72,11 +72,15 @@ export async function POST(request: NextRequest) {
         }))
       : []
 
+    const basePrice = parseFloat(body.price)
+    const taxRate = body.taxApplied && body.taxRate ? parseFloat(body.taxRate) : 0
+    const taxIncluded = body.taxIncluded !== false
+
     const productData = {
       name: body.name,
       slug: generateSlug(body.name),
       description: body.description,
-      price: parseFloat(body.price),
+      price: basePrice,
       originalPrice: body.originalPrice ? parseFloat(body.originalPrice) : null,
       media: media,
       categoryId: parseInt(body.categoryId),
@@ -87,6 +91,9 @@ export async function POST(request: NextRequest) {
       specifications: body.specifications || null,
       shippingInfo: body.shippingInfo || null,
       warranty: body.warranty || null,
+      taxApplied: body.taxApplied || false,
+      taxRate: taxRate,
+      taxIncluded: taxIncluded,
       rating: 0,
       reviews: 0,
       sold: 0,
@@ -119,6 +126,11 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('ProductVariant')
         .insert(variantData)
+
+      await supabase
+        .from('Product')
+        .update({ stock: 0 })
+        .eq('id', product.id)
     }
 
     if (body.attributes && Array.isArray(body.attributes) && body.attributes.length > 0) {

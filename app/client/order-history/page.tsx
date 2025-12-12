@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { ChevronRight } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,7 +26,7 @@ interface Order {
     vendorId: number
     variantId: number | null
     Product: { id: number; name: string }
-    ProductVariant?: { id: number; name: string } | null
+    ProductVariant?: { id: number; name: string; image?: string } | null
   }>
 }
 
@@ -158,18 +159,29 @@ export default function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="border-t pt-4 mb-4">
-                    {order.OrderItem.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-sm">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {order.OrderItem.map((item, idx) => {
+                      const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                      return (
+                        <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
+                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                            <Image
+                              src={displayImage}
+                              alt={item.Product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
                         </div>
-                        <p className="text-sm font-semibold">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
@@ -220,18 +232,29 @@ export default function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="border-t pt-4 mb-4">
-                    {order.OrderItem.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-sm">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {order.OrderItem.map((item, idx) => {
+                      const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                      return (
+                        <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
+                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                            <Image
+                              src={displayImage}
+                              alt={item.Product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
                         </div>
-                        <p className="text-sm font-semibold">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
@@ -292,18 +315,29 @@ export default function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="border-t pt-4 mb-4">
-                    {order.OrderItem.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-sm">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {order.OrderItem.map((item, idx) => {
+                      const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                      return (
+                        <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
+                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                            <Image
+                              src={displayImage}
+                              alt={item.Product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
                         </div>
-                        <p className="text-sm font-semibold">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
@@ -354,18 +388,29 @@ export default function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="border-t pt-4 mb-4">
-                    {order.OrderItem.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-sm">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {order.OrderItem.map((item, idx) => {
+                      const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                      return (
+                        <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
+                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                            <Image
+                              src={displayImage}
+                              alt={item.Product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
                         </div>
-                        <p className="text-sm font-semibold">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
@@ -416,18 +461,29 @@ export default function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="border-t pt-4 mb-4">
-                    {order.OrderItem.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-sm">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {order.OrderItem.map((item, idx) => {
+                      const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                      return (
+                        <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
+                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                            <Image
+                              src={displayImage}
+                              alt={item.Product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
                         </div>
-                        <p className="text-sm font-semibold">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
@@ -478,18 +534,29 @@ export default function OrderHistoryPage() {
                     </div>
                   </div>
                   <div className="border-t pt-4 mb-4">
-                    {order.OrderItem.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center mb-2">
-                        <div>
-                          <p className="text-sm">
-                            {item.Product.name}
-                            {item.ProductVariant && ` - ${item.ProductVariant.name}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                    {order.OrderItem.map((item, idx) => {
+                      const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                      return (
+                        <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
+                          <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                            <Image
+                              src={displayImage}
+                              alt={item.Product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.Product.name}
+                              {item.ProductVariant && ` - ${item.ProductVariant.name}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                          </div>
+                          <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
                         </div>
-                        <p className="text-sm font-semibold">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>

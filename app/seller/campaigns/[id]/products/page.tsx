@@ -15,13 +15,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
@@ -43,11 +36,26 @@ interface SellerProduct {
   price: number
   stock: number
   image: string
+  taxApplied?: boolean
+  taxRate?: number
+  taxIncluded?: boolean
   ProductVariant: Array<{
     id: number
     name: string
     price: number
     stock: number
+  }>
+  CampaignProduct?: Array<{
+    id: number
+    campaignId: number
+    variantId?: number | null
+    Campaign: {
+      id: number
+      name: string
+      status: string
+      startDate: string
+      endDate: string
+    }
   }>
 }
 
@@ -55,12 +63,12 @@ interface RegisteredProduct {
   id: number
   campaignId: number
   productId: number
-  variantId?: number
+  variantId?: number | null
   quantity: number
   purchasedQuantity: number
   status: 'pending' | 'approved' | 'rejected'
-  Product: { id: number; name: string }
-  ProductVariant?: { id: number; name: string }
+  Product: { id: number; name: string; price: number; taxApplied?: boolean; taxRate?: number; taxIncluded?: boolean }
+  ProductVariant?: { id: number; name: string; price?: number }
 }
 
 export default function CampaignProductsPage() {
@@ -76,9 +84,7 @@ export default function CampaignProductsPage() {
   const [openDialog, setOpenDialog] = useState(false)
   const [editingProductId, setEditingProductId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
-    productId: '',
-    variantIds: [] as string[],
-    quantity: '',
+    selectedProducts: [] as Array<{ productId: number; variantIds: number[] }>,
     variantQuantities: {} as Record<string, string>,
   })
   const { toast } = useToast()
@@ -87,16 +93,74 @@ export default function CampaignProductsPage() {
   const formatPrice = (price?: number | null) =>
     typeof price === 'number' ? `${price.toLocaleString('vi-VN')}₫` : '--'
 
+  // --- Simplified: Apply discount directly on display prices ---
   const computeSalePrice = (basePrice?: number | null) => {
-    if (!campaign || basePrice === undefined || basePrice === null) return { base: basePrice, sale: basePrice }
-    const price = basePrice
+    if (basePrice === undefined || basePrice === null || !campaign) {
+      return { displayBase: basePrice ?? 0, displaySale: basePrice ?? 0 }
+    }
+
+    const displayBase = basePrice
+    let displaySale = basePrice
+
     if (campaign.type === 'percentage') {
-      return { base: price, sale: Math.max(0, price - (price * campaign.discountValue) / 100) }
+      displaySale = Math.max(0, basePrice - (basePrice * campaign.discountValue) / 100)
+    } else if (campaign.type === 'fixed') {
+      displaySale = Math.max(0, basePrice - campaign.discountValue)
     }
-    if (campaign.type === 'fixed') {
-      return { base: price, sale: Math.max(0, price - campaign.discountValue) }
+
+    return {
+      displayBase: Math.round(displayBase),
+      displaySale: Math.round(displaySale)
     }
-    return { base: price, sale: price }
+  }
+
+  const getAvailableStock = (productId: number, variantId?: number | null): number => {
+    const registeredQty = registeredProducts
+      .filter(p => {
+        if (p.productId !== productId) return false
+        // compare variantId properly (null/undefined safe)
+        if (variantId === undefined || variantId === null) {
+          return p.variantId === undefined || p.variantId === null
+        }
+        return p.variantId === variantId
+      })
+      .reduce((sum, p) => sum + p.quantity, 0)
+
+    if (variantId !== undefined && variantId !== null) {
+      const product = products.find(p => p.id === productId)
+      const variant = product?.ProductVariant.find(v => v.id === variantId)
+      return Math.max(0, (variant?.stock || 0) - registeredQty)
+    } else {
+      const product = products.find(p => p.id === productId)
+      return Math.max(0, (product?.stock || 0) - registeredQty)
+    }
+  }
+
+  const getConflict = (productId: number, variantId: number | null) => {
+    const product = products.find(p => p.id === productId)
+    if (!product?.CampaignProduct || !campaign) return null
+
+    const currentStart = new Date(campaign.startDate).getTime()
+    const currentEnd = new Date(campaign.endDate).getTime()
+
+    const conflict = product.CampaignProduct.find(cp => {
+      if (cp.campaignId === campaign.id) return false
+      if (!cp.Campaign || cp.Campaign.status === 'ended') return false
+
+      // Check variant match
+      if (typeof variantId === 'number') {
+         if (cp.variantId !== variantId) return false
+      } else {
+         if (cp.variantId !== null) return false
+      }
+
+      const otherStart = new Date(cp.Campaign.startDate).getTime()
+      const otherEnd = new Date(cp.Campaign.endDate).getTime()
+
+      return (currentStart <= otherEnd && currentEnd >= otherStart)
+    })
+
+    return conflict ? conflict.Campaign.name : null
   }
 
   useEffect(() => {
@@ -116,17 +180,6 @@ export default function CampaignProductsPage() {
       }
 
       setVendorId(vid)
-
-      // Ensure vendor registration exists (idempotent)
-      try {
-        await fetch('/api/seller/campaigns/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaignId, vendorId: vid }),
-        })
-      } catch (e) {
-        // ignore; API already handles "already registered"
-      }
 
       // Fetch campaign details
       const campaignResponse = await fetch(`/api/admin/campaigns?campaignId=${campaignId}`)
@@ -166,56 +219,92 @@ export default function CampaignProductsPage() {
 
   const handleSaveProduct = async () => {
     if (!vendorId) return
-    if (!formData.productId) {
+    if (formData.selectedProducts.length === 0) {
       toast({
         title: 'Lỗi',
-        description: 'Vui lòng chọn sản phẩm',
+        description: 'Vui lòng chọn ít nhất một sản phẩm',
         variant: 'destructive',
       })
       return
     }
 
-    if (formData.variantIds.length === 0) {
-      toast({
-        title: 'Lỗi',
-        description: 'Vui lòng chọn ít nhất một variant',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    const product = products.find((p) => p.id === parseInt(formData.productId))
-
-    // Validate per-variant quantities and stock
-    for (const vidStr of formData.variantIds) {
-      const v = product?.ProductVariant.find((x) => x.id === parseInt(vidStr))
-      const qty = parseInt(formData.variantQuantities?.[vidStr] || '0')
-      if (!qty || qty <= 0) {
+    // Validate all selected products have variants and quantities
+    for (const item of formData.selectedProducts) {
+      // If product has variants in product list, require at least one variant selected
+      const productDef = products.find(p => p.id === item.productId)
+      const hasVariants = (productDef?.ProductVariant?.length || 0) > 0
+      if (hasVariants && item.variantIds.length === 0) {
+        const product = productDef
         toast({
           title: 'Lỗi',
-          description: `Vui lòng nhập số lượng hợp lệ cho variant ${v?.name || ''}`,
+          description: `${product?.name || 'Sản phẩm'}: vui lòng chọn ít nhất một variant`,
           variant: 'destructive',
         })
         return
       }
-      if (v && v.stock !== undefined && qty > v.stock) {
-        toast({
-          title: 'Lỗi',
-          description: `Số lượng ${v.name} phải ≤ tồn (${v.stock})`,
-          variant: 'destructive',
-        })
-        return
+
+      // Validate quantities for each variant OR for product without variant
+      if (hasVariants) {
+        for (const variantId of item.variantIds) {
+          const key = `${item.productId}-${variantId}`
+          const qty = parseInt(formData.variantQuantities?.[key] || '0')
+          if (!qty || qty <= 0) {
+            const product = products.find(p => p.id === item.productId)
+            const variant = product?.ProductVariant.find(v => v.id === variantId)
+            toast({
+              title: 'Lỗi',
+              description: `${product?.name} - ${variant?.name}: nhập số lượng hợp lệ`,
+              variant: 'destructive',
+            })
+            return
+          }
+
+          const product = products.find(p => p.id === item.productId)
+          const variant = product?.ProductVariant.find(v => v.id === variantId)
+          const availableStock = getAvailableStock(item.productId, variantId)
+          if (availableStock < qty) {
+            toast({
+              title: 'Lỗi',
+              description: `${product?.name} - ${variant?.name}: số lượng phải ≤ tồn kho (${availableStock})`,
+              variant: 'destructive',
+            })
+            return
+          }
+        }
+      } else {
+        // product without variants: expect key `${productId}-0`
+        const key = `${item.productId}-0`
+        const qty = parseInt(formData.variantQuantities?.[key] || '0')
+        if (!qty || qty <= 0) {
+          const product = products.find(p => p.id === item.productId)
+          toast({
+            title: 'Lỗi',
+            description: `${product?.name}: nhập số lượng hợp lệ`,
+            variant: 'destructive',
+          })
+          return
+        }
+
+        const availableStock = getAvailableStock(item.productId, null)
+        if (availableStock < qty) {
+          const product = products.find(p => p.id === item.productId)
+          toast({
+            title: 'Lỗi',
+            description: `${product?.name}: số lượng phải ≤ tồn kho (${availableStock})`,
+            variant: 'destructive',
+          })
+          return
+        }
       }
     }
 
     try {
       if (editingProductId) {
-        // Update quantity only for the single record (one variant)
-        const targetVariantId = formData.variantIds[0]
-        const qty = parseInt(formData.variantQuantities?.[targetVariantId] || '0')
-        if (!qty || qty <= 0) {
-          throw new Error('Vui lòng nhập số lượng hợp lệ cho variant')
-        }
+        // Update quantity for the single product being edited
+        const item = formData.selectedProducts[0]
+        const variantId = item.variantIds?.[0] ?? null
+        const key = variantId ? `${item.productId}-${variantId}` : `${item.productId}-0`
+        const qty = parseInt(formData.variantQuantities?.[key] || '0')
 
         const response = await fetch('/api/seller/campaigns/products', {
           method: 'PATCH',
@@ -223,45 +312,72 @@ export default function CampaignProductsPage() {
           body: JSON.stringify({
             campaignProductId: editingProductId,
             quantity: qty,
+            variantId: variantId, // backend may ignore null
           }),
         })
 
         if (!response.ok) {
-          const error = await response.json()
+          const error = await response.json().catch(() => ({}))
           throw new Error(error.error || 'Failed to update product')
         }
 
         toast({
           title: 'Thành công',
-          description: 'Cập nhật số lượng thành công',
+          description: 'Cập nhật sản phẩm thành công',
         })
       } else {
-        // Require per-variant quantity (variants already validated above)
-        const targets = formData.variantIds.map((vid) => parseInt(vid))
+        // Add multiple products
+        for (const item of formData.selectedProducts) {
+          const productDef = products.find(p => p.id === item.productId)
+          const hasVariants = (productDef?.ProductVariant?.length || 0) > 0
 
-        for (const variantId of targets) {
-          const key = variantId.toString()
-          const qtyStr = formData.variantQuantities?.[key]
-          const qty = parseInt(qtyStr || '0')
+          if (hasVariants) {
+            for (const variantId of item.variantIds) {
+              const key = `${item.productId}-${variantId}`
+              const qty = parseInt(formData.variantQuantities?.[key] || '0')
 
-          const response = await fetch('/api/seller/campaigns/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              campaignId,
-              vendorId,
-              productId: parseInt(formData.productId),
-              variantId,
-              quantity: qty,
-            }),
-          })
+              const response = await fetch('/api/seller/campaigns/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  campaignId,
+                  vendorId,
+                  productId: item.productId,
+                  variantId,
+                  quantity: qty,
+                }),
+              })
 
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}))
-            const message = error.error || 'Failed to add product'
-            // Stop on the first non-idempotent error
-            if (!message.includes('already registered')) {
-              throw new Error(message)
+              if (!response.ok) {
+                const error = await response.json().catch(() => ({}))
+                const message = error.error || 'Failed to add product'
+                if (!message.includes('already registered')) {
+                  throw new Error(message)
+                }
+              }
+            }
+          } else {
+            // product without variant
+            const key = `${item.productId}-0`
+            const qty = parseInt(formData.variantQuantities?.[key] || '0')
+            const response = await fetch('/api/seller/campaigns/products', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                campaignId,
+                vendorId,
+                productId: item.productId,
+                variantId: null,
+                quantity: qty,
+              }),
+            })
+
+            if (!response.ok) {
+              const error = await response.json().catch(() => ({}))
+              const message = error.error || 'Failed to add product'
+              if (!message.includes('already registered')) {
+                throw new Error(message)
+              }
             }
           }
         }
@@ -274,7 +390,7 @@ export default function CampaignProductsPage() {
 
       setOpenDialog(false)
       setEditingProductId(null)
-      setFormData({ productId: '', variantIds: [], quantity: '', variantQuantities: {} })
+      setFormData({ selectedProducts: [], variantQuantities: {} })
 
       fetchData()
     } catch (error) {
@@ -311,10 +427,46 @@ export default function CampaignProductsPage() {
     }
   }
 
-  const selectedProduct = products.find((p) => p.id === parseInt(formData.productId))
-  const selectedVariants = editingProductId 
-    ? selectedProduct?.ProductVariant.filter(v => formData.variantIds.includes(v.id.toString())) || []
-    : selectedProduct?.ProductVariant || []
+  const handleResetDialog = () => {
+    setOpenDialog(false)
+    setEditingProductId(null)
+    setFormData({ selectedProducts: [], variantQuantities: {} })
+  }
+
+  const toggleProductSelection = (productId: number) => {
+    setFormData(prev => {
+      const existing = prev.selectedProducts.find(p => p.productId === productId)
+      if (existing) {
+        return {
+          ...prev,
+          selectedProducts: prev.selectedProducts.filter(p => p.productId !== productId)
+        }
+      } else {
+        return {
+          ...prev,
+          selectedProducts: [...prev.selectedProducts, { productId, variantIds: [] }]
+        }
+      }
+    })
+  }
+
+  const toggleVariantSelection = (productId: number, variantId: number) => {
+    setFormData(prev => {
+      const updated = prev.selectedProducts.map(item => {
+        if (item.productId === productId) {
+          const hasVariant = item.variantIds.includes(variantId)
+          return {
+            ...item,
+            variantIds: hasVariant
+              ? item.variantIds.filter(v => v !== variantId)
+              : [...item.variantIds, variantId]
+          }
+        }
+        return item
+      })
+      return { ...prev, selectedProducts: updated }
+    })
+  }
 
   if (loading) return <div className="p-6 text-center">Đang tải...</div>
 
@@ -358,146 +510,179 @@ export default function CampaignProductsPage() {
                     Thêm sản phẩm
                   </Button>
                 </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Đăng ký sản phẩm vào chương trình</DialogTitle>
+                  <DialogTitle>{editingProductId ? 'Cập nhật sản phẩm' : 'Đăng ký sản phẩm vào chương trình'}</DialogTitle>
+                  <DialogDescription>
+                    {editingProductId ? 'Chỉnh sửa số lượng sản phẩm' : 'Chọn một hoặc nhiều sản phẩm cùng variant'}
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Chọn sản phẩm</Label>
+                  <div className="space-y-3">
+                    <Label>Chọn sản phẩm và variant</Label>
                     {products.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Chưa có sản phẩm để đăng ký.</p>
                     ) : (
-                      <div className="max-h-64 overflow-y-auto space-y-2 border rounded-md p-3">
+                      <div className="space-y-3 border rounded-md p-3 max-h-96 overflow-y-auto">
                         {products.map((product) => {
-                          const checked = formData.productId === product.id.toString()
+                          const isSelected = formData.selectedProducts.some(p => p.productId === product.id)
+                          const selectedItem = formData.selectedProducts.find(p => p.productId === product.id)
+                          const { displayBase, displaySale } = computeSalePrice(product.price)
+                          const hasSale = displaySale !== undefined && displayBase !== displaySale
+                          const availableStock = getAvailableStock(product.id)
+                          const productConflict = product.ProductVariant.length === 0 ? getConflict(product.id, null) : null
+
                           return (
-                            <label key={product.id} className="flex items-start gap-3 cursor-pointer">
-                              <Checkbox
-                                checked={checked}
-                                disabled={!!editingProductId && !checked}
-                                onCheckedChange={(val) => {
-                                  if (editingProductId && !checked) return
-                                  setFormData({
-                                    productId: val ? product.id.toString() : '',
-                                    variantIds: [],
-                                    quantity: formData.quantity,
-                                    variantQuantities: {},
-                                  })
-                                }}
-                              />
-                              <div>
-                                <p className="font-medium">{product.name}</p>
-                                {(() => {
-                                  const { base, sale } = computeSalePrice(product.price)
-                                  const hasSale = sale !== undefined && base !== sale
-                                  return (
-                                    <p className="text-xs text-muted-foreground">
-                                      Giá: {formatPrice(base)}
-                                      {hasSale && (
-                                        <> → <span className="text-green-600 font-semibold">{formatPrice(sale)}</span></>
+                            <div key={product.id} className={`border rounded-lg p-3 space-y-3 ${productConflict ? 'bg-gray-50 opacity-75' : ''}`}>
+                              <label className="flex items-start gap-3 cursor-pointer">
+                                <Checkbox
+                                  checked={isSelected}
+                                  disabled={(!!editingProductId && !isSelected) || !!productConflict}
+                                  onCheckedChange={() => {
+                                    if ((editingProductId && !isSelected) || productConflict) return
+                                    toggleProductSelection(product.id)
+                                  }}
+                                />
+                                <div className="flex-1">
+                                  <div className="flex gap-3">
+                                    {product.image && (
+                                      <img 
+                                        src={product.image} 
+                                        alt={product.name}
+                                        className="w-16 h-16 object-cover rounded border"
+                                      />
+                                    )}
+                                    <div>
+                                      <p className="font-medium">{product.name}</p>
+                                      <p className="text-xs">
+                                        <span className={hasSale ? "text-green-600 font-semibold" : "text-muted-foreground"}>
+                                          {hasSale ? formatPrice(displaySale) : formatPrice(displayBase)}
+                                        </span>
+                                        {hasSale && (
+                                          <span className="text-muted-foreground line-through ml-1">{formatPrice(displayBase)}</span>
+                                        )}
+                                        {' · '}Tồn kho: {availableStock}
+                                      </p>
+                                      {product.taxApplied && product.taxRate && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                          (Đã bao gồm thuế {product.taxRate}%)
+                                        </p>
                                       )}
-                                      {' · '}Tồn kho: {product.stock}
-                                    </p>
-                                  )
-                                })()}
-                              </div>
-                            </label>
+                                      {productConflict && (
+                                        <p className="text-xs text-red-600 font-medium mt-1">
+                                          Đã tham gia: {productConflict}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </label>
+
+                              {isSelected && product.ProductVariant.length > 0 && (
+                                <div className="ml-7 space-y-2 border-t pt-2">
+                                  <p className="text-xs font-medium">Chọn variant:</p>
+                                  {product.ProductVariant.map((variant) => {
+                                    const { displayBase: variantBase, displaySale: variantSale } = computeSalePrice(variant.price ?? product.price)
+                                    const variantHasSale = variantSale !== undefined && variantBase !== variantSale
+                                    const variantAvailableStock = getAvailableStock(product.id, variant.id)
+                                    const isVariantSelected = selectedItem?.variantIds.includes(variant.id) || false
+                                    const quantityKey = `${product.id}-${variant.id}`
+                                    const variantConflict = getConflict(product.id, variant.id)
+
+                                    return (
+                                      <div key={variant.id} className="space-y-1">
+                                        <label className="flex items-center gap-2">
+                                          <Checkbox
+                                            checked={isVariantSelected}
+                                            disabled={(!!editingProductId && !isVariantSelected) || !!variantConflict}
+                                            onCheckedChange={() => {
+                                              if ((editingProductId && !isVariantSelected) || variantConflict) return
+                                              toggleVariantSelection(product.id, variant.id)
+                                            }}
+                                          />
+                                          <span className={`text-sm flex-1 ${variantConflict ? 'text-muted-foreground' : ''}`}>
+                                            {variant.name}{' '}
+                                            <span className={variantHasSale ? "text-green-600 font-semibold" : "text-muted-foreground"}>
+                                              {variantHasSale ? formatPrice(variantSale) : formatPrice(variantBase)}
+                                            </span>
+                                            {variantHasSale && (
+                                              <span className="text-muted-foreground line-through ml-1">{formatPrice(variantBase)}</span>
+                                            )}
+                                            {` (Tồn: ${variantAvailableStock})`}
+                                            {variantConflict && (
+                                              <span className="text-red-600 ml-2 text-xs">
+                                                (Đã tham gia: {variantConflict})
+                                              </span>
+                                            )}
+                                          </span>
+                                          {isVariantSelected && (
+                                            <Input
+                                              type="number"
+                                              className="w-20"
+                                              min="1"
+                                              placeholder="SL"
+                                              value={formData.variantQuantities?.[quantityKey] || ''}
+                                              onChange={(e) =>
+                                                setFormData({
+                                                  ...formData,
+                                                  variantQuantities: {
+                                                    ...(formData.variantQuantities || {}),
+                                                    [quantityKey]: e.target.value,
+                                                  },
+                                                })
+                                              }
+                                            />
+                                          )}
+                                        </label>
+                                        {product.taxApplied && product.taxRate && isVariantSelected && (
+                                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-7">
+                                            (Đã bao gồm thuế {product.taxRate}%)
+                                          </p>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+
+                              {isSelected && product.ProductVariant.length === 0 && (
+                                <div className="ml-7 space-y-1">
+                                  <p className="text-xs text-muted-foreground">Sản phẩm này không có variant</p>
+                                  <div className="mt-2">
+                                    <Input
+                                      type="number"
+                                      className="w-28"
+                                      min="1"
+                                      placeholder="SL"
+                                      value={formData.variantQuantities?.[`${product.id}-0`] || ''}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          variantQuantities: {
+                                            ...(formData.variantQuantities || {}),
+                                            [`${product.id}-0`]: e.target.value,
+                                          },
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )
                         })}
                       </div>
                     )}
                   </div>
 
-                  {selectedProduct && selectedVariants.length > 0 && (
-                    <div>
-                      <Label>Chọn variant (tùy chọn)</Label>
-                      <div className="grid gap-2">
-                        <label className="flex items-center gap-2">
-                            <Checkbox
-                              checked={
-                                selectedVariants.length > 0 &&
-                                formData.variantIds.length === selectedVariants.length
-                              }
-                              disabled={!!editingProductId}
-                              onCheckedChange={(val) =>
-                                setFormData({
-                                  ...formData,
-                                  variantIds: val
-                                    ? selectedVariants.map((v) => v.id.toString())
-                                    : [],
-                                  variantQuantities: val
-                                    ? selectedVariants.reduce((acc, v) => {
-                                        acc[v.id.toString()] = formData.variantQuantities?.[v.id.toString()] || ''
-                                        return acc
-                                      }, {} as Record<string, string>)
-                                    : {},
-                                })
-                              }
-                            />
-                          <span className="text-sm">Tất cả variant</span>
-                        </label>
-                        {selectedVariants.map((variant) => {
-                          const { base, sale } = computeSalePrice(variant.price ?? selectedProduct.price)
-                          const hasSale = sale !== undefined && base !== sale
-                          return (
-                          <label key={variant.id} className="flex items-center gap-2">
-                            <Checkbox
-                              checked={formData.variantIds.includes(variant.id.toString())}
-                              disabled={!!editingProductId && !formData.variantIds.includes(variant.id.toString())}
-                              onCheckedChange={(val) => {
-                                const idStr = variant.id.toString()
-                                if (editingProductId && !formData.variantIds.includes(idStr)) return
-                                if (val) {
-                                  setFormData({
-                                    ...formData,
-                                    variantIds: Array.from(new Set([...formData.variantIds, idStr])),
-                                  })
-                                } else {
-                                  setFormData({
-                                    ...formData,
-                                    variantIds: formData.variantIds.filter((v) => v !== idStr),
-                                  })
-                                }
-                              }}
-                            />
-                              <span className="text-sm">
-                                {variant.name} — {formatPrice(base)}
-                                {hasSale && (
-                                  <> → <span className="text-green-600 font-semibold">{formatPrice(sale)}</span></>
-                                )}
-                                {` (Tồn: ${variant.stock})`}
-                              </span>
-                              {formData.variantIds.includes(variant.id.toString()) && (
-                                <Input
-                                  type="number"
-                                  className="w-24 ml-auto"
-                                  min="1"
-                                  placeholder="SL"
-                                  value={formData.variantQuantities?.[variant.id.toString()] || ''}
-                                  onChange={(e) =>
-                                    setFormData({
-                                      ...formData,
-                                      variantQuantities: {
-                                        ...(formData.variantQuantities || {}),
-                                        [variant.id.toString()]: e.target.value,
-                                      },
-                                    })
-                                  }
-                                />
-                              )}
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Removed global quantity input; quantities are per-variant */}
-
-                  <Button onClick={handleSaveProduct} className="w-full">
-                    {editingProductId ? 'Cập nhật' : 'Đăng ký'}
-                  </Button>
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button onClick={handleSaveProduct} className="flex-1">
+                      {editingProductId ? 'Cập nhật' : 'Đăng ký'}
+                    </Button>
+                    <Button variant="outline" onClick={handleResetDialog} className="flex-1">
+                      Hủy
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -529,11 +714,17 @@ export default function CampaignProductsPage() {
                       </td>
                     </tr>
                   ) : (
-                    registeredProducts.map((product) => (
+                    registeredProducts.map((product) => {
+                      const basePrice = product.ProductVariant?.price ?? product.Product.price
+                      const { displaySale } = computeSalePrice(basePrice)
+                      return (
                       <tr key={product.id} className="border-b border-border hover:bg-muted">
                         <td className="py-3 px-4 font-medium">
-                          {product.Product.name}
-                          {product.ProductVariant && ` - ${product.ProductVariant.name}`}
+                          <div>
+                            <p>{product.Product.name}</p>
+                            {product.ProductVariant && <p className="text-xs text-muted-foreground">{product.ProductVariant.name}</p>}
+                            <p className="text-xs text-green-600 font-semibold">{formatPrice(displaySale)}</p>
+                          </div>
                         </td>
                         <td className="py-3 px-4">{product.quantity}</td>
                         <td className="py-3 px-4">{product.purchasedQuantity}</td>
@@ -561,13 +752,16 @@ export default function CampaignProductsPage() {
                                 className="text-blue-600 hover:text-blue-700"
                                 onClick={() => {
                                   setEditingProductId(product.id)
+                                  const quantityKey = product.variantId 
+                                    ? `${product.productId}-${product.variantId}`
+                                    : `${product.productId}-0`
                                   setFormData({
-                                    productId: product.productId.toString(),
-                                    variantIds: product.variantId ? [product.variantId.toString()] : [],
-                                    quantity: product.quantity.toString(),
-                                    variantQuantities: product.variantId
-                                      ? { [product.variantId.toString()]: product.quantity.toString() }
-                                      : {},
+                                    selectedProducts: product.variantId 
+                                      ? [{ productId: product.productId, variantIds: [product.variantId] }]
+                                      : [{ productId: product.productId, variantIds: [] }],
+                                    variantQuantities: {
+                                      [quantityKey]: product.quantity.toString()
+                                    },
                                   })
                                   setOpenDialog(true)
                                 }}
@@ -589,7 +783,8 @@ export default function CampaignProductsPage() {
                           )}
                         </td>
                       </tr>
-                    ))
+                      )
+                    })
                   )}
                 </tbody>
               </table>

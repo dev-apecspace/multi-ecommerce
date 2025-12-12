@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('Product')
-      .select('*, Category(name, slug), SubCategory(name, slug), Vendor(id, name, userId)', { count: 'exact' })
+      .select('*, Category(name, slug), SubCategory(name, slug), Vendor(id, name, userId), ProductVariant(id, name, price, originalPrice, stock)', { count: 'exact' })
 
     if (status) {
       query = query.eq('status', status)

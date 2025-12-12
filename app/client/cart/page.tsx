@@ -1,343 +1,325 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import Image from "next/image"
-import Link from "next/link"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { X, Minus, Plus, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Card, CardContent } from "@/components/ui/card"
+import { Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
+import { computePrice } from "@/lib/price-utils"
 
-interface CartItem {
-  id: number
+interface CartLine {
+  id: number // cart item id
+  productId: number
+  variantId?: number | null
+  productName: string
+  image?: string
   quantity: number
-  variantId: number | null
-  price: number // Base unit price (variant or product)
-  originalPrice?: number // Original unit price (variant or product)
-  salePrice?: number | null // Discounted price from campaign
-  finalPrice: number // Final price (unit price * quantity)
-  appliedCampaign?: {
-    id: number
-    name: string
-    type: string
-    discountValue: number
-  } | null
-  Product: {
-    id: number
-    name: string
-    slug: string
-    price: number
-    originalPrice?: number
-    stock: number
-    vendorId: number
-    Vendor: { id: number; name: string }
-  }
-  ProductVariant?: {
-    id: number
-    name: string
-    sku?: string
-    barcode?: string
-    image?: string
-    price?: number
-    originalPrice?: number
-  } | null
+  // Stored prices come from backend. Conventions: stored values follow product.taxIncluded flag.
+  basePrice: number // base stored price (could be incl tax if taxIncluded true)
+  salePrice?: number | null // stored sale price if exists (same convention as basePrice)
+  originalPrice?: number
+  taxApplied?: boolean
+  taxRate?: number
+  taxIncluded?: boolean
+  vendorId?: number
+  vendorName?: string
 }
 
 export default function CartPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
-  const { removeFromCart } = useCart()
-  const [items, setItems] = useState<CartItem[]>([])
-  const [selectedItems, setSelectedItems] = useState<number[]>([])
+  useCart()
+  const [lines, setLines] = useState<CartLine[] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [updatingId, setUpdatingId] = useState<number | null>(null)
 
   useEffect(() => {
-    if (user) {
-      fetchCart()
-    } else {
-      setLoading(false)
-    }
-  }, [user])
+    fetchCart()
+  }, [])
 
   const fetchCart = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
-      const response = await fetch(`/api/cart?userId=${user!.id}`)
-      const result = await response.json()
-      console.log('Cart data:', result.data)
-      setItems(result.data || [])
-    } catch (error) {
-      console.error('Cart fetch error:', error)
-      toast({ title: 'Lỗi', description: 'Không thể tải giỏ hàng', variant: 'destructive' })
+      const res = await fetch('/api/cart')
+      if (!res.ok) throw new Error('Failed to load cart')
+      const data = await res.json()
+      // Expect data.items = array of cart lines
+      setLines(data.items || [])
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tải giỏ hàng',
+        variant: 'destructive'
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const updateQuantity = async (cartItemId: number, quantity: number) => {
-    if (quantity < 1) {
-      removeItem(cartItemId)
-      return
-    }
-    try {
-      const response = await fetch(`/api/cart`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cartItemId, quantity })
+  // Compute totals using canonical pre-tax logic per line, then aggregate
+  const computeTotals = (items: CartLine[]) => {
+    // We'll compute:
+    // - subtotalPreTax: sum of (line.preTaxSale * qty)
+    // - taxTotal: sum of (line.taxAmount * qty)
+    // - totalDisplay: sum of displayPrice * qty (display prices include tax where applicable)
+    let subtotalPreTax = 0
+    let taxTotal = 0
+    let totalDisplay = 0
+
+    const linesWithPriceData = items.map((line) => {
+      const cp = computePrice({
+        basePrice: line.basePrice,
+        originalPrice: line.originalPrice ?? line.basePrice,
+        salePrice: typeof line.salePrice === 'number' ? line.salePrice : null,
+        taxRate: line.taxRate ?? 0,
       })
-      if (response.ok) {
-        setItems(items.map((item) => (item.id === cartItemId ? { ...item, quantity } : item)))
-      } else {
-        toast({ title: 'Lỗi', description: 'Không thể cập nhật số lượng', variant: 'destructive' })
+
+      // cp.displayPrice is final display (incl tax if applicable)
+      // cp.canonicalPreTaxSale is pre-tax canonical sale value (rounded)
+      const preTaxSale = cp._preTaxSale ?? cp._preTaxBase // raw float before rounding
+      const preTaxSaleRounded = cp.canonicalPreTaxSale ?? Math.round(preTaxSale ?? 0)
+
+      // tax amount per unit (using floats then rounding at the end)
+      // Calculate tax from the inclusive price if rate > 0
+      const taxPerUnit = ((line.taxRate ?? 0) > 0)
+        ? ((preTaxSale ?? cp._preTaxBase ?? 0) * ((line.taxRate ?? 0) / 100))
+        : 0
+
+      subtotalPreTax += (preTaxSaleRounded) * line.quantity
+      taxTotal += Math.round(taxPerUnit * line.quantity)
+      totalDisplay += cp.displayPrice * line.quantity
+
+      return {
+        ...line,
+        displayPrice: cp.displayPrice,
+        displayOriginalPrice: cp.displayOriginalPrice,
+        discountPercent: cp.discountPercent,
+        preTaxSaleRounded,
+        taxPerUnit
       }
-    } catch (error) {
-      toast({ title: 'Lỗi', description: 'Không thể cập nhật số lượng', variant: 'destructive' })
+    })
+
+    return {
+      lines: linesWithPriceData,
+      subtotalPreTax,
+      taxTotal,
+      totalDisplay,
     }
   }
 
-  const removeItem = async (cartItemId: number) => {
+  const handleUpdateQty = async (lineId: number, newQty: number) => {
+    if (newQty < 1) return
+    setUpdatingId(lineId)
     try {
-      const itemToRemove = items.find(item => item.id === cartItemId)
-      await fetch(`/api/cart?id=${cartItemId}`, { method: 'DELETE' })
-      setItems(items.filter((item) => item.id !== cartItemId))
-      setSelectedItems(selectedItems.filter((sid) => sid !== cartItemId))
-      if (itemToRemove) {
-        removeFromCart(itemToRemove.quantity)
-      }
-      toast({ title: 'Thành công', description: 'Xóa sản phẩm khỏi giỏ hàng' })
-    } catch (error) {
+      const res = await fetch('/api/cart', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cartItemId: lineId, quantity: newQty }),
+      })
+      if (!res.ok) throw new Error('Failed to update')
+      await fetchCart()
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể cập nhật số lượng',
+        variant: 'destructive'
+      })
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleRemove = async (lineId: number) => {
+    if (!confirm('Bạn có chắc muốn xóa sản phẩm khỏi giỏ hàng không?')) return
+    try {
+      const res = await fetch('/api/cart', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cartItemId: lineId }),
+      })
+      if (!res.ok) throw new Error('Failed to remove')
+      toast({ title: 'Đã xóa' })
+      await fetchCart()
+    } catch (err) {
+      console.error(err)
       toast({ title: 'Lỗi', description: 'Không thể xóa sản phẩm', variant: 'destructive' })
     }
   }
 
-  const toggleSelectItem = (id: number) => {
-    setSelectedItems((prev) => (prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]))
-  }
-
-  const toggleSelectVendor = (vendorId: number) => {
-    const vendorItemIds = items.filter(item => item.Product.vendorId === vendorId).map(item => item.id)
-    const allVendorItemsSelected = vendorItemIds.every(id => selectedItems.includes(id))
-    
-    if (allVendorItemsSelected) {
-      setSelectedItems(selectedItems.filter(id => !vendorItemIds.includes(id)))
-    } else {
-      setSelectedItems([...new Set([...selectedItems, ...vendorItemIds])])
-    }
-  }
-
-  const groupedByVendor = items.reduce((acc, item) => {
-    const vendorId = item.Product.vendorId
-    if (!acc[vendorId]) {
-      acc[vendorId] = { vendor: item.Product.Vendor, items: [] }
-    }
-    acc[vendorId].items.push(item)
-    return acc
-  }, {} as Record<number, { vendor: { id: number; name: string }; items: CartItem[] }>)
-
-  const selectedItemsData = items.filter((item) => selectedItems.includes(item.id))
-  // Use finalPrice which already includes quantity and campaign discounts
-  const subtotal = selectedItemsData.reduce((sum, item) => sum + item.finalPrice, 0)
-  const originalSubtotal = selectedItemsData.reduce((sum, item) => sum + (item.originalPrice ?? item.price) * item.quantity, 0)
-  const savings = originalSubtotal - subtotal
-  const shipping = subtotal > 0 ? 0 : 0
-  const total = subtotal + shipping
-
   const handleCheckout = () => {
-    if (selectedItems.length === 0) {
-      toast({ title: 'Lỗi', description: 'Chọn ít nhất một sản phẩm', variant: 'destructive' })
+    if (!user) {
+      router.push('/auth/login?callback=/client/checkout')
       return
     }
-    const checkoutItems = selectedItemsData.map(item => ({
-      id: item.id,
-      productId: item.Product.id,
-      productName: item.Product.name,
-      quantity: item.quantity,
-      price: item.salePrice ?? item.price, // Use campaign price if available, otherwise use base price
-      originalPrice: item.originalPrice,
-      image: item.ProductVariant?.image || "/placeholder.svg",
-      variantId: item.variantId,
-      vendorId: item.Product.vendorId,
-      vendorName: item.Product.Vendor.name
-    }))
+    // Save checkout items to session/localstorage same shape as checkout expects
+    // Transform current lines into checkoutItems
+    if (!lines || lines.length === 0) {
+      toast({ title: 'Giỏ hàng trống', description: 'Vui lòng thêm sản phẩm trước khi thanh toán' })
+      return
+    }
+
+    const checkoutItems = lines.map(l => {
+      const cp = computePrice({
+        basePrice: l.basePrice,
+        originalPrice: l.originalPrice ?? l.basePrice,
+        salePrice: typeof l.salePrice === 'number' ? l.salePrice : null,
+        taxApplied: !!l.taxApplied,
+        taxRate: l.taxRate ?? 0,
+        taxIncluded: l.taxIncluded !== false,
+      })
+      return {
+        id: l.variantId ?? l.productId,
+        productId: l.productId,
+        productName: l.productName,
+        quantity: l.quantity,
+        price: cp.displayPrice,
+        basePrice: cp.canonicalPreTaxPrice ?? 0,
+        originalPrice: cp.displayOriginalPrice,
+        salePrice: cp.displayPrice,
+        taxApplied: l.taxApplied,
+        taxRate: l.taxRate,
+        image: l.image,
+        vendorId: l.vendorId,
+        vendorName: l.vendorName
+      }
+    })
+
     sessionStorage.setItem('checkoutItems', JSON.stringify(checkoutItems))
     router.push('/client/checkout')
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-surface dark:bg-slate-950">
-        <div className="container-viewport py-12 text-center">
-          <p>Đang tải giỏ hàng...</p>
-        </div>
+      <main className="p-6">
+        <p className="text-center text-muted-foreground">Đang tải giỏ hàng...</p>
       </main>
     )
   }
 
-  if (items.length === 0) {
+  if (!lines || lines.length === 0) {
     return (
-      <main className="min-h-screen bg-surface dark:bg-slate-950">
-        <div className="container-viewport py-12">
-          <div className="max-w-md mx-auto">
-            <Card className="p-8">
-              <CardContent className="p-0 text-center space-y-6">
-                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                  <ShoppingBag className="h-10 w-10 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold mb-2">Giỏ hàng trống</h1>
-                  <p className="text-muted-foreground">Thêm sản phẩm yêu thích vào giỏ hàng để tiếp tục</p>
-                </div>
-                <Link href="/">
-                  <Button size="lg" className="w-full">
-                    Tiếp tục mua sắm
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+      <main className="p-6">
+        <p className="text-center text-muted-foreground">Giỏ hàng trống</p>
       </main>
     )
   }
+
+  const totals = computeTotals(lines)
 
   return (
-    <main className="min-h-screen bg-surface dark:bg-slate-950">
-      <div className="container-viewport py-6">
-        <h1 className="text-3xl font-bold mb-6">Giỏ hàng</h1>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            {Object.entries(groupedByVendor).map(([vendorId, { vendor, items: vendorItems }]) => {
-              const vendorItemIds = vendorItems.map(item => item.id)
-              const allVendorItemsSelected = vendorItemIds.every(id => selectedItems.includes(id))
-              
-              return (
-                <Card key={vendorId}>
-                  <CardHeader className="pb-3 border-b border-border">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={allVendorItemsSelected}
-                        onCheckedChange={() => toggleSelectVendor(parseInt(vendorId))}
-                      />
-                      <span className="text-sm font-medium">Yêu thích</span>
-                      <span className="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-950 px-2 py-0.5 rounded">
-                        {vendor.name}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-4">
-                    {vendorItems.map((item) => (
-                      <div key={item.id} className="flex gap-4 pb-4 border-b border-border last:border-b-0 last:pb-0">
-                        <Checkbox
-                          checked={selectedItems.includes(item.id)}
-                          onCheckedChange={() => toggleSelectItem(item.id)}
-                        />
-
-                        <Link href={`/client/product/${item.Product.slug}`} className="relative w-20 h-20 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
-                          <Image src={item.ProductVariant?.image || "/placeholder.svg"} alt={item.Product.name} fill className="object-cover" />
-                        </Link>
-
-                        <div className="flex-1">
-                          <Link href={`/client/product/${item.Product.slug}`}>
-                            <h3 className="font-medium mb-1 hover:text-primary transition-colors cursor-pointer">{item.Product.name}</h3>
-                          </Link>
-                          {item.ProductVariant && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Phiên bản: <span className="font-medium">{item.ProductVariant.name}</span>
-                            </p>
+    <main className="p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <CardContent>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3">Sản phẩm</th>
+                    <th className="text-left py-3">Đơn giá</th>
+                    <th className="text-left py-3">Số lượng</th>
+                    <th className="text-left py-3">Thành tiền</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {totals.lines.map((line: any) => (
+                    <tr key={line.id} className="border-b hover:bg-muted">
+                      <td className="py-3">
+                        <div className="flex items-center gap-3">
+                          {line.image ? (
+                            <img src={line.image} alt={line.productName} className="w-16 h-16 object-cover rounded" />
+                          ) : (
+                            <div className="w-16 h-16 bg-gray-100 rounded" />
                           )}
-                          <div className="flex items-baseline gap-2">
-                            <span className="font-bold text-primary">
-                              {(item.salePrice ?? item.price).toLocaleString('vi-VN')}₫
-                            </span>
-                            {(item.originalPrice && (item.originalPrice > (item.salePrice ?? item.price))) && (
-                              <span className="text-xs text-muted-foreground line-through">
-                                {item.originalPrice.toLocaleString('vi-VN')}₫
-                              </span>
-                            )}
-                            {item.appliedCampaign && (
-                              <span className="text-xs text-orange-600 font-medium">
-                                -{item.appliedCampaign.type === 'percentage' 
-                                  ? `${item.appliedCampaign.discountValue}%` 
-                                  : `${item.appliedCampaign.discountValue.toLocaleString('vi-VN')}₫`}
-                              </span>
-                            )}
+                          <div>
+                            <div className="font-medium">{line.productName}</div>
+                            {line.variantId && <div className="text-xs text-muted-foreground">Variant: {line.variantId}</div>}
+                            {line.discountPercent > 0 && <div className="text-xs text-red-600">-{line.discountPercent}%</div>}
                           </div>
                         </div>
-
-                        <div className="flex flex-col items-end gap-4">
+                      </td>
+                      <td className="py-3">
+                        <div className="font-medium">{line.displayPrice.toLocaleString('vi-VN')}₫</div>
+                        <div className="text-xs text-muted-foreground line-through">{line.displayOriginalPrice.toLocaleString('vi-VN')}₫</div>
+                        {line.taxApplied && line.taxRate ? <div className="text-xs text-amber-600">(VAT {line.taxRate}%)</div> : null}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => removeItem(item.id)}
-                            className="text-muted-foreground hover:text-destructive transition"
+                            disabled={updatingId === line.id}
+                            onClick={() => handleUpdateQty(line.id, Math.max(1, line.quantity - 1))}
+                            className="px-2 py-1 border rounded"
                           >
-                            <X className="h-5 w-5" />
+                            −
                           </button>
-
-                          <div className="flex items-center border border-border rounded-lg">
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="px-2 py-1 hover:bg-surface transition"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            <span className="px-4 py-1">{item.quantity}</span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="px-2 py-1 hover:bg-surface transition"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
+                          <input
+                            type="number"
+                            value={line.quantity}
+                            onChange={(e) => {
+                              const v = Math.max(1, Number.parseInt(e.target.value) || 1)
+                              handleUpdateQty(line.id, v)
+                            }}
+                            className="w-16 text-center border px-2 py-1 rounded"
+                            min={1}
+                          />
+                          <button
+                            disabled={updatingId === line.id}
+                            onClick={() => handleUpdateQty(line.id, line.quantity + 1)}
+                            className="px-2 py-1 border rounded"
+                          >
+                            +
+                          </button>
                         </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-
-          <div>
-            <Card className="sticky top-20">
-              <CardHeader>
-                <CardTitle className="text-lg">Tóm tắt</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tạm tính:</span>
-                    <span>{subtotal.toLocaleString("vi-VN")}₫</span>
-                  </div>
-                  {savings > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span className="text-muted-foreground">Tiết kiệm:</span>
-                      <span>-{savings.toLocaleString("vi-VN")}₫</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between border-t border-border pt-2 font-bold">
-                    <span>Tổng cộng:</span>
-                    <span className="text-primary text-lg">{total.toLocaleString("vi-VN")}₫</span>
-                  </div>
-                </div>
-
-                <Button disabled={selectedItems.length === 0} onClick={handleCheckout} className="w-full h-12 text-base">
-                  Tiếp tục thanh toán
-                </Button>
-
-                <Link href="/">
-                  <Button variant="outline" className="w-full bg-transparent">
-                    Tiếp tục mua sắm
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
+                      </td>
+                      <td className="py-3 font-medium">{(line.displayPrice * line.quantity).toLocaleString('vi-VN')}₫</td>
+                      <td className="py-3">
+                        <div className="flex gap-2">
+                          <button onClick={() => handleRemove(line.id)} className="text-red-600">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
         </div>
+
+        <aside className="lg:col-span-1 space-y-4">
+          <Card>
+            <CardContent>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Tạm tính (chưa VAT)</span>
+                <span className="font-medium">{totals.subtotalPreTax.toLocaleString('vi-VN')}₫</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-muted-foreground">Thuế (VAT)</span>
+                <span className="font-medium">{totals.taxTotal.toLocaleString('vi-VN')}₫</span>
+              </div>
+              <div className="border-t mt-3 pt-3 flex justify-between items-center">
+                <div>
+                  <div className="text-sm text-muted-foreground">Tổng</div>
+                  <div className="font-bold text-xl">{totals.totalDisplay.toLocaleString('vi-VN')}₫</div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <Button className="w-full" onClick={handleCheckout}>
+                  Thanh toán
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </main>
   )

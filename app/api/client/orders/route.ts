@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
           vendorId,
           variantId,
           Product(id, name),
-          ProductVariant(id, name),
+          ProductVariant(id, name, image),
           productId
         )
       `, { count: 'exact' })
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, cartItems, shippingAddress, paymentMethod, shippingMethod, estimatedDelivery } = body
+    const { userId, cartItems, shippingAddress, paymentMethod, shippingMethod, estimatedDelivery, vendorVouchers = {} } = body
 
     if (!userId || !cartItems || !shippingAddress || !paymentMethod) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -187,10 +187,31 @@ export async function POST(request: NextRequest) {
           discount: itemDiscount,
           finalPrice: finalPrice,
           campaign: campaign,
+          taxApplied: item.taxApplied || false,
+          taxRate: item.taxRate || 0,
         })
       }
 
-      const vendorTotal = itemsSubtotal + shippingCostPerVendor
+      // Calculate tax for this vendor's items
+      let totalTax = 0
+      for (const item of itemsWithDiscounts) {
+        if (item.taxApplied && item.taxRate && item.taxRate > 0) {
+          const unitPrice = item.finalPrice / parseInt(item.quantity)
+          const itemTax = Math.round(unitPrice * (item.taxRate / 100)) * parseInt(item.quantity)
+          totalTax += itemTax
+        }
+      }
+      
+      let vendorTotal = itemsSubtotal + totalTax + shippingCostPerVendor
+      
+      // Apply voucher discount for this vendor
+      const vendorVoucherInfo = vendorVouchers[vendorId.toString()]
+      let voucherDiscount = 0
+      if (vendorVoucherInfo) {
+        voucherDiscount = vendorVoucherInfo.discountAmount || 0
+        vendorTotal = Math.max(0, vendorTotal - voucherDiscount)
+      }
+
       const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
       // Determine payment status based on payment method
@@ -222,15 +243,24 @@ export async function POST(request: NextRequest) {
       const orderId = orderData[0].id
       createdOrders.push(orderData[0])
 
-      // Create OrderItems for this vendor with final price (after discount)
-      const orderItems = itemsWithDiscounts.map((item: any) => ({
-        orderId,
-        productId: parseInt(item.productId),
-        vendorId,
-        variantId: item.variantId ? parseInt(item.variantId) : null,
-        quantity: parseInt(item.quantity),
-        price: item.finalPrice / parseInt(item.quantity)
-      }))
+      // Create OrderItems for this vendor with final price (after discount and tax)
+      const orderItems = itemsWithDiscounts.map((item: any) => {
+        const unitPrice = item.finalPrice / parseInt(item.quantity)
+        
+        let taxAmount = 0
+        if (item.taxApplied && item.taxRate && item.taxRate > 0) {
+          taxAmount = Math.round(unitPrice * (item.taxRate / 100))
+        }
+        
+        return {
+          orderId,
+          productId: parseInt(item.productId),
+          vendorId,
+          variantId: item.variantId ? parseInt(item.variantId) : null,
+          quantity: parseInt(item.quantity),
+          price: unitPrice + taxAmount
+        }
+      })
 
       const { error: itemsError } = await supabase
         .from('OrderItem')
@@ -240,20 +270,42 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: itemsError.message }, { status: 400 })
       }
 
-      // Update campaign purchased quantity and deduct stock
-      for (const item of itemsWithDiscounts) {
-        // Deduct stock for product / variant
-        const { data: productRow } = await supabase
-          .from('Product')
-          .select('id, stock')
-          .eq('id', item.productId)
-          .single()
+      // Handle voucher usage tracking
+      if (vendorVoucherInfo && vendorVoucherInfo.voucherId) {
+        const voucherId = vendorVoucherInfo.voucherId
+        const discountAmount = vendorVoucherInfo.discountAmount
 
-        if (productRow) {
-          const newStock = Math.max(0, (productRow.stock || 0) - item.quantity)
-          await supabase.from('Product').update({ stock: newStock }).eq('id', item.productId)
+        // Create VoucherUsage record
+        const { error: usageError } = await supabase
+          .from('VoucherUsage')
+          .insert([{
+            voucherId,
+            userId: parsedUserId,
+            orderId,
+            discountAmount,
+          }])
+
+        if (usageError) {
+          console.error('Failed to create voucher usage:', usageError)
         }
 
+        // Increment usageCount on Voucher
+        const { data: voucherData, error: voucherFetchError } = await supabase
+          .from('Voucher')
+          .select('usageCount')
+          .eq('id', voucherId)
+          .single()
+
+        if (!voucherFetchError && voucherData) {
+          await supabase
+            .from('Voucher')
+            .update({ usageCount: (voucherData.usageCount || 0) + 1 })
+            .eq('id', voucherId)
+        }
+      }
+
+      // Update campaign purchased quantity and deduct stock
+      for (const item of itemsWithDiscounts) {
         if (item.variantId) {
           const { data: variantRow } = await supabase
             .from('ProductVariant')
@@ -263,6 +315,17 @@ export async function POST(request: NextRequest) {
           if (variantRow) {
             const newVariantStock = Math.max(0, (variantRow.stock || 0) - item.quantity)
             await supabase.from('ProductVariant').update({ stock: newVariantStock }).eq('id', item.variantId)
+          }
+        } else {
+          const { data: productRow } = await supabase
+            .from('Product')
+            .select('id, stock')
+            .eq('id', item.productId)
+            .single()
+
+          if (productRow) {
+            const newStock = Math.max(0, (productRow.stock || 0) - item.quantity)
+            await supabase.from('Product').update({ stock: newStock }).eq('id', item.productId)
           }
         }
 
@@ -371,7 +434,7 @@ export async function PATCH(request: NextRequest) {
           vendorId,
           variantId,
           Product(id, name),
-          ProductVariant(id, name)
+          ProductVariant(id, name, image)
         )
       `)
 

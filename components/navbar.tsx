@@ -309,6 +309,14 @@ export function Navbar() {
                       </Link>
                     ))}
                   </div>
+                  <div className="border-t border-border px-4 py-3 bg-gray-50 dark:bg-slate-900">
+                    <Link
+                      href="/client/categories"
+                      className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      Xem tất cả danh mục →
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
