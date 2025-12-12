@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
       : []
 
     const basePrice = parseFloat(body.price)
-    const taxRate = body.taxApplied && body.taxRate ? parseFloat(body.taxRate) : 0
+    const taxApplied = body.taxApplied !== false
+    const taxRate = taxApplied && body.taxRate ? parseFloat(body.taxRate) : (taxApplied ? 10 : 0)
     const taxIncluded = body.taxIncluded !== false
 
     const productData = {
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       specifications: body.specifications || null,
       shippingInfo: body.shippingInfo || null,
       warranty: body.warranty || null,
-      taxApplied: body.taxApplied || false,
+      taxApplied: taxApplied,
       taxRate: taxRate,
       taxIncluded: taxIncluded,
       rating: 0,

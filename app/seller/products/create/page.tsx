@@ -317,9 +317,9 @@ export default function SellerCreateProductPage() {
           stock: stockToSend,
           attributes: attributes,
           variants: filteredVariants,
-          taxApplied: false,
+          taxApplied: true,
           taxIncluded: true,
-          taxRate: 0,
+          taxRate: 10,
           images: productImages.map(img => ({
             image: img.url,
             isMain: img.isMain,
