@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         OrderItem(
           *,
           Product(name, price),
-          ProductVariant(id, name)
+          ProductVariant(id, name, image)
         )
       `, { count: 'exact' })
 

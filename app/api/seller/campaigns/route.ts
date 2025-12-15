@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const vendorId = searchParams.get('vendorId')
     const type = searchParams.get('type') // 'available', 'registered', 'all'
+    const campaignType = searchParams.get('campaignType') // 'regular', 'flash_sale', or null for all
 
     if (!vendorId) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 })
@@ -23,7 +24,12 @@ export async function GET(request: NextRequest) {
       .from('Campaign')
       .select('*')
       .in('status', visibleStatuses)
-      .order('startDate', { ascending: false })
+
+    if (campaignType && ['regular', 'flash_sale'].includes(campaignType)) {
+      campaignQuery = campaignQuery.eq('campaignType', campaignType)
+    }
+
+    campaignQuery = campaignQuery.order('startDate', { ascending: false })
 
     const { data: campaigns, error: campaignError } = await campaignQuery
 
@@ -31,7 +37,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: campaignError.message }, { status: 400 })
     }
 
-    // Get vendor registrations
     const { data: registrations, error: registrationError } = await supabase
       .from('CampaignVendorRegistration')
       .select('*')
@@ -41,7 +46,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: registrationError.message }, { status: 400 })
     }
 
-    // Get approved products for this vendor to determine actual vendor registration status
     const { data: approvedProducts, error: productsError } = await supabase
       .from('CampaignProduct')
       .select('campaignId')
@@ -52,7 +56,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: productsError.message }, { status: 400 })
     }
 
-    // Create a map of campaignId -> has approved products
     const campaignsWithApprovedProducts = new Set(
       approvedProducts?.map((p) => p.campaignId) || []
     )
@@ -75,8 +78,6 @@ export async function GET(request: NextRequest) {
       const vendorRegistration = registrations?.find((r) => r.campaignId === campaign.id)
       const hasApprovedProducts = campaignsWithApprovedProducts.has(campaign.id)
       
-      // If vendor has approved products, vendor registration is considered approved
-      // Otherwise, use the status from vendor registration table
       let registrationStatus = vendorRegistration?.status || null
       if (hasApprovedProducts && registrationStatus !== 'rejected') {
         registrationStatus = 'approved'

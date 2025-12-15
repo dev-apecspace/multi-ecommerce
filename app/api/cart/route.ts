@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { isCampaignActive } from '@/lib/price-utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,11 +30,9 @@ export async function GET(request: NextRequest) {
           originalPrice,
           stock,
           vendorId,
-          taxApplied,
-          taxRate,
           Vendor!inner(id, name)
         ),
-        ProductVariant(id, name, sku, barcode, image, price, originalPrice)
+        ProductVariant(id, name, sku, barcode, price, originalPrice, image)
       `)
       .eq('userId', parseInt(userId))
 
@@ -85,7 +84,9 @@ export async function GET(request: NextRequest) {
 
     const responseData = (data || []).map((item: any) => {
       const product = item.Product
-      const variant = item.ProductVariant
+      const variant = item.variantId && Array.isArray(item.ProductVariant)
+        ? item.ProductVariant.find((v: any) => v.id === item.variantId)
+        : item.ProductVariant
       const baseUnit = variant?.price ?? product.price
       const originalUnit = variant?.originalPrice ?? product.originalPrice ?? baseUnit
       const key = `${product.id}-${variant?.id || 'null'}`
@@ -94,6 +95,7 @@ export async function GET(request: NextRequest) {
       let applied = null
       let bestPrice = baseUnit
       campaignsForItem.forEach((c) => {
+        if (!isCampaignActive(c)) return
         const price = computeDiscountPrice(baseUnit, c)
         if (price < bestPrice) {
           bestPrice = price
@@ -103,13 +105,19 @@ export async function GET(request: NextRequest) {
       const saleUnit = applied ? bestPrice : null
       const finalUnit = saleUnit ?? baseUnit
       return {
-        ...item,
-        price: baseUnit,
+        id: item.id,
+        productId: product.id,
+        variantId: item.variantId,
+        variantName: variant?.name,
+        productName: product.name,
+        image: variant?.image,
+        quantity: item.quantity,
+        basePrice: baseUnit,
         originalPrice: originalUnit,
         salePrice: saleUnit,
         finalPrice: finalUnit * item.quantity,
-        taxApplied: product.taxApplied || false,
-        taxRate: product.taxRate || 0,
+        vendorId: product.vendorId,
+        vendorName: product.Vendor?.name,
         appliedCampaign: applied,
       }
     })
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest) {
         quantity,
         variantId,
         Product!inner(id, name, price, stock),
-        ProductVariant(id, name, image)
+        ProductVariant(id, name)
       `)
 
     if (error) {

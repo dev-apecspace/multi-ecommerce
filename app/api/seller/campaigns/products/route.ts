@@ -152,6 +152,9 @@ export async function POST(request: NextRequest) {
         const otherStart = new Date(cp.Campaign.startDate).getTime()
         const otherEnd = new Date(cp.Campaign.endDate).getTime()
 
+        // Ignore expired campaigns
+        if (otherEnd < Date.now()) return false
+
         // Check overlap: (StartA <= EndB) and (EndA >= StartB)
         return (currentStart <= otherEnd && currentEnd >= otherStart)
       })

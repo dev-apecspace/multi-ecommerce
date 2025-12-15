@@ -152,6 +152,7 @@ export default function AccountContent() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList>
             <TabsTrigger value="orders">Đơn hàng</TabsTrigger>
+            <TabsTrigger value="returns">Trả hàng</TabsTrigger>
             <TabsTrigger value="addresses">Địa chỉ</TabsTrigger>
             <TabsTrigger value="favorites">Yêu thích</TabsTrigger>
             <TabsTrigger value="settings">Cài đặt</TabsTrigger>
@@ -165,6 +166,20 @@ export default function AccountContent() {
                   <p className="text-muted-foreground">Không có đơn hàng nào</p>
                   <Link href="/">
                     <Button className="mt-4">Bắt đầu mua sắm</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="returns" className="mt-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center py-12">
+                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-4">Quản lý các yêu cầu trả hàng của bạn</p>
+                  <Link href="/client/returns">
+                    <Button>Xem trả hàng</Button>
                   </Link>
                 </div>
               </CardContent>

@@ -46,8 +46,11 @@ interface Campaign {
   description?: string
   type: 'percentage' | 'fixed'
   discountValue: number
+  campaignType?: 'regular' | 'flash_sale'
   startDate: string
   endDate: string
+  flashSaleStartTime?: string
+  flashSaleEndTime?: string
   status: CampaignStatus
   budget?: number
   createdAt: string
@@ -86,8 +89,11 @@ export default function AdminCampaignsPage() {
     description: '',
     type: 'percentage',
     discountValue: 0,
+    campaignType: 'regular' as 'regular' | 'flash_sale',
     startDate: '',
     endDate: '',
+    flashSaleStartTime: '',
+    flashSaleEndTime: '',
     budget: '',
     status: 'draft' as CampaignStatus,
   })
@@ -156,6 +162,15 @@ export default function AdminCampaignsPage() {
       return
     }
 
+    if (formData.campaignType === 'flash_sale' && (!formData.flashSaleStartTime || !formData.flashSaleEndTime)) {
+      toast({
+        title: 'Lỗi',
+        description: 'Flash Sale phải có giờ bắt đầu và giờ kết thúc',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const startDateObj = new Date(formData.startDate)
     const endDateObj = new Date(formData.endDate)
     if (startDateObj >= endDateObj) {
@@ -174,6 +189,8 @@ export default function AdminCampaignsPage() {
         discountValue: parseFloat(formData.discountValue.toString()),
         budget: formData.budget ? parseFloat(formData.budget) : null,
         createdBy: parseInt(userId),
+        flashSaleStartTime: formData.campaignType === 'flash_sale' ? formData.flashSaleStartTime : null,
+        flashSaleEndTime: formData.campaignType === 'flash_sale' ? formData.flashSaleEndTime : null,
         ...(editingCampaign && { campaignId: editingCampaign.id }),
       }
 
@@ -200,8 +217,11 @@ export default function AdminCampaignsPage() {
         description: '',
         type: 'percentage',
         discountValue: 0,
+        campaignType: 'regular',
         startDate: '',
         endDate: '',
+        flashSaleStartTime: '',
+        flashSaleEndTime: '',
         budget: '',
         status: 'draft',
       })
@@ -369,6 +389,18 @@ export default function AdminCampaignsPage() {
                   placeholder="Nhập mô tả"
                 />
               </div>
+              <div>
+                <Label>Loại chương trình</Label>
+                <Select value={formData.campaignType} onValueChange={(value) => setFormData({ ...formData, campaignType: value as 'regular' | 'flash_sale' })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="regular">Khuyến mãi thường</SelectItem>
+                    <SelectItem value="flash_sale">Flash Sale</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Loại giảm giá</Label>
@@ -410,6 +442,26 @@ export default function AdminCampaignsPage() {
                   />
                 </div>
               </div>
+              {formData.campaignType === 'flash_sale' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Giờ bắt đầu (mỗi ngày)</Label>
+                    <Input
+                      type="time"
+                      value={formData.flashSaleStartTime}
+                      onChange={(e) => setFormData({ ...formData, flashSaleStartTime: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Giờ kết thúc (mỗi ngày)</Label>
+                    <Input
+                      type="time"
+                      value={formData.flashSaleEndTime}
+                      onChange={(e) => setFormData({ ...formData, flashSaleEndTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Trạng thái</Label>
@@ -461,7 +513,8 @@ export default function AdminCampaignsPage() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-3 px-4">Tên chương trình</th>
-                      <th className="text-left py-3 px-4">Loại</th>
+                      <th className="text-left py-3 px-4">Loại CT</th>
+                      <th className="text-left py-3 px-4">Loại giảm giá</th>
                       <th className="text-left py-3 px-4">Giảm giá</th>
                       <th className="text-left py-3 px-4">Từ ngày</th>
                       <th className="text-left py-3 px-4">Đến ngày</th>
@@ -473,6 +526,15 @@ export default function AdminCampaignsPage() {
                     {campaigns.map((campaign) => (
                       <tr key={campaign.id} className="border-b border-border hover:bg-muted">
                         <td className="py-3 px-4 font-medium">{campaign.name}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            campaign.campaignType === 'flash_sale' 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {campaign.campaignType === 'flash_sale' ? 'Flash Sale' : 'Thường'}
+                          </span>
+                        </td>
                         <td className="py-3 px-4">{campaign.type === 'percentage' ? 'Phần trăm' : 'Giảm trực tiếp'}</td>
                         <td className="py-3 px-4">
                           {campaign.discountValue}
@@ -497,8 +559,11 @@ export default function AdminCampaignsPage() {
                                 description: campaign.description || '',
                                 type: campaign.type,
                                 discountValue: campaign.discountValue,
+                                campaignType: campaign.campaignType || 'regular',
                                 startDate: new Date(campaign.startDate).toISOString().slice(0, 16),
                                 endDate: new Date(campaign.endDate).toISOString().slice(0, 16),
+                                flashSaleStartTime: campaign.flashSaleStartTime || '',
+                                flashSaleEndTime: campaign.flashSaleEndTime || '',
                                 budget: campaign.budget?.toString() || '',
                                 status: campaign.status,
                               })

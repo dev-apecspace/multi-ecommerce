@@ -13,7 +13,7 @@ import { VariantSelectionModal } from "@/components/product/variant-selection-mo
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
-import { computePrice } from "@/lib/price-utils"
+import { computePrice, isCampaignActive } from "@/lib/price-utils"
 
 interface ProductDetailPageProps {
   params: Promise<{ slug: string }>
@@ -50,15 +50,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             originalPrice: v.originalPrice ?? prod.originalPrice,
           }))
 
-          const campaignPrices = variantPrices.filter((p) => p.campaignPrice !== null).map((p) => p.campaignPrice!)
-          const minVariantCampaignPrice = campaignPrices.length ? Math.min(...campaignPrices) : null
-
-          const basePrices = variantPrices.map((p) => p.basePrice).filter((p) => typeof p === 'number' && p > 0)
-          const minVariantBasePrice = basePrices.length ? Math.min(...basePrices) : null
-
-          const originalPrices = variantPrices.map((p) => p.originalPrice).filter((p): p is number => typeof p === 'number' && p > 0)
-          const minVariantOriginalPrice = originalPrices.length ? Math.min(...originalPrices) : null
-
           const productData = {
             ...prod,
             images: prod.media?.map((img: any) => img.url) || [prod.image || "/placeholder.svg"],
@@ -81,14 +72,24 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             variants: prod.ProductVariant || [],
           }
 
-          const campaignPrice = minVariantCampaignPrice !== null ? minVariantCampaignPrice : prod.salePrice
-          const basePrice = minVariantBasePrice ?? prod.price
-          const originalPrice = minVariantOriginalPrice ?? prod.originalPrice
+          // Use first variant price if available, otherwise fallback to product price
+          let campaignPrice = prod.salePrice
+          let basePrice = prod.price
+          let originalPrice = prod.originalPrice
+
+          if (prod.ProductVariant && prod.ProductVariant.length > 0) {
+            const firstVar = prod.ProductVariant[0]
+            campaignPrice = firstVar.salePrice ?? null
+            basePrice = firstVar.price
+            originalPrice = firstVar.originalPrice ?? firstVar.price
+          }
 
           productData.salePrice = campaignPrice ?? null
           productData.campaignPrice = campaignPrice ?? null
           productData.price = basePrice ?? originalPrice
           productData.originalPrice = originalPrice ?? basePrice
+          productData.parentPrice = prod.price
+          productData.parentOriginalPrice = prod.originalPrice
           productData.taxApplied = prod.taxApplied || false
           productData.taxIncluded = prod.taxIncluded !== false
           productData.taxRate = prod.taxRate || 0
@@ -112,6 +113,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : []
 
+  const isPromotionActive = () => {
+    return isCampaignActive(product?.appliedCampaign)
+  }
+
+  const getFlashSaleTimeDisplay = () => {
+    if (!product?.appliedCampaign?.flashSaleStartTime || !product?.appliedCampaign?.flashSaleEndTime) {
+      return null
+    }
+    return `${product.appliedCampaign.flashSaleStartTime} - ${product.appliedCampaign.flashSaleEndTime}`
+  }
+
   const handleBuyNow = () => {
     if (!user) {
       router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
@@ -122,15 +134,16 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       setAction('buy')
       setVariantModalOpen(true)
     } else {
+      const effectivePrice = (promotionActive ? (product.campaignPrice ?? product.salePrice ?? product.price) : product.price)
       const checkoutItems = [{
         id: product?.id,
         productId: product.id,
         productName: product.name,
         quantity: quantity,
-        price: product.campaignPrice ?? product.price,
+        price: effectivePrice,
         basePrice: product.price,
         originalPrice: product.originalPrice,
-        salePrice: product.salePrice,
+        salePrice: promotionActive ? product.salePrice : null,
         taxApplied: product.taxApplied,
         taxRate: product.taxRate,
         image: product.image,
@@ -208,7 +221,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
       if (action === 'buy') {
         const selectedVariant = product.variants.find((v: any) => v.id === variantId)
-        const variantCampaignPrice = selectedVariant?.salePrice ?? null
+        const variantPromotionActive = isCampaignActive(selectedVariant?.appliedCampaign)
+        const variantCampaignPrice = (variantPromotionActive ? selectedVariant?.salePrice : null) ?? null
         const variantBasePrice = selectedVariant?.price ?? product.price
         const variantOriginalPrice = selectedVariant?.originalPrice ?? product.originalPrice
 
@@ -280,9 +294,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     ? product.price 
     : (typeof product.originalPrice === 'number' && product.originalPrice > 0 ? product.originalPrice : 0)
   
-  const salePrice = (typeof product.salePrice === 'number' && product.salePrice > 0) 
+  const promotionActive = isCampaignActive(product?.appliedCampaign)
+  const salePrice = (promotionActive && typeof product.salePrice === 'number' && product.salePrice > 0) 
     ? product.salePrice 
-    : (typeof product.campaignPrice === 'number' && product.campaignPrice > 0 ? product.campaignPrice : null)
+    : (promotionActive && typeof product.campaignPrice === 'number' && product.campaignPrice > 0 ? product.campaignPrice : null)
   
   const originalPrice = (typeof product.originalPrice === 'number' && product.originalPrice > 0) ? product.originalPrice : basePrice
 
@@ -297,9 +312,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   // prepare variants list enriched with display prices for modal
   const variantListForModal = (product.variants || []).map((v: any) => {
-    const variantBase = v.price ?? product.price
-    const variantSale = v.salePrice ?? null
-    const variantOriginal = v.originalPrice ?? product.originalPrice ?? variantBase
+    const variantBase = v.price ?? product.parentPrice ?? product.price
+    const variantPromotionActive = isCampaignActive(v.appliedCampaign)
+    const variantSale = (variantPromotionActive && v.salePrice) ? v.salePrice : null
+    const variantOriginal = v.originalPrice ?? product.parentOriginalPrice ?? product.originalPrice ?? variantBase
 
     const vd = computePrice({
       basePrice: variantBase,
@@ -380,6 +396,18 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     fill
                     className="object-cover"
                   />
+                  {product.appliedCampaign?.campaignType === 'flash_sale' && (
+                    <div className="absolute top-3 left-3 bg-yellow-400 text-yellow-900 px-2 py-1 rounded text-xs font-bold z-10">
+                      <div className="flex items-center gap-1">
+                        <span className="animate-pulse">⚡</span> FLASH SALE
+                      </div>
+                      {getFlashSaleTimeDisplay() && (
+                        <div className="text-xs font-semibold mt-1">
+                          {getFlashSaleTimeDisplay()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {priceData.discountPercent > 0 && (
                     <div className="absolute top-3 right-3 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
                       -{priceData.discountPercent}%
@@ -436,7 +464,19 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 </div>
 
                 {/* Price */}
-                <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-4">
+                <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-4 relative overflow-hidden">
+                  {product.appliedCampaign?.campaignType === 'flash_sale' && (
+                    <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 px-3 py-2 rounded-bl-lg text-xs font-bold">
+                      <div className="flex items-center gap-1">
+                        <span className="animate-pulse">⚡</span> FLASH SALE
+                      </div>
+                      {getFlashSaleTimeDisplay() && (
+                        <div className="text-xs font-semibold mt-1 whitespace-nowrap">
+                          {getFlashSaleTimeDisplay()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl font-bold text-primary">{displayProduct.price.toLocaleString("vi-VN")}₫</span>
                     {displayProduct.taxApplied && displayProduct.taxRate && product.taxIncluded && (

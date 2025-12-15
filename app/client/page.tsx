@@ -10,21 +10,37 @@ import { BrandSlider } from "@/components/homepage/brand-slider"
 
 export default function HomePage() {
   return (
-    <main className="w-full">
+    <main className="w-full bg-white dark:bg-slate-950">
       <TopBanner />
       <MegaMenu />
-      <FlashSaleCarousel />
-      <div className="container-viewport my-8">
-        <ShopeemalSlider />
+      
+      {/* Flash Sale Section - Prominent */}
+      <div className="bg-gradient-to-b from-red-50 to-white dark:from-slate-900 dark:to-slate-950 py-6">
+        <FlashSaleCarousel />
       </div>
-      <div className="container-viewport my-8">
+
+      {/* Promotional Blocks Section */}
+      <div className="container-viewport my-12">
         <PromotionalBlocks />
       </div>
-      <div className="container-viewport my-8">
+
+      {/* Shopeemal Section */}
+      <div className="bg-gray-50 dark:bg-slate-900 py-8">
+        <div className="container-viewport">
+          <ShopeemalSlider />
+        </div>
+      </div>
+
+      {/* Brand Slider Section */}
+      <div className="container-viewport my-12">
         <BrandSlider />
       </div>
-      <div className="container-viewport my-8">
-        <RecommendedProducts />
+
+      {/* Recommended Products Section */}
+      <div className="bg-gray-50 dark:bg-slate-900 py-8">
+        <div className="container-viewport">
+          <RecommendedProducts />
+        </div>
       </div>
     </main>
   )

@@ -24,6 +24,7 @@ interface Campaign {
   name: string
   type: 'percentage' | 'fixed'
   discountValue: number
+  campaignType?: 'regular' | 'flash_sale'
   startDate: string
   endDate: string
   status?: 'draft' | 'upcoming' | 'active' | 'ended'
@@ -146,6 +147,9 @@ export default function CampaignProductsPage() {
     const conflict = product.CampaignProduct.find(cp => {
       if (cp.campaignId === campaign.id) return false
       if (!cp.Campaign || cp.Campaign.status === 'ended') return false
+
+      // Ignore expired campaigns
+      if (new Date(cp.Campaign.endDate).getTime() < Date.now()) return false
 
       // Check variant match
       if (typeof variantId === 'number') {
@@ -488,7 +492,16 @@ export default function CampaignProductsPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">{campaign.name}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold">{campaign.name}</h1>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              campaign.campaignType === 'flash_sale' 
+                ? 'bg-yellow-100 text-yellow-800' 
+                : 'bg-blue-100 text-blue-800'
+            }`}>
+              {campaign.campaignType === 'flash_sale' ? 'Flash Sale' : 'Khuyến mãi thường'}
+            </span>
+          </div>
           <p className="text-muted-foreground mt-1">
             Giảm {campaign.discountValue}
             {campaign.type === 'percentage' ? '%' : ' VND'} | Từ{' '}

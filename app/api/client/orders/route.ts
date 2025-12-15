@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { isCampaignActive } from '@/lib/price-utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
         total,
         shippingCost,
         date,
+        updatedAt,
         paymentMethod,
         paymentStatus,
         shippingAddress,
@@ -38,9 +40,10 @@ export async function GET(request: NextRequest) {
           price,
           vendorId,
           variantId,
+          variantName,
+          productId,
           Product(id, name),
-          ProductVariant(id, name, image),
-          productId
+          ProductVariant(id, name, image)
         )
       `, { count: 'exact' })
       .eq('userId', parseInt(userId))
@@ -82,12 +85,14 @@ export async function POST(request: NextRequest) {
 
     // Get active campaigns
     const now = new Date().toISOString()
-    const { data: activeCampaigns } = await supabase
+    const { data: rawCampaigns } = await supabase
       .from('Campaign')
       .select('*')
       .eq('status', 'active')
       .lte('startDate', now)
       .gte('endDate', now)
+
+    const activeCampaigns = (rawCampaigns || []).filter(isCampaignActive)
 
     // Get approved campaign products
     let campaignProducts: any[] = []
@@ -135,49 +140,62 @@ export async function POST(request: NextRequest) {
       // Calculate subtotal and discount for each item, using server-trusted prices
       const itemsWithDiscounts = []
       for (const item of vendorItems) {
-        // Fetch latest price for product/variant
-        const { data: productRow, error: productErr } = await supabase
-          .from('Product')
-          .select('price, originalPrice')
-          .eq('id', item.productId)
-          .single()
-        if (productErr || !productRow) {
-          return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-        }
-        let unitPrice = productRow.price
-        let unitOriginal = productRow.originalPrice ?? productRow.price
+        const campaignKey = `${item.productId}-${item.variantId || 'null'}`
+        const campaign = campaignMap.get(campaignKey)
 
+        let basePrice = 0
+        let unitPrice = 0
+        let unitOriginal = 0
+
+        // IMPORTANT: If variantId exists, MUST use variant price. Never fallback to product price for variant items.
         if (item.variantId) {
           const { data: variantRow, error: variantErr } = await supabase
             .from('ProductVariant')
-            .select('price, originalPrice')
+            .select('price, originalPrice, name')
             .eq('id', item.variantId)
             .eq('productId', item.productId)
             .single()
           if (variantErr || !variantRow) {
-            return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+            return NextResponse.json({ error: `Variant ${item.variantId} not found` }, { status: 404 })
           }
-          unitPrice = variantRow.price ?? unitPrice
-          unitOriginal = variantRow.originalPrice ?? unitOriginal
+          // Use variant price - if null, it's an error, don't fallback to product
+          if (!variantRow.price && variantRow.price !== 0) {
+            return NextResponse.json({ error: `Variant ${item.variantId} has no price set` }, { status: 400 })
+          }
+          basePrice = variantRow.price
+          unitOriginal = variantRow.originalPrice ?? basePrice
+          // Store variant name for order item
+          item.variantName = variantRow.name
+        } else {
+          // No variant, use product price
+          const { data: productRow, error: productErr } = await supabase
+            .from('Product')
+            .select('price, originalPrice')
+            .eq('id', item.productId)
+            .single()
+          if (productErr || !productRow) {
+            return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+          }
+          basePrice = productRow.price
+          unitOriginal = productRow.originalPrice ?? basePrice
         }
 
-        const basePrice = unitPrice * item.quantity
-        const campaignKey = `${item.productId}-${item.variantId || 'null'}`
-        const campaign = campaignMap.get(campaignKey)
-
+        // Apply campaign discount if available
         let itemDiscount = 0
-        let finalPrice = basePrice
-
         if (campaign) {
           if (campaign.type === 'percentage') {
-            itemDiscount = (basePrice * campaign.discountValue) / 100
+            itemDiscount = (basePrice * campaign.discountValue / 100) * item.quantity
+            unitPrice = basePrice * (1 - campaign.discountValue / 100)
           } else if (campaign.type === 'fixed') {
             itemDiscount = campaign.discountValue * item.quantity
+            unitPrice = Math.max(0, basePrice - campaign.discountValue)
           }
-          finalPrice = Math.max(0, basePrice - itemDiscount)
           discountAmount += itemDiscount
+        } else {
+          unitPrice = basePrice
         }
 
+        const finalPrice = unitPrice * item.quantity
         itemsSubtotal += finalPrice
 
         itemsWithDiscounts.push({
@@ -245,7 +263,7 @@ export async function POST(request: NextRequest) {
 
       // Create OrderItems for this vendor with final price (after discount and tax)
       const orderItems = itemsWithDiscounts.map((item: any) => {
-        const unitPrice = item.finalPrice / parseInt(item.quantity)
+        let unitPrice = item.price
         
         let taxAmount = 0
         if (item.taxApplied && item.taxRate && item.taxRate > 0) {
@@ -257,6 +275,7 @@ export async function POST(request: NextRequest) {
           productId: parseInt(item.productId),
           vendorId,
           variantId: item.variantId ? parseInt(item.variantId) : null,
+          variantName: item.variantName || null,
           quantity: parseInt(item.quantity),
           price: unitPrice + taxAmount
         }
@@ -367,6 +386,7 @@ export async function POST(request: NextRequest) {
         total,
         shippingCost,
         date,
+        updatedAt,
         shippingAddress,
         paymentMethod,
         Vendor(id, name),
@@ -376,6 +396,8 @@ export async function POST(request: NextRequest) {
           price,
           vendorId,
           variantId,
+          variantName,
+          productId,
           Product(id, name),
           ProductVariant(id, name, image)
         )
@@ -397,26 +419,58 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Order ID and status required' }, { status: 400 })
     }
 
-    // Only allow cancellation of pending orders
+    const parsedOrderId = parseInt(orderId)
+
+    // Fetch existing order with items
     const { data: existingOrder, error: fetchError } = await supabase
       .from('Order')
-      .select('status')
-      .eq('id', parseInt(orderId))
+      .select(`
+        status,
+        OrderItem(id)
+      `)
+      .eq('id', parsedOrderId)
       .single()
 
     if (fetchError || !existingOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    if (existingOrder.status !== 'pending') {
-      return NextResponse.json({ error: 'Only pending orders can be cancelled' }, { status: 400 })
+    // Allow specific status transitions
+    const validTransitions: Record<string, string[]> = {
+      'pending': ['cancelled'],
+      'delivered': ['completed']
+    }
+
+    const allowedStatuses = validTransitions[existingOrder.status] || []
+    if (!allowedStatuses.includes(status)) {
+      return NextResponse.json({ error: `Cannot update order from ${existingOrder.status} to ${status}` }, { status: 400 })
+    }
+
+    // If transitioning to 'completed', check for pending returns
+    if (status === 'completed') {
+      const orderItemIds = (existingOrder.OrderItem || []).map((item: any) => item.id)
+      
+      if (orderItemIds.length > 0) {
+        const { data: pendingReturns, error: returnsError } = await supabase
+          .from('Return')
+          .select('id, status')
+          .in('orderItemId', orderItemIds)
+          .not('status', 'in', '("rejected","completed","cancelled")')
+
+        if (!returnsError && pendingReturns && pendingReturns.length > 0) {
+          return NextResponse.json(
+            { error: 'Cannot complete order with pending returns. Please wait for all returns to be processed.' },
+            { status: 400 }
+          )
+        }
+      }
     }
 
     // Update order status
     const { data, error } = await supabase
       .from('Order')
       .update({ status })
-      .eq('id', parseInt(orderId))
+      .eq('id', parsedOrderId)
       .select(`
         id,
         orderNumber,
@@ -424,6 +478,7 @@ export async function PATCH(request: NextRequest) {
         total,
         shippingCost,
         date,
+        updatedAt,
         paymentMethod,
         shippingAddress,
         Vendor(id, name),
@@ -433,6 +488,8 @@ export async function PATCH(request: NextRequest) {
           price,
           vendorId,
           variantId,
+          variantName,
+          productId,
           Product(id, name),
           ProductVariant(id, name, image)
         )

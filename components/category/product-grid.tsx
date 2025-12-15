@@ -10,6 +10,7 @@ import { generateSlug } from "@/lib/utils"
 import { VariantSelectionModal } from "@/components/product/variant-selection-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { computePrice, isCampaignActive } from "@/lib/price-utils"
 
 interface ProductGridProps {
   category?: string
@@ -211,9 +212,32 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         {displayProducts.map((product) => {
           const vendorName = product.Vendor?.name || "Shop"
-          const discount = product.originalPrice 
-            ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-            : 0
+          
+          let basePrice = product.price
+          let originalPrice = product.originalPrice || product.price
+          let promotionActive = isCampaignActive(product.appliedCampaign)
+          let salePrice = (promotionActive && product.salePrice) ? product.salePrice : null
+          const hasVariants = product.ProductVariant && product.ProductVariant.length > 0
+          
+          if (hasVariants) {
+            const firstVariant = product.ProductVariant[0]
+            basePrice = firstVariant.price ?? product.price
+            originalPrice = firstVariant.originalPrice ?? product.originalPrice ?? basePrice
+            const variantPromotionActive = isCampaignActive(firstVariant.appliedCampaign)
+            salePrice = (variantPromotionActive && firstVariant.salePrice) ? firstVariant.salePrice : null
+          }
+          
+          const priceData = computePrice({
+            basePrice,
+            originalPrice,
+            salePrice,
+            taxApplied: product.taxApplied || false,
+            taxRate: product.taxRate || 0,
+            taxIncluded: product.taxIncluded !== false,
+          })
+          
+          const displayPrice = priceData.displayPrice
+          const discount = priceData.discountPercent
           
           const mainImage = (product.media?.[0]?.url) 
             || product.image 
@@ -264,29 +288,22 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
                     <p className="text-xs text-muted-foreground">Đã bán {(product.sold / 1000).toFixed(1)}k</p>
 
                     <div className="space-y-1">
-                      <div>
-                        {(() => {
-                          const taxAmount = (product.taxApplied && product.taxRate && !product.taxIncluded)
-                            ? Math.round(product.price * (product.taxRate / 100))
-                            : 0
-                          const finalPrice = product.price + taxAmount
-                          return (
-                            <>
-                              <p className="font-bold text-sm md:text-base text-primary">
-                                {finalPrice.toLocaleString("vi-VN")}₫
-                              </p>
-                              {product.taxApplied && product.taxRate && !product.taxIncluded && (
-                                <p className="text-xs text-amber-600 dark:text-amber-400">
-                                  (chưa bao gồm thuế {product.taxRate}%)
-                                </p>
-                              )}
-                            </>
-                          )
-                        })()}
+                      <div className="flex items-baseline gap-1">
+                        {hasVariants && (
+                          <p className="text-xs text-muted-foreground">Từ</p>
+                        )}
+                        <p className="font-bold text-sm md:text-base text-primary">
+                          {displayPrice.toLocaleString("vi-VN")}₫
+                        </p>
                       </div>
-                      {product.originalPrice && (
+                      {priceData.displayOriginalPrice > displayPrice && (
                         <p className="text-xs text-muted-foreground line-through">
-                          {product.originalPrice.toLocaleString("vi-VN")}₫
+                          {priceData.displayOriginalPrice.toLocaleString("vi-VN")}₫
+                        </p>
+                      )}
+                      {product.taxApplied && product.taxRate && !product.taxIncluded && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          (chưa bao gồm thuế {product.taxRate}%)
                         </p>
                       )}
                     </div>

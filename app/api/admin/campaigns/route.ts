@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const campaignId = searchParams.get('campaignId')
     const status = searchParams.get('status')
+    const campaignType = searchParams.get('campaignType')
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
 
@@ -24,6 +25,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       query = query.eq('status', status)
+    }
+
+    if (campaignType) {
+      query = query.eq('campaignType', campaignType)
     }
 
     const { data, error, count } = await query
@@ -50,7 +55,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, description, type, discountValue, startDate, endDate, budget, createdBy, status } = body
+    const { name, description, type, discountValue, startDate, endDate, budget, createdBy, status, campaignType, flashSaleStartTime, flashSaleEndTime } = body
 
     if (!name || !type || discountValue === undefined || !startDate || !endDate) {
       return NextResponse.json(
@@ -61,6 +66,17 @@ export async function POST(request: NextRequest) {
 
     if (!['percentage', 'fixed'].includes(type)) {
       return NextResponse.json({ error: 'Invalid type. Must be "percentage" or "fixed"' }, { status: 400 })
+    }
+
+    if (campaignType && !['regular', 'flash_sale'].includes(campaignType)) {
+      return NextResponse.json({ error: 'Invalid campaignType. Must be "regular" or "flash_sale"' }, { status: 400 })
+    }
+
+    if (campaignType === 'flash_sale' && (!flashSaleStartTime || !flashSaleEndTime)) {
+      return NextResponse.json(
+        { error: 'Flash sale requires flashSaleStartTime and flashSaleEndTime' },
+        { status: 400 }
+      )
     }
 
     if (type === 'percentage' && (discountValue < 0 || discountValue > 100)) {
@@ -74,6 +90,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 })
     }
 
+    const flashStartTime = campaignType === 'flash_sale' && flashSaleStartTime ? flashSaleStartTime : null
+    const flashEndTime = campaignType === 'flash_sale' && flashSaleEndTime ? flashSaleEndTime : null
+
     const { data, error } = await supabase
       .from('Campaign')
       .insert([
@@ -84,8 +103,11 @@ export async function POST(request: NextRequest) {
           discountValue,
           startDate: startDateObj.toISOString(),
           endDate: endDateObj.toISOString(),
+          flashSaleStartTime: flashStartTime,
+          flashSaleEndTime: flashEndTime,
           budget: budget || null,
           createdBy,
+          campaignType: campaignType || 'regular',
           status: status && ['draft', 'upcoming', 'active', 'ended'].includes(status) ? status : 'draft',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -116,6 +138,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid type. Must be "percentage" or "fixed"' }, { status: 400 })
     }
 
+    if (updateData.campaignType && !['regular', 'flash_sale'].includes(updateData.campaignType)) {
+      return NextResponse.json({ error: 'Invalid campaignType. Must be "regular" or "flash_sale"' }, { status: 400 })
+    }
+
+    if (updateData.campaignType === 'flash_sale' && (!updateData.flashSaleStartTime || !updateData.flashSaleEndTime)) {
+      return NextResponse.json(
+        { error: 'Flash sale requires flashSaleStartTime and flashSaleEndTime' },
+        { status: 400 }
+      )
+    }
+
     if (updateData.status && !['draft', 'upcoming', 'active', 'ended'].includes(updateData.status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
@@ -129,6 +162,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     updateData.updatedAt = new Date().toISOString()
+
+    if (updateData.flashSaleStartTime === '') updateData.flashSaleStartTime = null
+    if (updateData.flashSaleEndTime === '') updateData.flashSaleEndTime = null
 
     const { data, error } = await supabase
       .from('Campaign')

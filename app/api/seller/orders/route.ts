@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
           quantity,
           price,
           variantId,
+          variantName,
           Product(id, name),
           ProductVariant(id, name, image)
         )
@@ -89,7 +90,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Order ID, status and vendor ID required' }, { status: 400 })
     }
 
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled']
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
@@ -97,12 +98,27 @@ export async function PATCH(request: NextRequest) {
     // Verify order belongs to this vendor and check payment status
     const { data: orderData, error: orderError } = await supabase
       .from('Order')
-      .select('id, vendorId, paymentMethod, paymentStatus')
+      .select('id, vendorId, paymentMethod, paymentStatus, status')
       .eq('id', parseInt(orderId))
       .single()
 
     if (orderError || !orderData || orderData.vendorId !== parseInt(vendorId)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Add allowed transitions check for seller updates. Sellers should only transition orders in the normal flow.
+    const allowedTransitions: Record<string, string[]> = {
+      pending: ['processing', 'cancelled'],
+      processing: ['shipped', 'cancelled'],
+      shipped: ['delivered'],
+      delivered: [],
+      cancelled: []
+    }
+
+    const currentStatus = orderData.status
+    const allowedStatusesForCurrent = allowedTransitions[currentStatus] || []
+    if (!allowedStatusesForCurrent.includes(status)) {
+      return NextResponse.json({ error: `Cannot update order from ${currentStatus} to ${status}` }, { status: 400 })
     }
 
     // If trying to approve/process order with bank transfer, check payment status
@@ -140,6 +156,7 @@ export async function PATCH(request: NextRequest) {
           quantity,
           price,
           variantId,
+          variantName,
           Product(id, name),
           ProductVariant(id, name, image)
         )

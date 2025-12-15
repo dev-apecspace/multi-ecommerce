@@ -34,6 +34,7 @@ interface Campaign {
   description?: string
   type: 'percentage' | 'fixed'
   discountValue: number
+  campaignType?: 'regular' | 'flash_sale'
   startDate: string
   endDate: string
   status: CampaignStatus
@@ -244,6 +245,10 @@ export default function SellerCampaignsPage() {
                     )}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                       <div>
+                        <p className="text-sm text-muted-foreground">Loại chương trình</p>
+                        <p className="font-semibold">{campaign.campaignType === 'flash_sale' ? 'Flash Sale' : 'Khuyến mãi thường'}</p>
+                      </div>
+                      <div>
                         <p className="text-sm text-muted-foreground">Loại giảm giá</p>
                         <p className="font-semibold">{campaign.type === 'percentage' ? 'Phần trăm' : 'Giảm trực tiếp'}</p>
                       </div>
@@ -321,6 +326,10 @@ export default function SellerCampaignsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Loại chương trình</p>
+                        <p className="font-semibold">{campaign.campaignType === 'flash_sale' ? 'Flash Sale' : 'Khuyến mãi thường'}</p>
+                      </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Loại giảm giá</p>
                         <p className="font-semibold">{campaign.type === 'percentage' ? 'Phần trăm' : 'Giảm trực tiếp'}</p>
