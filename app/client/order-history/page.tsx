@@ -626,7 +626,7 @@ export default function OrderHistoryPage() {
                                   className="mt-2 text-blue-600 hover:text-blue-700"
                                   onClick={() => handleOpenReturnModal(order.id, item)}
                                 >
-                                  Trả hàng / Đổi hàng
+                                  Trả hàng hoàn tiền
                                 </Button>
                               )
                             )}

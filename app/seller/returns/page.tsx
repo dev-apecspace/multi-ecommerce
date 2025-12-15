@@ -275,7 +275,7 @@ export default function SellerReturnsPage() {
     <main className="container-viewport py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Quản lý trả hàng</h1>
-        <p className="text-muted-foreground">Xử lý các yêu cầu trả hàng / đổi hàng từ khách hàng</p>
+        <p className="text-muted-foreground">Xử lý các yêu cầu trả hàng từ khách hàng</p>
       </div>
 
       <Tabs defaultValue="all">
@@ -319,8 +319,7 @@ export default function SellerReturnsPage() {
                       : ret.Product.name
                     : ret.ProductVariant?.name || "Sản phẩm"
                   const paymentMethod = (ret.Order?.paymentMethod || "cod").toLowerCase()
-                  const requiresRefund =
-                    ret.returnType === "return" && paymentMethod !== "cod"
+                  const requiresRefund = ret.returnType === "return"
                   const refundCompleted =
                     ret.status === "refund_confirmed" || ret.Order?.paymentStatus === "refunded"
                   const awaitingRefund = requiresRefund && !refundCompleted

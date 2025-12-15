@@ -40,7 +40,7 @@ const RETURN_REASONS = [
 
 const RETURN_TYPES = [
   { value: "return", label: "Trả hàng hoàn tiền" },
-  { value: "exchange", label: "Đổi sản phẩm" },
+ 
 ]
 
 export function CreateReturnModal({
@@ -227,7 +227,7 @@ export function CreateReturnModal({
           </div>
 
           {/* Return Type */}
-          <div>
+          {/* <div>
             <label className="text-sm font-semibold mb-2 block">Loại yêu cầu</label>
             <div className="grid grid-cols-2 gap-2">
               {RETURN_TYPES.map((type) => (
@@ -244,7 +244,7 @@ export function CreateReturnModal({
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Return Reason */}
           <div>

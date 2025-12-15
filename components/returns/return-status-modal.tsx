@@ -182,7 +182,8 @@ export function ReturnStatusModal({
   }
 
   const paymentMethod = returnData.Order?.paymentMethod || "cod"
-  const requiresRefundStep = paymentMethod !== "cod"
+  // Treat COD same as other payment methods (require refund step)
+  const requiresRefundStep = true 
   const stepDefinitions = requiresRefundStep ? NON_COD_STEP_DEFS : COD_STEP_DEFS
   const statusFlow = stepDefinitions.map((step) => step.key)
   const normalizedStep = (() => {
