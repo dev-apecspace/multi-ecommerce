@@ -3,22 +3,58 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { User, ShoppingBag, Heart, MapPin, Settings, LogOut, Package, Award } from "lucide-react"
+import { User, ShoppingBag, Heart, MapPin, Settings, LogOut, Package, Award, ChevronRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/hooks/use-toast"
 import { AddressManagement } from "@/components/client/address-management"
+import Image from "next/image"
+
+interface Order {
+  id: number
+  orderNumber: string
+  status: string
+  total: number
+  date: string
+  Vendor: { id: number; name: string }
+  OrderItem: Array<{
+    id: number
+    quantity: number
+    Product: { id: number; name: string; image?: string }
+  }>
+}
+
+interface ReturnRequest {
+  id: number
+  status: string
+  requestedAt: string
+}
 
 export default function AccountContent() {
   const { user: authUser } = useAuth()
+  const { toast } = useToast()
   const searchParams = useSearchParams()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [activeTab, setActiveTab] = useState("orders")
+  const [userId, setUserId] = useState<number | null>(null)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [returnedOrders, setReturnedOrders] = useState<Order[]>([])
+  const [returns, setReturns] = useState<ReturnRequest[]>([])
+  const [exchanges, setExchanges] = useState<ReturnRequest[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [loadingReturns, setLoadingReturns] = useState(false)
 
   useEffect(() => {
     if (authUser) {
       setIsLoggedIn(true)
+      setUserId(Number(authUser.id))
+    } else {
+      const storedUserId = localStorage.getItem('userId')
+      if (storedUserId) {
+        setUserId(parseInt(storedUserId))
+      }
     }
   }, [authUser])
 
@@ -29,6 +65,47 @@ export default function AccountContent() {
     }
   }, [searchParams])
 
+  useEffect(() => {
+    if (userId && isLoggedIn) {
+      fetchOrders()
+      fetchReturns()
+    }
+  }, [userId, isLoggedIn])
+
+  const fetchOrders = async () => {
+    try {
+      setLoadingOrders(true)
+      const response = await fetch(`/api/client/orders?userId=${userId}`)
+      const result = await response.json()
+      const allOrders = result.data || []
+      
+      const activeOrders = allOrders.filter((o: Order) => o.status !== 'returned')
+      const returned = allOrders.filter((o: Order) => o.status === 'returned')
+      
+      setOrders(activeOrders.slice(0, 5))
+      setReturnedOrders(returned)
+    } catch (error) {
+      toast({ title: "Lỗi", description: "Không thể tải đơn hàng", variant: "destructive" })
+    } finally {
+      setLoadingOrders(false)
+    }
+  }
+
+  const fetchReturns = async () => {
+    try {
+      setLoadingReturns(true)
+      const response = await fetch(`/api/client/returns?userId=${userId}&limit=100`)
+      const result = await response.json()
+      const allReturns = result.data || []
+      setReturns(allReturns.filter((r: any) => r.returnType === "return"))
+      setExchanges(allReturns.filter((r: any) => r.returnType === "exchange"))
+    } catch (error) {
+      toast({ title: "Lỗi", description: "Không thể tải trả hàng", variant: "destructive" })
+    } finally {
+      setLoadingReturns(false)
+    }
+  }
+
   const user = authUser ? {
     id: authUser.id,
     name: authUser.name || "Người dùng",
@@ -37,14 +114,15 @@ export default function AccountContent() {
     avatar: (authUser.name || "User").charAt(0).toUpperCase(),
     joinDate: new Date().toISOString().split('T')[0],
     orders: {
-      pending: 0,
-      completed: 0,
-      cancelled: 0,
+      pending: orders.filter(o => o.status === 'pending' || o.status === 'processing').length,
+      completed: orders.filter(o => o.status === 'delivered').length,
+      cancelled: orders.filter(o => o.status === 'cancelled').length,
     },
     stats: {
       points: 0,
       level: "Thành viên",
-      favorites: 0,
+      returns: returns.length,
+      exchanges: exchanges.length,
     },
   } : null
 
@@ -132,18 +210,18 @@ export default function AccountContent() {
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
-                <Award className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold">{user.stats.points}</p>
-                <p className="text-xs text-muted-foreground">Điểm tích luỹ</p>
+                <Package className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold">{user.stats.returns}</p>
+                <p className="text-xs text-muted-foreground">Yêu cầu trả hàng</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="text-center">
-                <Heart className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold">{user.stats.favorites}</p>
-                <p className="text-xs text-muted-foreground">Sản phẩm yêu thích</p>
+                <Package className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-2xl font-bold">{user.stats.exchanges}</p>
+                <p className="text-xs text-muted-foreground">Yêu cầu đổi hàng</p>
               </div>
             </CardContent>
           </Card>
@@ -153,41 +231,201 @@ export default function AccountContent() {
           <TabsList>
             <TabsTrigger value="orders">Đơn hàng</TabsTrigger>
             <TabsTrigger value="returns">Trả hàng</TabsTrigger>
+            <TabsTrigger value="exchanges">Đổi hàng</TabsTrigger>
             <TabsTrigger value="addresses">Địa chỉ</TabsTrigger>
             <TabsTrigger value="favorites">Yêu thích</TabsTrigger>
             <TabsTrigger value="settings">Cài đặt</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="orders" className="mt-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-12">
-                  <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Không có đơn hàng nào</p>
-                  <Link href="/">
-                    <Button className="mt-4">Bắt đầu mua sắm</Button>
+          <TabsContent value="orders" className="mt-4 space-y-4">
+            {loadingOrders ? (
+              <Card><CardContent className="p-6 text-center">Đang tải đơn hàng...</CardContent></Card>
+            ) : orders.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center py-12">
+                    <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Không có đơn hàng nào</p>
+                    <Link href="/">
+                      <Button className="mt-4">Bắt đầu mua sắm</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {orders.map((order) => (
+                  <Card key={order.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <p className="font-semibold">Đơn #{order.orderNumber}</p>
+                            <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                              order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                              order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {order.status === 'delivered' ? 'Đã giao' :
+                               order.status === 'processing' ? 'Đang xử lý' :
+                               order.status === 'pending' ? 'Chờ xác nhận' :
+                               'Đã hủy'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{order.Vendor.name}</p>
+                          <p className="text-sm">
+                            {order.OrderItem.length} sản phẩm
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-orange-600">{order.total.toLocaleString('vi-VN')}₫</p>
+                          <Link href={`/client/orders/${order.id}`}>
+                            <Button variant="ghost" size="sm" className="mt-2">
+                              Chi tiết <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {orders.length > 0 && (
+                  <Link href="/client/order-history" className="block">
+                    <Button variant="outline" className="w-full">Xem tất cả đơn hàng</Button>
                   </Link>
-                </div>
-              </CardContent>
-            </Card>
+                )}
+              </>
+            )}
           </TabsContent>
 
-          <TabsContent value="returns" className="mt-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground mb-4">Quản lý các yêu cầu trả hàng của bạn</p>
-                  <Link href="/client/returns">
-                    <Button>Xem trả hàng</Button>
-                  </Link>
+          <TabsContent value="returns" className="mt-4 space-y-4">
+            {loadingReturns || loadingOrders ? (
+              <Card><CardContent className="p-6 text-center">Đang tải trả hàng...</CardContent></Card>
+            ) : returnedOrders.length === 0 && returns.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">Không có yêu cầu trả hàng nào</p>
+                    <Link href="/client/returns">
+                      <Button>Xem trả hàng</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {returnedOrders.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-lg">Đơn hàng đã trả</h3>
+                    {returnedOrders.map((order) => (
+                      <Card key={order.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <p className="font-semibold">Đơn #{order.orderNumber}</p>
+                                <span className="text-xs px-2 py-1 rounded font-semibold bg-orange-100 text-orange-800">
+                                  Đã trả
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">{order.Vendor.name}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-orange-600">{order.total.toLocaleString('vi-VN')}₫</p>
+                              <Link href={`/client/orders/${order.id}`}>
+                                <Button variant="ghost" size="sm" className="mt-2">
+                                  Chi tiết <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {returns.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-lg">Yêu cầu trả hàng</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-yellow-600">{returns.filter(r => r.status === 'pending').length}</p>
+                          <p className="text-xs text-muted-foreground">Chờ xử lý</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-blue-600">{returns.filter(r => r.status === 'approved').length}</p>
+                          <p className="text-xs text-muted-foreground">Đã duyệt</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4 text-center">
+                          <p className="text-2xl font-bold text-green-600">{returns.filter(r => r.status === 'completed').length}</p>
+                          <p className="text-xs text-muted-foreground">Hoàn thành</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                )}
+
+                <Link href="/client/returns" className="block">
+                  <Button className="w-full">Xem chi tiết trả hàng</Button>
+                </Link>
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="exchanges" className="mt-4">
+            {loadingReturns ? (
+              <Card><CardContent className="p-6 text-center">Đang tải đổi hàng...</CardContent></Card>
+            ) : exchanges.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">Không có yêu cầu đổi hàng nào</p>
+                    <Link href="/client/exchanges">
+                      <Button>Xem đổi hàng</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-yellow-600">{exchanges.filter(e => e.status === 'pending').length}</p>
+                      <p className="text-xs text-muted-foreground">Chờ liên hệ</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-600">{exchanges.filter(e => e.status === 'approved').length}</p>
+                      <p className="text-xs text-muted-foreground">Đã duyệt</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-green-600">{exchanges.filter(e => e.status === 'completed').length}</p>
+                      <p className="text-xs text-muted-foreground">Hoàn thành</p>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
+                <Link href="/client/exchanges" className="block">
+                  <Button className="w-full">Xem chi tiết đổi hàng</Button>
+                </Link>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="addresses" className="mt-4">
-            <AddressManagement userId={user?.id || null} />
+            <AddressManagement userId={user?.id ? Number(user.id) : null} />
           </TabsContent>
 
           <TabsContent value="favorites" className="mt-4">

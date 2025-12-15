@@ -138,6 +138,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       const checkoutItems = [{
         id: product?.id,
         productId: product.id,
+        variantId: null,
         productName: product.name,
         quantity: quantity,
         price: effectivePrice,
@@ -229,6 +230,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         const checkoutItems = [{
           id: variantId,
           productId: product.id,
+          variantId: variantId,
+          variantName: selectedVariant?.name,
           productName: product.name,
           quantity: qty,
           price: variantCampaignPrice ?? variantBasePrice,

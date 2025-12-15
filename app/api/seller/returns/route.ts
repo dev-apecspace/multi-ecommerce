@@ -171,7 +171,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     const paymentMethod = (existingReturn.Order?.paymentMethod || 'cod').toLowerCase()
-    const requiresRefund = existingReturn.returnType === 'return' && paymentMethod !== 'cod'
+    // Treat COD same as other payment methods (require refund step)
+    const requiresRefund = existingReturn.returnType === 'return'
 
     const baseUpdate: any = {}
     if (sellerNotes !== undefined) {

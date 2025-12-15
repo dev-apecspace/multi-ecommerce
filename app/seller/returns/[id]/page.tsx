@@ -320,8 +320,7 @@ export default function ReturnDetailPage({ params }: PageProps) {
     : returnData.ProductVariant?.name || "Sản phẩm"
 
   const paymentMethod = (returnData.Order?.paymentMethod || "cod").toLowerCase()
-  const requiresRefundStep =
-    returnData.returnType === "return" && paymentMethod !== "cod"
+  const requiresRefundStep = returnData.returnType === "return"
   const refundCompleted =
     returnData.status === "refund_confirmed" ||
     returnData.Order?.paymentStatus === "refunded"
@@ -627,9 +626,7 @@ export default function ReturnDetailPage({ params }: PageProps) {
                     Loại yêu cầu
                   </p>
                   <p className="text-sm font-medium">
-                    {returnData.returnType === "return"
-                      ? "Trả hàng hoàn tiền"
-                      : "Đổi sản phẩm"}
+                    Trả hàng hoàn tiền
                   </p>
                 </div>
                 <div>

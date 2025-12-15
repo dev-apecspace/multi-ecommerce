@@ -19,6 +19,7 @@ import {
   Tag,
   Users,
   Percent,
+  RotateCcw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -38,7 +39,8 @@ const sellerLinks = [
       { href: "/seller/products/create", label: "Thêm sản phẩm mới" },
     ],
   },
-  { href: "/seller/orders", label: "Đơn hàng", icon: ShoppingBag, restricted: true },
+  { href: "/seller/orders", label: "Đơn hàng bán", icon: ShoppingBag, restricted: true },
+  { href: "/seller/returns", label: "Đơn hàng trả", icon: RotateCcw, restricted: true },
   { href: "/seller/customers", label: "Khách hàng", icon: Users, restricted: true },
   { href: "/seller/promotions", label: "Chương trình khuyến mãi", icon: Tag, restricted: true },
   { href: "/seller/vouchers", label: "Voucher", icon: Percent, restricted: true },
@@ -111,30 +113,38 @@ export function SellerSidebar() {
                       <p>Yêu cầu hồ sơ được phê duyệt</p>
                     </TooltipContent>
                   </Tooltip>
+                ) : !hasSubItems ? (
+                  <Link href={link.href} className="w-full block">
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-between gap-2 px-3",
+                        isActive &&
+                          "bg-orange-50 dark:bg-slate-800 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-slate-800",
+                      )}
+                    >
+                      <span className="flex items-center gap-3 flex-1">
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="text-sm">{link.label}</span>
+                      </span>
+                    </Button>
+                  </Link>
                 ) : (
-                  <button
-                    onClick={() => hasSubItems && toggleExpanded(link.href)}
-                    className="w-full"
-                    asChild={!hasSubItems}
+                  <Button
+                    variant="ghost"
+                    onClick={() => toggleExpanded(link.href)}
+                    className={cn(
+                      "w-full justify-between gap-2 px-3",
+                      isActive &&
+                        "bg-orange-50 dark:bg-slate-800 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-slate-800",
+                    )}
                   >
-                    <Link href={link.href}>
-                      <Button
-                        variant="ghost"
-                        className={cn(
-                          "w-full justify-between gap-2 px-3",
-                          isActive && "bg-orange-50 dark:bg-slate-800 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-slate-800",
-                        )}
-                      >
-                        <span className="flex items-center gap-3 flex-1">
-                          <Icon className="h-4 w-4 flex-shrink-0" />
-                          <span className="text-sm">{link.label}</span>
-                        </span>
-                        {hasSubItems && (
-                          <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
-                        )}
-                      </Button>
-                    </Link>
-                  </button>
+                    <span className="flex items-center gap-3 flex-1">
+                      <Icon className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm">{link.label}</span>
+                    </span>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                  </Button>
                 )}
 
                 {hasSubItems && isExpanded && !isRestricted && (

@@ -396,7 +396,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                               className="text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
                               onClick={() => handleOpenReturnModal(order.id, item)}
                             >
-                              Trả hàng / Đổi hàng
+                              Trả hàng hoàn tiền
                             </Button>
                           </div>
                         )
