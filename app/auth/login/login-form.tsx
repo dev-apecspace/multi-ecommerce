@@ -32,14 +32,16 @@ export default function LoginForm() {
     try {
       const userData = await login(email, password)
       
-      let redirectUrl = '/client'
+      let redirectUrl: string
       
-      if (userData.role === 'admin') {
-        redirectUrl = '/admin'
-      } else if (userData.role === 'vendor') {
+      if (userData.role === 'vendor') {
         redirectUrl = '/seller'
+      } else if (userData.role === 'admin') {
+        redirectUrl = '/admin'
       } else if (callback) {
         redirectUrl = callback
+      } else {
+        redirectUrl = '/client'
       }
       
       router.replace(redirectUrl)
