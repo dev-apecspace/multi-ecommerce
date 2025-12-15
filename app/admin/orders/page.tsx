@@ -34,8 +34,9 @@ interface Order {
     quantity: number
     price: number
     variantId: number | null
-    Product: { id: number; name: string }
-    ProductVariant: { id: number; name: string; image: string } | null
+    variantName?: string | null
+    Product: { id: number; name: string; image?: string }
+    ProductVariant: { id: number; name: string } | null
   }>
 }
 
@@ -71,6 +72,7 @@ export default function AdminOrdersPage() {
     processing: { label: "Đang xử lý", color: "bg-blue-100 text-blue-600" },
     shipped: { label: "Đang giao", color: "bg-yellow-100 text-yellow-600" },
     delivered: { label: "Đã giao", color: "bg-green-100 text-green-600" },
+    completed: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-600" },
     cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-600" }
   }
 
@@ -89,6 +91,7 @@ export default function AdminOrdersPage() {
     processing: orders.filter(o => o.status === 'processing').length,
     shipped: orders.filter(o => o.status === 'shipped').length,
     delivered: orders.filter(o => o.status === 'delivered').length,
+    completed: orders.filter(o => o.status === 'completed').length,
     cancelled: orders.filter(o => o.status === 'cancelled').length
   }
 
@@ -161,6 +164,7 @@ export default function AdminOrdersPage() {
                 <SelectItem value="processing">Đang xử lý</SelectItem>
                 <SelectItem value="shipped">Đang giao</SelectItem>
                 <SelectItem value="delivered">Đã giao</SelectItem>
+                <SelectItem value="completed">Hoàn thành</SelectItem>
                 <SelectItem value="cancelled">Đã hủy</SelectItem>
               </SelectContent>
             </Select>
@@ -268,17 +272,17 @@ export default function AdminOrdersPage() {
                 <p className="font-semibold mb-3">Sản phẩm</p>
                 {selectedOrder.OrderItem.map((item, idx) => (
                   <div key={idx} className="flex gap-4 py-3 border-b last:border-b-0">
-                    {item.ProductVariant?.image && (
+                    {item.Product.image && (
                       <img
-                        src={item.ProductVariant.image}
+                        src={item.Product.image}
                         alt={item.Product.name}
                         className="w-16 h-16 object-cover rounded"
                       />
                     )}
                     <div className="flex-1">
                       <p className="font-medium">{item.Product.name}</p>
-                      {item.ProductVariant && (
-                        <p className="text-sm text-muted-foreground">({item.ProductVariant.name})</p>
+                      {(item.variantName || item.ProductVariant) && (
+                        <p className="text-sm text-muted-foreground">({item.variantName || item.ProductVariant?.name})</p>
                       )}
                       <p className="text-sm text-muted-foreground">x{item.quantity}</p>
                     </div>

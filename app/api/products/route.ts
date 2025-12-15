@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { isCampaignActive } from '@/lib/price-utils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,10 +17,45 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const slug = searchParams.get('slug')
     const showPending = searchParams.get('showPending') === 'true'
+    const isFlashSale = searchParams.get('isFlashSale') === 'true'
 
     let query = supabase
       .from('Product')
       .select('*, Category(name, slug), SubCategory(name, slug), Vendor(name, status, slug, logo, rating, followers), ProductVariant(*), ProductAttribute(id, name, ProductAttributeValue(id, value))', { count: 'exact' })
+
+    if (isFlashSale) {
+      const now = new Date().toISOString()
+      const { data: campaigns } = await supabase
+        .from('Campaign')
+        .select('*')
+        .eq('campaignType', 'flash_sale')
+        .in('status', ['active', 'upcoming'])
+        .gte('endDate', now)
+
+      let productIds: number[] = []
+      
+      const activeFlashSales = (campaigns || []).filter(isCampaignActive)
+      
+      if (activeFlashSales.length > 0) {
+        const campaignIds = activeFlashSales.map((c) => c.id)
+        const { data: campaignProducts } = await supabase
+          .from('CampaignProduct')
+          .select('productId')
+          .in('campaignId', campaignIds)
+          .eq('status', 'approved')
+        
+        if (campaignProducts) {
+           productIds = campaignProducts.map((cp) => cp.productId)
+        }
+      }
+      
+      if (productIds.length > 0) {
+        query = query.in('id', productIds)
+      } else {
+        // Force empty result
+        query = query.in('id', [-1]) 
+      }
+    }
 
     if (!showPending) {
       query = query.eq('status', 'approved')
@@ -133,11 +169,13 @@ export async function GET(request: NextRequest) {
     // Get active campaigns and their products
     const now = new Date().toISOString()
     // Consider active và sắp diễn ra để hiển thị giá CTKM cho client
-    const { data: activeCampaigns } = await supabase
+    const { data: rawCampaigns } = await supabase
       .from('Campaign')
       .select('*')
       .in('status', ['active', 'upcoming'])
       .gte('endDate', now)
+
+    const activeCampaigns = (rawCampaigns || []).filter(isCampaignActive)
 
     // Helper: compute discounted price from a base price and campaign
     const computeDiscountPrice = (basePrice: number, campaign: any) => {
@@ -178,6 +216,10 @@ export async function GET(request: NextRequest) {
       // Add campaign info to products
       filteredData.forEach((product: any) => {
         const productCampaigns = campaignProductMap.get(`${product.id}-null`) || []
+        
+        // Collect all campaigns for this product (product-level + variant-level)
+        let allProductCampaigns = [...productCampaigns]
+        let bestVariantDeal: any = null
 
         // Choose best campaign (max discount value in currency)
         const pickBestCampaign = (basePrice: number, campaigns: any[]) => {
@@ -198,24 +240,57 @@ export async function GET(request: NextRequest) {
         if (product.ProductVariant && product.ProductVariant.length > 0) {
           product.ProductVariant = product.ProductVariant.map((variant: any) => {
             const variantCampaigns = campaignProductMap.get(`${product.id}-${variant.id}`) || []
+            allProductCampaigns = [...allProductCampaigns, ...variantCampaigns]
+            
             const basePrice = variant.price ?? product.price
             const originalPrice = variant.originalPrice ?? product.originalPrice ?? basePrice
             const best = pickBestCampaign(basePrice, variantCampaigns.length ? variantCampaigns : productCampaigns)
-            return {
+            
+            const deal = {
               ...variant,
               campaigns: variantCampaigns,
               appliedCampaign: best?.campaign || null,
               salePrice: best ? best.salePrice : null,
               originalPrice: originalPrice,
+              currentPrice: best ? best.salePrice : basePrice
             }
+
+            // Track best deal among variants (lowest price)
+            if (best?.campaign?.campaignType === 'flash_sale') {
+                if (!bestVariantDeal || deal.currentPrice < bestVariantDeal.currentPrice) {
+                    bestVariantDeal = deal
+                }
+            }
+
+            return deal
           })
         }
 
+        // Deduplicate campaigns
+        const uniqueCampaigns = Array.from(new Map(allProductCampaigns.map(c => [c.id, c])).values())
+        product.campaigns = uniqueCampaigns
+
         const productBasePrice = product.price
         const bestProductCampaign = pickBestCampaign(productBasePrice, productCampaigns)
-        product.campaigns = productCampaigns
+        
         product.appliedCampaign = bestProductCampaign?.campaign || null
         product.salePrice = bestProductCampaign ? bestProductCampaign.salePrice : null
+        
+        // If isFlashSale mode and we found a better deal on a variant (or only on a variant), promote it
+        if (isFlashSale && bestVariantDeal) {
+            // If product has no campaign, or variant deal is better/exists
+            // We want to show the "From" price or the specific flash sale price
+            if (!product.appliedCampaign || (product.appliedCampaign.campaignType !== 'flash_sale')) {
+                product.appliedCampaign = bestVariantDeal.appliedCampaign
+                product.price = bestVariantDeal.currentPrice
+                product.originalPrice = bestVariantDeal.originalPrice
+                product.salePrice = bestVariantDeal.salePrice
+                // Use variant's image if available
+                if (bestVariantDeal.image) {
+                    product.image = bestVariantDeal.image
+                }
+            }
+        }
       })
     }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -31,8 +32,9 @@ interface OrderItem {
   quantity: number
   price: number
   variantId: number | null
+  variantName?: string | null
   Product: { id: number; name: string }
-  ProductVariant: { id: number; name: string; image: string } | null
+  ProductVariant: { id: number; name: string; image?: string } | null
 }
 
 interface Order {
@@ -66,9 +68,11 @@ function formatShippingAddress(address: string): string {
 }
 
 export default function SellerOrdersPage() {
+  const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
   const [allOrders, setAllOrders] = useState<Order[]>([])
+  const [returnsMap, setReturnsMap] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [newStatus, setNewStatus] = useState<string>("")
@@ -89,14 +93,36 @@ export default function SellerOrdersPage() {
     if (!vendorId) return
     try {
       setLoading(true)
-      const url = new URL(`/api/seller/orders`, typeof window !== 'undefined' ? window.location.origin : '')
-      url.searchParams.append('vendorId', vendorId.toString())
-      const response = await fetch(url.toString())
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const ordersUrl = new URL(`/api/seller/orders`, origin)
+      ordersUrl.searchParams.append('vendorId', vendorId.toString())
+      const response = await fetch(ordersUrl.toString())
       if (!response.ok) {
         throw new Error('Failed to fetch orders')
       }
       const result = await response.json()
       setAllOrders(result.data || [])
+
+      try {
+        const returnsUrl = new URL(`/api/seller/returns`, origin)
+        returnsUrl.searchParams.append('vendorId', vendorId.toString())
+        const returnsResponse = await fetch(returnsUrl.toString())
+        if (returnsResponse.ok) {
+          const returnsResult = await returnsResponse.json()
+          const map: Record<number, number> = {}
+          returnsResult.data?.forEach((ret: any) => {
+            const orderId = typeof ret?.orderId === 'string' ? parseInt(ret.orderId, 10) : ret?.orderId
+            if (typeof orderId === 'number' && !Number.isNaN(orderId) && typeof ret.id === 'number') {
+              map[orderId] = ret.id
+            }
+          })
+          setReturnsMap(map)
+        } else {
+          setReturnsMap({})
+        }
+      } catch {
+        setReturnsMap({})
+      }
     } catch (error) {
       console.error('Error fetching orders:', error)
       toast({ title: 'Lỗi', description: 'Không thể tải đơn hàng', variant: 'destructive' })
@@ -108,6 +134,15 @@ export default function SellerOrdersPage() {
   const orders = activeTab === "all" 
     ? allOrders 
     : allOrders.filter(o => o.status === activeTab)
+
+  const handleReturnNavigate = (orderId: number) => {
+    const returnId = returnsMap[orderId]
+    if (returnId) {
+      router.push(`/seller/returns/${returnId}`)
+    } else {
+      toast({ title: 'Thông báo', description: 'Không tìm thấy yêu cầu trả hàng cho đơn này' })
+    }
+  }
 
   const handleConfirmPayment = async () => {
     if (!selectedOrder || !vendorId) return
@@ -241,8 +276,32 @@ export default function SellerOrdersPage() {
     pending: { label: "Chờ tiếp nhận", color: "bg-gray-100 text-gray-600" },
     processing: { label: "Đã duyệt", color: "bg-blue-100 text-blue-600" },
     shipped: { label: "Đang giao", color: "bg-yellow-100 text-yellow-600" },
-    delivered: { label: "Hoàn thành", color: "bg-green-100 text-green-600" },
-    cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-600" }
+    delivered: { label: "Đã giao", color: "bg-green-100 text-green-600" },
+    completed: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-600" },
+    cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-600" },
+    returned: { label: "Đã đổi trả hàng", color: "bg-purple-100 text-purple-700" }
+  }
+
+  const renderStatusBadge = (order: Order) => {
+    const badge = (
+      <Badge className={statusConfig[order.status]?.color || statusConfig.pending.color}>
+        {statusConfig[order.status]?.label || order.status}
+      </Badge>
+    )
+
+    if (order.status === "returned") {
+      return (
+        <button
+          type="button"
+          onClick={() => handleReturnNavigate(order.id)}
+          className="p-0 border-0 bg-transparent cursor-pointer"
+        >
+          {badge}
+        </button>
+      )
+    }
+
+    return badge
   }
 
   if (loading) {
@@ -264,7 +323,8 @@ export default function SellerOrdersPage() {
           <TabsTrigger value="pending">Chờ tiếp nhận</TabsTrigger>
           <TabsTrigger value="processing">Đã duyệt</TabsTrigger>
           <TabsTrigger value="shipped">Đang giao</TabsTrigger>
-          <TabsTrigger value="delivered">Hoàn thành</TabsTrigger>
+          <TabsTrigger value="delivered">Đã giao</TabsTrigger>
+          <TabsTrigger value="completed">Hoàn thành</TabsTrigger>
           <TabsTrigger value="cancelled">Đã hủy</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -297,8 +357,16 @@ export default function SellerOrdersPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-muted-foreground text-sm">Hoàn thành</p>
+              <p className="text-muted-foreground text-sm">Đã giao</p>
               <p className="text-3xl font-bold text-green-600">{allOrders.filter(o => o.status === 'delivered').length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-muted-foreground text-sm">Hoàn thành</p>
+              <p className="text-3xl font-bold text-emerald-600">{allOrders.filter(o => o.status === 'completed').length}</p>
             </div>
           </CardContent>
         </Card>
@@ -336,9 +404,7 @@ export default function SellerOrdersPage() {
                       </td>
                       <td className="py-3 px-4">{order.total.toLocaleString("vi-VN")}₫</td>
                       <td className="py-3 px-4">
-                        <Badge className={statusConfig[order.status]?.color || statusConfig.pending.color}>
-                          {statusConfig[order.status]?.label || order.status}
-                        </Badge>
+                        {renderStatusBadge(order)}
                       </td>
                       <td className="py-3 px-4">{new Date(order.date).toLocaleDateString("vi-VN")}</td>
                       <td className="py-3 px-4">
@@ -425,8 +491,8 @@ export default function SellerOrdersPage() {
                       {/* Product Details */}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{item.Product.name}</p>
-                        {item.ProductVariant && (
-                          <p className="text-xs text-muted-foreground">{item.ProductVariant.name}</p>
+                        {(item.variantName || item.ProductVariant) && (
+                          <p className="text-xs text-muted-foreground">{item.variantName || item.ProductVariant?.name}</p>
                         )}
                         <div className="flex justify-between mt-2">
                           <span className="text-xs text-muted-foreground">x{item.quantity}</span>
@@ -559,7 +625,7 @@ export default function SellerOrdersPage() {
                     disabled={updating}
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
-                    {updating ? 'Đang xử lý...' : '✓ Hoàn thành'}
+                    {updating ? 'Đang xử lý...' : '✓ Xác nhận đã giao'}
                   </Button>
                 </div>
               )}

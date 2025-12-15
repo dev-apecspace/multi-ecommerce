@@ -27,6 +27,9 @@ interface Variant {
   originalPrice?: number
   image?: string
   stock: number
+  displayPrice?: number
+  displayOriginalPrice?: number
+  discountPercent?: number
 }
 
 interface AttributeValue {
@@ -153,18 +156,18 @@ export function VariantSelectionModal({
   }
 
   const selectedVariantData = variants.find((v) => v.id === selectedVariant)
-  const variantOriginalPrice = selectedVariantData?.originalPrice ?? originalPrice ?? price
-  const variantSalePrice = selectedVariantData?.salePrice ?? salePrice
-  const baseOriginalPrice = originalPrice ?? price
-  const baseSalePrice = salePrice
   
-  const displayOriginalPrice = variantOriginalPrice ?? baseOriginalPrice
-  const discountAmount = variantSalePrice ?? baseSalePrice ? (displayOriginalPrice - (variantSalePrice ?? baseSalePrice)) : 0
-  const displayPrice = variantSalePrice ?? (displayOriginalPrice - discountAmount)
+  // Use pre-calculated display values if available, otherwise fallback to calculation
+  const displayPrice = selectedVariantData?.displayPrice ?? 
+    (selectedVariantData?.salePrice ?? salePrice ?? price)
+    
+  const displayOriginalPrice = selectedVariantData?.displayOriginalPrice ?? 
+    (selectedVariantData?.originalPrice ?? originalPrice ?? price)
 
-  const discount = displayOriginalPrice && discountAmount > 0
-    ? Math.round((discountAmount / displayOriginalPrice) * 100)
-    : 0
+  const discount = selectedVariantData?.discountPercent ?? 
+    (displayOriginalPrice > displayPrice 
+      ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100) 
+      : 0)
 
    
   const displayImage = selectedVariantData?.image || productImage

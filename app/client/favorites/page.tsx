@@ -5,11 +5,24 @@ import { Heart, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { useAuth } from "@/lib/auth-context"
 import { useFavorites } from "@/hooks/useSupabase"
 
 export default function FavoritesPage() {
-  const [userId, setUserId] = useState<number | null>(1)
+  const { user } = useAuth()
+  const [userId, setUserId] = useState<number | null>(null)
   const { data: favoriteProducts, loading, error, fetchFavorites, removeFavorite } = useFavorites(userId)
+
+  useEffect(() => {
+    if (user?.id) {
+      setUserId(user.id)
+    } else {
+      const storedUserId = localStorage.getItem('userId')
+      if (storedUserId) {
+        setUserId(parseInt(storedUserId))
+      }
+    }
+  }, [user?.id])
 
   useEffect(() => {
     if (userId) {

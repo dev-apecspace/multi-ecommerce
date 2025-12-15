@@ -29,6 +29,7 @@ interface CheckoutItem {
   taxRate?: number
   image: string
   variantId: number | null
+  variantName?: string
   vendorId: number
   vendorName: string
 }
@@ -233,7 +234,7 @@ export default function CheckoutPage() {
           taxApplied: item.taxApplied,
           taxRate: item.taxRate,
         })
-        return sum + (priced.priceWithTax * item.quantity)
+        return sum + (priced.displayPrice * item.quantity)
       }, 0)
   }
 
@@ -245,7 +246,7 @@ export default function CheckoutPage() {
       taxApplied: item.taxApplied,
       taxRate: item.taxRate,
     })
-    return sum + (priced.priceWithTax * item.quantity)
+    return sum + (priced.displayPrice * item.quantity)
   }, 0)
   const shippingCostPerVendor = formData.shippingMethod === "express" ? 30000 : 10000
   const uniqueVendors = new Set(cartItems.map(item => item.vendorId)).size
@@ -398,13 +399,13 @@ export default function CheckoutPage() {
             userId,
             cartItems: cartItems.map(item => ({
               productId: item.productId,
+              variantId: item.variantId || null,
               quantity: item.quantity,
               price: item.price,
               basePrice: item.basePrice,
               taxApplied: item.taxApplied,
               taxRate: item.taxRate,
               vendorId: item.vendorId,
-              variantId: item.variantId,
               voucherId: vendorVouchers[item.vendorId]?.voucherId || null
             })),
             shippingAddress: {
@@ -763,7 +764,10 @@ export default function CheckoutPage() {
                               <div className="flex-1 flex justify-between text-sm">
                                 <div>
                                   <p className="font-medium line-clamp-2">{item.productName}</p>
-                                  <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                                  {item.variantName && (
+                                    <p className="text-xs text-gray-500 mt-0.5">Phân loại: {item.variantName}</p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-1">x{item.quantity}</p>
                                 </div>
                                 {(() => {
                                   const priced = computePrice({
@@ -773,7 +777,7 @@ export default function CheckoutPage() {
                                     taxApplied: item.taxApplied,
                                     taxRate: item.taxRate,
                                   })
-                                  return <p className="font-medium text-right">{(priced.priceWithTax * item.quantity).toLocaleString("vi-VN")}₫</p>
+                                  return <p className="font-medium text-right">{(priced.displayPrice * item.quantity).toLocaleString("vi-VN")}₫</p>
                                 })()}
                               </div>
                             </div>

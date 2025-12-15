@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
           price,
           vendorId,
           variantId,
+          variantName,
           Product(id, name),
           ProductVariant(id, name, image)
         )
@@ -68,9 +69,33 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Order ID and status required' }, { status: 400 })
     }
 
-    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'completed', 'cancelled']
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    }
+
+    // Fetch existing order to validate allowed transitions
+    const { data: existingOrder, error: existingOrderErr } = await supabase
+      .from('Order')
+      .select('status')
+      .eq('id', parseInt(orderId))
+      .single()
+
+    if (existingOrderErr || !existingOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    const allowedTransitions: Record<string, string[]> = {
+      pending: ['processing', 'cancelled'],
+      processing: ['shipped', 'cancelled'],
+      shipped: ['delivered'],
+      delivered: ['completed'],
+      cancelled: []
+    }
+
+    const allowedForCurrent = allowedTransitions[existingOrder.status] || []
+    if (!allowedForCurrent.includes(status)) {
+      return NextResponse.json({ error: `Cannot update order from ${existingOrder.status} to ${status}` }, { status: 400 })
     }
 
     const updateData: any = { status }
@@ -98,8 +123,9 @@ export async function PATCH(request: NextRequest) {
           price,
           vendorId,
           variantId,
-          Product(id, name),
-          ProductVariant(id, name, image)
+          variantName,
+          Product(id, name, image),
+          ProductVariant(id, name)
         )
       `)
 

@@ -54,3 +54,43 @@ export const computePrice = ({
     canonicalPreTaxPrice: Math.round(preTaxBase),
   }
 }
+
+export interface Campaign {
+  id?: number
+  campaignType?: string
+  type?: string
+  startDate?: string | Date
+  endDate?: string | Date
+  flashSaleStartTime?: string
+  flashSaleEndTime?: string
+  status?: string
+}
+
+export const isCampaignActive = (campaign: Campaign | null | undefined): boolean => {
+  if (!campaign) return false
+  
+  const now = new Date()
+  
+  if (campaign.endDate) {
+    const endDateTime = new Date(campaign.endDate)
+    if (now > endDateTime) {
+      return false
+    }
+  }
+  
+  if (campaign.startDate) {
+    const startDateTime = new Date(campaign.startDate)
+    if (now < startDateTime) {
+      return false
+    }
+  }
+  
+  if (campaign.campaignType === 'flash_sale' && campaign.flashSaleStartTime && campaign.flashSaleEndTime) {
+    const hours = String(now.getHours()).padStart(2, '0')
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    const currentTime = `${hours}:${minutes}`
+    return currentTime >= campaign.flashSaleStartTime && currentTime <= campaign.flashSaleEndTime
+  }
+  
+  return true
+}
