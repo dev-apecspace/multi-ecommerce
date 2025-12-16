@@ -216,7 +216,8 @@ export default function SellerVouchersPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
+              <>
+                <div className="space-y-4">
                 {vouchers.map(voucher => (
                   <Card key={voucher.id}>
                     <CardContent className="pt-6">
@@ -343,6 +344,7 @@ export default function SellerVouchersPage() {
                   />
                 </div>
               )}
+              </>
             )}
           </TabsContent>
         ))}
