@@ -2,16 +2,17 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ChevronRight, Truck, Package, CheckCircle } from "lucide-react"
-import Link from "next/link"
+import { ArrowLeft, Truck, Package, CheckCircle, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
+import { ReviewModal } from "@/components/review/review-modal"
 
 interface OrderItem {
   id: number
@@ -67,6 +68,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const resolvedParams = use(params)
   const orderId = resolvedParams.id
 
@@ -90,6 +92,24 @@ export default function OrderDetailPage({ params }: PageProps) {
     open: false,
     orderItemId: 0
   })
+  const [reviewModal, setReviewModal] = useState<{
+    open: boolean
+    productId: number | null
+    productName: string
+    orderId: number | null
+    reviewId: number | null
+    initialRating: number | null
+    initialComment: string | null
+  }>({
+    open: false,
+    productId: null,
+    productName: '',
+    orderId: null,
+    reviewId: null,
+    initialRating: null,
+    initialComment: null
+  })
+  const [orderReviews, setOrderReviews] = useState<Record<number, { id: number; rating: number; comment: string | null; createdAt: string }>>({})
 
   useEffect(() => {
     if (user?.id) {
@@ -104,8 +124,11 @@ export default function OrderDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     if (userId && orderId) {
+      const parsedOrderId = parseInt(orderId)
+      if (Number.isNaN(parsedOrderId)) return
       fetchOrder()
-      fetchOrderReturns(userId, parseInt(orderId))
+      fetchOrderReturns(userId, parsedOrderId)
+      fetchOrderReviews(userId, parsedOrderId)
     }
   }, [userId, orderId])
 
@@ -131,8 +154,38 @@ export default function OrderDetailPage({ params }: PageProps) {
     }
   }
 
+  const fetchOrderReviews = async (currentUserId: number, currentOrderId: number) => {
+    try {
+      const response = await fetch(`/api/reviews?userId=${currentUserId}&orderId=${currentOrderId}`)
+      if (!response.ok) {
+        setOrderReviews({})
+        return
+      }
+      const result = await response.json()
+      if (Array.isArray(result.data)) {
+        const map: Record<number, { id: number; rating: number; comment: string | null; createdAt: string }> = {}
+        result.data.forEach((review: any) => {
+          if (review?.productId) {
+            map[review.productId] = {
+              id: review.id,
+              rating: review.rating,
+              comment: review.comment || null,
+              createdAt: review.createdAt
+            }
+          }
+        })
+        setOrderReviews(map)
+      } else {
+        setOrderReviews({})
+      }
+    } catch {
+      setOrderReviews({})
+    }
+  }
+
   const fetchOrder = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/client/orders?userId=${userId}&limit=100&offset=0`)
       const result = await response.json()
@@ -147,6 +200,7 @@ export default function OrderDetailPage({ params }: PageProps) {
       toast({ title: 'Lỗi', description: 'Không thể tải thông tin đơn hàng', variant: 'destructive' })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -174,6 +228,25 @@ export default function OrderDetailPage({ params }: PageProps) {
     })
   }
 
+  const canReviewOrder = (order: Order) => order.status === 'completed'
+
+  const getProductDisplayName = (item: OrderItem) => {
+    const variantLabel = item.variantName || item.ProductVariant?.name
+    return variantLabel ? `${item.Product.name} - ${variantLabel}` : item.Product.name
+  }
+
+  const handleOpenReviewModal = (orderId: number, item: OrderItem, existingReview?: { id: number; rating: number; comment: string | null }) => {
+    setReviewModal({
+      open: true,
+      productId: item.Product.id,
+      productName: getProductDisplayName(item),
+      orderId,
+      reviewId: existingReview?.id ?? null,
+      initialRating: existingReview?.rating ?? null,
+      initialComment: existingReview?.comment ?? null
+    })
+  }
+
   const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
     pending: { label: "Chờ xử lý", color: "bg-gray-100 text-gray-800", icon: <Package className="h-4 w-4" /> },
     processing: { label: "Đã duyệt", color: "bg-blue-100 text-blue-800", icon: <Package className="h-4 w-4" /> },
@@ -188,6 +261,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   const handleConfirmReceipt = async () => {
     if (!order) return
     try {
+      setIsLoading(true)
       setConfirming(true)
       const response = await fetch(`/api/client/orders`, {
         method: 'PATCH',
@@ -217,6 +291,7 @@ export default function OrderDetailPage({ params }: PageProps) {
       })
     } finally {
       setConfirming(false)
+      setIsLoading(false)
     }
   }
 
@@ -349,6 +424,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                   const displayImage = item.ProductVariant?.image || '/placeholder.svg'
                   const itemReturnStatus = returnStatuses[item.id]
                   const itemHasReturnRecord = Boolean(itemReturnStatus)
+                  const productReview = orderReviews[item.Product.id]
                   return (
                     <div key={item.id} className="border-b pb-4 last:border-b-0">
                       <div className="flex gap-4">
@@ -369,13 +445,53 @@ export default function OrderDetailPage({ params }: PageProps) {
                               </p>
                               <p className="text-sm text-muted-foreground">Số lượng: {item.quantity}</p>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold">{item.price.toLocaleString('vi-VN')}₫ × {item.quantity}</p>
-                              <p className="text-sm font-bold text-orange-600">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            <div className="text-right flex flex-col items-end gap-2">
+                              <div>
+                                <p className="font-semibold">{item.price.toLocaleString('vi-VN')}₫ × {item.quantity}</p>
+                                <p className="text-sm font-bold text-orange-600">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                              </div>
+                              {canReviewOrder(order) && !productReview && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-3 text-xs"
+                                  onClick={() => handleOpenReviewModal(order.id, item)}
+                                >
+                                  <Star className="h-3.5 w-3.5 mr-1" />
+                                  Đánh giá
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
                       </div>
+                      {productReview && (
+                        <div className="mt-3 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                              <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                              {productReview.rating}/5
+                              <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                            </div>
+                            {canReviewOrder(order) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-orange-600 hover:text-orange-700"
+                                onClick={() => handleOpenReviewModal(order.id, item, productReview)}
+                              >
+                                Chỉnh sửa
+                              </Button>
+                            )}
+                          </div>
+                          {productReview.comment && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{productReview.comment}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(productReview.createdAt).toLocaleDateString('vi-VN')}
+                          </p>
+                        </div>
+                      )}
                       {isReturnable(order) && (
                         itemHasReturnRecord ? (
                           <div className="mt-2 flex justify-end">
@@ -500,6 +616,26 @@ export default function OrderDetailPage({ params }: PageProps) {
           }}
         />
       )}
+
+      <ReviewModal
+        isOpen={reviewModal.open}
+        onClose={() => setReviewModal(prev => ({ ...prev, open: false }))}
+        productId={reviewModal.productId || 0}
+        productName={reviewModal.productName}
+        orderId={reviewModal.orderId || 0}
+        reviewId={reviewModal.reviewId}
+        initialRating={reviewModal.initialRating}
+        initialComment={reviewModal.initialComment}
+        onReviewSubmitted={() => {
+          fetchOrder()
+          if (userId && orderId) {
+            const parsedOrderId = parseInt(orderId)
+            if (!Number.isNaN(parsedOrderId)) {
+              fetchOrderReviews(userId, parsedOrderId)
+            }
+          }
+        }}
+      />
     </main>
   )
 }

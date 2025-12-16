@@ -5,6 +5,8 @@ import { Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/lib/auth-context"
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
 
 interface Customer {
   id: number
@@ -23,14 +25,19 @@ export default function SellerCustomersPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [totalCount, setTotalCount] = useState(0)
+  const [totalStats, setTotalStats] = useState({
+    totalSpent: 0,
+    totalOrders: 0
+  })
 
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
   const vendorId = user?.vendorId
 
   useEffect(() => {
     if (vendorId) {
       fetchCustomers()
     }
-  }, [vendorId, search])
+  }, [vendorId, search, pagination.page, pagination.limit])
 
   const fetchCustomers = async () => {
     if (!vendorId) return
@@ -39,6 +46,8 @@ export default function SellerCustomersPage() {
       setLoading(true)
       const params = new URLSearchParams()
       params.append('vendorId', vendorId.toString())
+      params.append('limit', pagination.limit.toString())
+      params.append('offset', pagination.offset.toString())
       if (search) params.append('search', search)
 
       const response = await fetch(`/api/seller/customers?${params}`)
@@ -60,6 +69,22 @@ export default function SellerCustomersPage() {
 
       setCustomers(formattedData)
       setTotalCount(result.pagination?.total || 0)
+      pagination.setTotal(result.pagination?.total || 0)
+      
+      // Note: Total stats (total spent, total orders) are calculated from the current page only if we don't get them from API.
+      // Ideally API should return global stats.
+      // For now, let's just sum up what we have on the page, or we need another API call for stats.
+      // The previous implementation summed up ALL customers because it fetched ALL.
+      // Now we only fetch a page.
+      // Let's assume for now we only show stats for visible customers or we need to fix this later.
+      // Or we can calculate stats in the API and return them.
+      // Let's update the API to return stats if possible, or just accept this limitation for now.
+      // I'll update the state with current page stats for now.
+      setTotalStats({
+        totalSpent: formattedData.reduce((sum, c) => sum + c.totalSpent, 0),
+        totalOrders: formattedData.reduce((sum, c) => sum + c.orders, 0)
+      })
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -80,17 +105,17 @@ export default function SellerCustomersPage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Tổng doanh số</p>
+            <p className="text-sm text-muted-foreground">Doanh số (Trang này)</p>
             <p className="text-3xl font-bold text-green-600 mt-2">
-              {customers.reduce((sum, c) => sum + c.totalSpent, 0).toLocaleString('vi-VN')} ₫
+              {totalStats.totalSpent.toLocaleString('vi-VN')} ₫
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Tổng đơn hàng</p>
+            <p className="text-sm text-muted-foreground">Đơn hàng (Trang này)</p>
             <p className="text-3xl font-bold text-yellow-600 mt-2">
-              {customers.reduce((sum, c) => sum + c.orders, 0).toLocaleString('vi-VN')}
+              {totalStats.totalOrders.toLocaleString('vi-VN')}
             </p>
           </CardContent>
         </Card>
@@ -98,7 +123,7 @@ export default function SellerCustomersPage() {
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Đơn hàng TB/khách</p>
             <p className="text-3xl font-bold text-purple-600 mt-2">
-              {totalCount > 0 ? (customers.reduce((sum, c) => sum + c.orders, 0) / totalCount).toFixed(1) : '0'}
+              {customers.length > 0 ? (totalStats.totalOrders / customers.length).toFixed(1) : '0'}
             </p>
           </CardContent>
         </Card>
@@ -120,7 +145,10 @@ export default function SellerCustomersPage() {
               placeholder="Tìm kiếm..." 
               className="w-48"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                pagination.setPage(1)
+              }}
             />
           </div>
         </CardHeader>
@@ -160,6 +188,17 @@ export default function SellerCustomersPage() {
                 </tbody>
               </table>
             )}
+          </div>
+          
+          <div className="mt-4">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
           </div>
         </CardContent>
       </Card>

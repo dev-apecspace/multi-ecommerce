@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get('vendorId')
     const type = searchParams.get('type') // 'available', 'registered', 'all'
     const campaignType = searchParams.get('campaignType') // 'regular', 'flash_sale', or null for all
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20
+    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
 
     if (!vendorId) {
       return NextResponse.json({ error: 'Vendor ID is required' }, { status: 400 })
@@ -22,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     let campaignQuery = supabase
       .from('Campaign')
-      .select('*')
+      .select('*', { count: 'exact' })
       .in('status', visibleStatuses)
 
     if (campaignType && ['regular', 'flash_sale'].includes(campaignType)) {
@@ -30,8 +32,9 @@ export async function GET(request: NextRequest) {
     }
 
     campaignQuery = campaignQuery.order('startDate', { ascending: false })
+      .range(offset, offset + limit - 1)
 
-    const { data: campaigns, error: campaignError } = await campaignQuery
+    const { data: campaigns, error: campaignError, count } = await campaignQuery
 
     if (campaignError) {
       return NextResponse.json({ error: campaignError.message }, { status: 400 })
@@ -94,6 +97,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       campaigns: campaignsWithStatus,
       registrations,
+      pagination: {
+        total: count,
+        limit,
+        offset,
+      },
     })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

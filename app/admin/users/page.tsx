@@ -5,6 +5,8 @@ import { Search, Filter, Lock, LockOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 
 interface Customer {
   id: number
@@ -27,10 +29,11 @@ export default function AdminUsersPage() {
   const [activeCount, setActiveCount] = useState(0)
   const [lockedCount, setLockedCount] = useState(0)
   const [updating, setUpdating] = useState<number | null>(null)
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
     fetchCustomers()
-  }, [search, statusFilter])
+  }, [search, statusFilter, pagination.page, pagination.limit])
 
   const fetchCustomers = async () => {
     try {
@@ -38,6 +41,8 @@ export default function AdminUsersPage() {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
       if (statusFilter !== 'all') params.append('status', statusFilter)
+      params.append('page', String(pagination.page))
+      params.append('limit', String(pagination.limit))
 
       const response = await fetch(`/api/admin/customers?${params}`)
       const result = await response.json()
@@ -58,6 +63,7 @@ export default function AdminUsersPage() {
       }))
 
       setCustomers(formattedData)
+      pagination.setTotal(result.pagination?.total || 0)
       setTotalCount(result.pagination?.total || 0)
 
       const activeCustomers = formattedData.filter(c => c.status === 'active').length
@@ -233,6 +239,16 @@ export default function AdminUsersPage() {
               </table>
             )}
           </div>
+          {customers.length > 0 && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
+          )}
         </CardContent>
       </Card>
     </main>

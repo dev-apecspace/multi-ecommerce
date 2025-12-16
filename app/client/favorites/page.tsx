@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 import { useFavorites } from "@/hooks/useSupabase"
+import { useLoading } from "@/hooks/use-loading"
 
 export default function FavoritesPage() {
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [userId, setUserId] = useState<number | null>(null)
   const { data: favoriteProducts, loading, error, fetchFavorites, removeFavorite } = useFavorites(userId)
 
@@ -26,7 +28,8 @@ export default function FavoritesPage() {
 
   useEffect(() => {
     if (userId) {
-      fetchFavorites()
+      setIsLoading(true)
+      fetchFavorites().finally(() => setIsLoading(false))
     }
   }, [userId])
 

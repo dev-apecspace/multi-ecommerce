@@ -36,14 +36,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: shopError.message }, { status: 400 })
     }
 
-    const { data: shopDetail, error: detailError } = await supabase
-      .from('ShopDetail')
-      .select('*')
-      .eq('shopId', shop?.id)
-      .single()
+    let shopDetail = null
+    if (shop && shop.id) {
+      const { data: detailData, error: detailError } = await supabase
+        .from('ShopDetail')
+        .select('*')
+        .eq('shopId', shop.id)
+        .single()
 
-    if (detailError && detailError.code !== 'PGRST116') {
-      return NextResponse.json({ error: detailError.message }, { status: 400 })
+      if (detailError && detailError.code !== 'PGRST116') {
+        return NextResponse.json({ error: detailError.message }, { status: 400 })
+      }
+      shopDetail = detailData || {}
     }
 
     return NextResponse.json({

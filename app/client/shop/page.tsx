@@ -9,6 +9,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { generateSlug } from "@/lib/utils"
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
 
 export default function ShopsPage() {
   const [favorites, setFavorites] = useState<number[]>([])
@@ -16,13 +18,28 @@ export default function ShopsPage() {
   const [sortBy, setSortBy] = useState("followers")
   const [shops, setShops] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const pagination = usePagination({ initialPage: 1, initialLimit: 12 })
+
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+      pagination.setPage(1)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   useEffect(() => {
     const fetchShops = async () => {
       try {
-        const response = await fetch('/api/vendors?status=approved&limit=50')
+        setLoading(true)
+        const response = await fetch(
+          `/api/vendors?status=approved&limit=${pagination.limit}&offset=${pagination.offset}&search=${debouncedSearch}&sortBy=${sortBy}`
+        )
         const result = await response.json()
         setShops(result.data || [])
+        pagination.setTotal(result.pagination?.total || 0)
       } catch (error) {
         console.error('Failed to fetch shops:', error)
       } finally {
@@ -31,20 +48,15 @@ export default function ShopsPage() {
     }
 
     fetchShops()
-  }, [])
+  }, [pagination.page, pagination.limit, debouncedSearch, sortBy])
 
   const toggleFavorite = (shopId: number) => {
     setFavorites((prev) => (prev.includes(shopId) ? prev.filter((id) => id !== shopId) : [...prev, shopId]))
   }
 
-  let filteredShops = shops.filter((shop) => shop.name.toLowerCase().includes(searchQuery.toLowerCase()))
-
-  if (sortBy === "followers") {
-    filteredShops.sort((a, b) => b.followers - a.followers)
-  } else if (sortBy === "rating") {
-    filteredShops.sort((a, b) => b.rating - a.rating)
-  } else if (sortBy === "reviews") {
-    filteredShops.sort((a, b) => b.products - a.products)
+  const handleSortChange = (value: string) => {
+    setSortBy(value)
+    pagination.setPage(1)
   }
 
   if (loading) {
@@ -82,20 +94,20 @@ export default function ShopsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="md:col-span-2"
           />
-          <Select value={sortBy} onValueChange={setSortBy}>
+          <Select value={sortBy} onValueChange={handleSortChange}>
             <SelectTrigger>
               <SelectValue placeholder="Sắp xếp theo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="followers">Nhiều người theo dõi</SelectItem>
               <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
-              <SelectItem value="reviews">Sản phẩm</SelectItem>
+              <SelectItem value="newest">Mới nhất</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredShops.map((shop) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {shops.map((shop) => (
             <Link key={shop.id} href={`/client/shop/${shop.id}`}>
               <Card className="hover:shadow-lg transition-shadow overflow-hidden h-full">
                 <CardContent className="p-0">
@@ -160,11 +172,24 @@ export default function ShopsPage() {
           ))}
         </div>
 
-        {filteredShops.length === 0 && (
+        {shops.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Không tìm thấy cửa hàng nào</p>
           </div>
         )}
+
+        <Card className="bg-muted/50 border-0">
+          <CardContent className="p-6">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
+          </CardContent>
+        </Card>
       </div>
     </main>
   )

@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'pending'
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
 
     let query = supabase
       .from('Product')
@@ -29,12 +30,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    const totalPages = Math.ceil((count || 0) / limit)
+
     return NextResponse.json({
       data,
       pagination: {
         total: count,
         limit,
-        offset,
+        page,
+        totalPages,
       },
     })
   } catch (error) {

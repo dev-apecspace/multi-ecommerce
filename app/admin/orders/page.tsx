@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import {
   Dialog,
   DialogContent,
@@ -47,19 +49,23 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>("")
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
     fetchOrders()
-  }, [filterStatus])
+  }, [filterStatus, pagination.page, pagination.limit])
 
   const fetchOrders = async () => {
     try {
       setLoading(true)
       const url = new URL('/api/admin/orders', window.location.origin)
       if (filterStatus) url.searchParams.append('status', filterStatus)
+      url.searchParams.append('page', String(pagination.page))
+      url.searchParams.append('limit', String(pagination.limit))
       const response = await fetch(url)
       const result = await response.json()
       setOrders(result.data || [])
+      pagination.setTotal(result.pagination?.total || 0)
     } catch (error) {
       toast({ title: 'Lỗi', description: 'Không thể tải đơn hàng', variant: 'destructive' })
     } finally {
@@ -180,54 +186,64 @@ export default function AdminOrdersPage() {
           {orders.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">Không có đơn hàng nào</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4">Mã đơn</th>
-                    <th className="text-left py-3 px-4">Khách hàng</th>
-                    <th className="text-left py-3 px-4">Shop</th>
-                    <th className="text-left py-3 px-4">Tổng tiền</th>
-                    <th className="text-left py-3 px-4">Trạng thái</th>
-                    <th className="text-left py-3 px-4">Ngày</th>
-                    <th className="text-left py-3 px-4">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border hover:bg-surface dark:hover:bg-slate-900">
-                      <td className="py-3 px-4 font-semibold">{order.orderNumber}</td>
-                      <td className="py-3 px-4">
-                        <div>
-                          <p className="font-medium">{order.User.name}</p>
-                          <p className="text-xs text-muted-foreground">{order.User.email}</p>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">{order.Vendor.name}</td>
-                      <td className="py-3 px-4 font-semibold">{order.total.toLocaleString("vi-VN")}₫</td>
-                      <td className="py-3 px-4">
-                        <Badge className={statusConfig[order.status]?.color || statusConfig.pending.color}>
-                          {statusConfig[order.status]?.label || order.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">{new Date(order.date).toLocaleDateString("vi-VN")}</td>
-                      <td className="py-3 px-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedOrder(order)
-                            setDialogOpen(true)
-                          }}
-                        >
-                          Xem
-                        </Button>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4">Mã đơn</th>
+                      <th className="text-left py-3 px-4">Khách hàng</th>
+                      <th className="text-left py-3 px-4">Shop</th>
+                      <th className="text-left py-3 px-4">Tổng tiền</th>
+                      <th className="text-left py-3 px-4">Trạng thái</th>
+                      <th className="text-left py-3 px-4">Ngày</th>
+                      <th className="text-left py-3 px-4">Hành động</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr key={order.id} className="border-b border-border hover:bg-surface dark:hover:bg-slate-900">
+                        <td className="py-3 px-4 font-semibold">{order.orderNumber}</td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-medium">{order.User.name}</p>
+                            <p className="text-xs text-muted-foreground">{order.User.email}</p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">{order.Vendor.name}</td>
+                        <td className="py-3 px-4 font-semibold">{order.total.toLocaleString("vi-VN")}₫</td>
+                        <td className="py-3 px-4">
+                          <Badge className={statusConfig[order.status]?.color || statusConfig.pending.color}>
+                            {statusConfig[order.status]?.label || order.status}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">{new Date(order.date).toLocaleDateString("vi-VN")}</td>
+                        <td className="py-3 px-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedOrder(order)
+                              setDialogOpen(true)
+                            }}
+                          >
+                            Xem
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                onPageChange={pagination.goToPage}
+                limit={pagination.limit}
+                onLimitChange={pagination.setPageLimit}
+                total={pagination.total}
+              />
+            </>
           )}
         </CardContent>
       </Card>

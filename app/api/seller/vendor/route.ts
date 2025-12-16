@@ -43,12 +43,30 @@ export async function GET(request: NextRequest) {
 
     const userProfile = userProfileArray && userProfileArray.length > 0 ? userProfileArray[0] : null
 
+    const { data: shop } = await supabase
+      .from('Shop')
+      .select('id')
+      .eq('vendorId', vendor.id)
+      .maybeSingle()
+
+    let shopDetail = null
+    if (shop && shop.id) {
+      const { data: detail } = await supabase
+        .from('ShopDetail')
+        .select('*')
+        .eq('shopId', shop.id)
+        .maybeSingle()
+      shopDetail = detail
+    }
+
     console.log('UserProfile query:', { userId: vendor.userId, data: userProfile, error: profileError })
 
     return NextResponse.json({
       vendor,
       user,
       userProfile,
+      shop,
+      shopDetail,
     })
   } catch (error) {
     return NextResponse.json(
@@ -84,6 +102,7 @@ export async function PATCH(request: NextRequest) {
     if (body.vendorLogo) vendorData.logo = body.vendorLogo
     if (body.shopLogo) vendorData.coverImage = body.shopLogo
     if (body.shopDescription) vendorData.description = body.shopDescription
+    if (body.address) vendorData.businessAddress = body.address
     if (body.taxId) vendorData.taxId = body.taxId
     if (body.businessLicense) vendorData.businessLicense = body.businessLicense
     if (body.bankAccount) vendorData.bankAccount = body.bankAccount
@@ -111,6 +130,44 @@ export async function PATCH(request: NextRequest) {
         .from('User')
         .update(userData)
         .eq('id', userId)
+    }
+
+    const { data: shop } = await supabase
+      .from('Shop')
+      .select('id')
+      .eq('vendorId', vendorId)
+      .maybeSingle()
+
+    if (shop && shop.id) {
+      const shopDetailData: any = {}
+      if (body.address) shopDetailData.address = body.address
+      if (body.email) shopDetailData.email = body.email
+      if (body.phone) shopDetailData.phone = body.phone
+      if (body.ownerName) shopDetailData.ownerName = body.ownerName
+      if (body.taxId) shopDetailData.taxId = body.taxId
+      if (body.businessLicense) shopDetailData.businessLicense = body.businessLicense
+      if (body.bankAccount) shopDetailData.bankAccount = body.bankAccount
+      if (body.bankName) shopDetailData.bankName = body.bankName
+      if (body.bankBranch) shopDetailData.bankBranch = body.bankBranch
+
+      if (Object.keys(shopDetailData).length > 0) {
+        const { data: existingDetail } = await supabase
+          .from('ShopDetail')
+          .select('id')
+          .eq('shopId', shop.id)
+          .maybeSingle()
+
+        if (existingDetail) {
+          await supabase
+            .from('ShopDetail')
+            .update(shopDetailData)
+            .eq('shopId', shop.id)
+        } else {
+          await supabase
+            .from('ShopDetail')
+            .insert([{ shopId: shop.id, ...shopDetailData }])
+        }
+      }
     }
 
     if (body.vendorLogo) {

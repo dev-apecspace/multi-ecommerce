@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Star } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -11,8 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
+import { ReviewModal } from "@/components/review/review-modal"
 
 interface Order {
   id: number
@@ -60,6 +62,7 @@ export default function OrderHistoryPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [userId, setUserId] = useState<number | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,6 +83,24 @@ export default function OrderHistoryPage() {
     open: false,
     orderItemId: 0
   })
+  const [reviewModal, setReviewModal] = useState<{
+    open: boolean
+    productId: number | null
+    productName: string
+    orderId: number | null
+    reviewId: number | null
+    initialRating: number | null
+    initialComment: string | null
+  }>({
+    open: false,
+    productId: null,
+    productName: '',
+    orderId: null,
+    reviewId: null,
+    initialRating: null,
+    initialComment: null
+  })
+  const [reviewsMap, setReviewsMap] = useState<Record<string, { id: number; rating: number; comment: string | null; createdAt: string }>>({})
   
   useEffect(() => {
     if (user?.id) {
@@ -96,12 +117,14 @@ export default function OrderHistoryPage() {
     if (userId) {
       fetchOrders()
       fetchReturnStatuses(userId)
+      fetchUserReviews(userId)
     }
   }, [userId])
 
   const fetchOrders = async () => {
     try {
       setLoading(true)
+      setIsLoading(true)
       const response = await fetch(`/api/client/orders?userId=${userId}`)
       const result = await response.json()
       setOrders(result.data || [])
@@ -109,6 +132,7 @@ export default function OrderHistoryPage() {
       toast({ title: 'Lỗi', description: 'Không thể tải lịch sử đơn hàng', variant: 'destructive' })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -131,6 +155,34 @@ export default function OrderHistoryPage() {
       setReturnStatuses(map)
     } catch {
       setReturnStatuses({})
+    }
+  }
+
+  const fetchUserReviews = async (currentUserId: number) => {
+    try {
+      const response = await fetch(`/api/reviews?userId=${currentUserId}`)
+      if (!response.ok) {
+        setReviewsMap({})
+        return
+      }
+      const result = await response.json()
+      const map: Record<string, { id: number; rating: number; comment: string | null; createdAt: string }> = {}
+      if (Array.isArray(result.data)) {
+        result.data.forEach((review: any) => {
+          if (review?.orderId && review?.productId) {
+            const key = `${review.orderId}-${review.productId}`
+            map[key] = {
+              id: review.id,
+              rating: review.rating,
+              comment: review.comment || null,
+              createdAt: review.createdAt
+            }
+          }
+        })
+      }
+      setReviewsMap(map)
+    } catch {
+      setReviewsMap({})
     }
   }
 
@@ -192,6 +244,29 @@ export default function OrderHistoryPage() {
     returned: { label: "Đã đổi trả", color: "bg-indigo-100 text-indigo-800" }
   }
 
+  const canReviewOrder = (order: Order) => order.status === 'completed'
+
+  const getProductDisplayName = (item: Order['OrderItem'][number]) => {
+    const variantLabel = item.variantName || item.ProductVariant?.name
+    return variantLabel ? `${item.Product.name} - ${variantLabel}` : item.Product.name
+  }
+
+  const handleOpenReviewModal = (
+    orderId: number,
+    item: Order['OrderItem'][number],
+    existingReview?: { id: number; rating: number; comment: string | null }
+  ) => {
+    setReviewModal({
+      open: true,
+      productId: item.Product.id,
+      productName: getProductDisplayName(item),
+      orderId,
+      reviewId: existingReview?.id ?? null,
+      initialRating: existingReview?.rating ?? null,
+      initialComment: existingReview?.comment ?? null
+    })
+  }
+
   const getOrderStatusKey = (order: Order) => {
     const statuses = order.OrderItem
       .map((item) => returnStatuses[item.id])
@@ -212,7 +287,24 @@ export default function OrderHistoryPage() {
     return (
       <main className="container-viewport py-8">
         <p className="text-center">Đang tải lịch sử đơn hàng...</p>
-      </main>
+  
+      <ReviewModal
+        isOpen={reviewModal.open}
+        onClose={() => setReviewModal({ ...reviewModal, open: false })}
+        productId={reviewModal.productId || 0}
+        productName={reviewModal.productName}
+        orderId={reviewModal.orderId || 0}
+        reviewId={reviewModal.reviewId}
+        initialRating={reviewModal.initialRating}
+        initialComment={reviewModal.initialComment}
+        onReviewSubmitted={() => {
+          fetchOrders()
+          if (userId) {
+            fetchUserReviews(userId)
+          }
+        }}
+      />
+    </main>
     )
   }
 
@@ -273,25 +365,70 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className="border-t pt-4 mb-4">
                       {order.OrderItem.map((item, idx) => {
-                        const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                        const displayImage = item.ProductVariant?.image || item.Product?.image || '/placeholder.svg'
+                        const reviewKey = `${order.id}-${item.Product.id}`
+                        const itemReview = reviewsMap[reviewKey]
+                        const showReviewButton = canReviewOrder(order) && !itemReview
                         return (
-                          <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={displayImage}
-                                alt={item.Product.name}
-                                fill
-                                className="object-cover"
-                              />
+                          <div key={idx} className="flex flex-col gap-2 mb-3 pb-3 border-b last:border-b-0">
+                            <div className="flex gap-3 items-start">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={displayImage}
+                                  alt={item.Product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium line-clamp-2">
+                                  {item.Product.name}
+                                  {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <p className="text-sm font-semibold whitespace-nowrap">
+                                  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+                                </p>
+                                {showReviewButton && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleOpenReviewModal(order.id, item)}
+                                  >
+                                    <Star className="h-3.5 w-3.5 mr-1" />
+                                    Đánh giá
+                                  </Button>
+                                )}
+                                {itemReview && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs text-orange-600 hover:text-orange-700"
+                                    onClick={() => handleOpenReviewModal(order.id, item, itemReview)}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">
-                                {item.Product.name}
-                                {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                            </div>
-                            <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            {itemReview && (
+                              <div className="ml-16 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                                  <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                  {itemReview.rating}/5
+                                  <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                                </div>
+                                {itemReview.comment && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{itemReview.comment}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(itemReview.createdAt).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -350,25 +487,70 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className="border-t pt-4 mb-4">
                       {order.OrderItem.map((item, idx) => {
-                        const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                        const displayImage = item.ProductVariant?.image || item.Product?.image || '/placeholder.svg'
+                        const reviewKey = `${order.id}-${item.Product.id}`
+                        const itemReview = reviewsMap[reviewKey]
+                        const showReviewButton = canReviewOrder(order) && !itemReview
                         return (
-                          <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={displayImage}
-                                alt={item.Product.name}
-                                fill
-                                className="object-cover"
-                              />
+                          <div key={idx} className="flex flex-col gap-2 mb-3 pb-3 border-b last:border-b-0">
+                            <div className="flex gap-3 items-start">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={displayImage}
+                                  alt={item.Product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium line-clamp-2">
+                                  {item.Product.name}
+                                  {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <p className="text-sm font-semibold whitespace-nowrap">
+                                  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+                                </p>
+                                {showReviewButton && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleOpenReviewModal(order.id, item)}
+                                  >
+                                    <Star className="h-3.5 w-3.5 mr-1" />
+                                    Đánh giá
+                                  </Button>
+                                )}
+                                {itemReview && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs text-orange-600 hover:text-orange-700"
+                                    onClick={() => handleOpenReviewModal(order.id, item, itemReview)}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">
-                                {item.Product.name}
-                                {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                            </div>
-                            <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            {itemReview && (
+                              <div className="ml-16 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                                  <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                  {itemReview.rating}/5
+                                  <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                                </div>
+                                {itemReview.comment && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{itemReview.comment}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(itemReview.createdAt).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -437,25 +619,70 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className="border-t pt-4 mb-4">
                       {order.OrderItem.map((item, idx) => {
-                        const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                        const displayImage = item.ProductVariant?.image || item.Product?.image || '/placeholder.svg'
+                        const reviewKey = `${order.id}-${item.Product.id}`
+                        const itemReview = reviewsMap[reviewKey]
+                        const showReviewButton = canReviewOrder(order) && !itemReview
                         return (
-                          <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={displayImage}
-                                alt={item.Product.name}
-                                fill
-                                className="object-cover"
-                              />
+                          <div key={idx} className="flex flex-col gap-2 mb-3 pb-3 border-b last:border-b-0">
+                            <div className="flex gap-3 items-start">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={displayImage}
+                                  alt={item.Product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium line-clamp-2">
+                                  {item.Product.name}
+                                  {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <p className="text-sm font-semibold whitespace-nowrap">
+                                  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+                                </p>
+                                {showReviewButton && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleOpenReviewModal(order.id, item)}
+                                  >
+                                    <Star className="h-3.5 w-3.5 mr-1" />
+                                    Đánh giá
+                                  </Button>
+                                )}
+                                {itemReview && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs text-orange-600 hover:text-orange-700"
+                                    onClick={() => handleOpenReviewModal(order.id, item, itemReview)}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">
-                                {item.Product.name}
-                                {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                            </div>
-                            <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            {itemReview && (
+                              <div className="ml-16 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                                  <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                  {itemReview.rating}/5
+                                  <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                                </div>
+                                {itemReview.comment && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{itemReview.comment}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(itemReview.createdAt).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -514,25 +741,70 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className="border-t pt-4 mb-4">
                       {order.OrderItem.map((item, idx) => {
-                        const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                        const displayImage = item.ProductVariant?.image || item.Product?.image || '/placeholder.svg'
+                        const reviewKey = `${order.id}-${item.Product.id}`
+                        const itemReview = reviewsMap[reviewKey]
+                        const showReviewButton = canReviewOrder(order) && !itemReview
                         return (
-                          <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={displayImage}
-                                alt={item.Product.name}
-                                fill
-                                className="object-cover"
-                              />
+                          <div key={idx} className="flex flex-col gap-2 mb-3 pb-3 border-b last:border-b-0">
+                            <div className="flex gap-3 items-start">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={displayImage}
+                                  alt={item.Product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium line-clamp-2">
+                                  {item.Product.name}
+                                  {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <p className="text-sm font-semibold whitespace-nowrap">
+                                  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+                                </p>
+                                {showReviewButton && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleOpenReviewModal(order.id, item)}
+                                  >
+                                    <Star className="h-3.5 w-3.5 mr-1" />
+                                    Đánh giá
+                                  </Button>
+                                )}
+                                {itemReview && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs text-orange-600 hover:text-orange-700"
+                                    onClick={() => handleOpenReviewModal(order.id, item, itemReview)}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">
-                                {item.Product.name}
-                                {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                            </div>
-                            <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            {itemReview && (
+                              <div className="ml-16 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                                  <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                  {itemReview.rating}/5
+                                  <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                                </div>
+                                {itemReview.comment && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{itemReview.comment}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(itemReview.createdAt).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -688,25 +960,70 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className="border-t pt-4 mb-4">
                       {order.OrderItem.map((item, idx) => {
-                        const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                        const displayImage = item.ProductVariant?.image || item.Product?.image || '/placeholder.svg'
+                        const reviewKey = `${order.id}-${item.Product.id}`
+                        const itemReview = reviewsMap[reviewKey]
+                        const showReviewButton = canReviewOrder(order) && !itemReview
                         return (
-                          <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={displayImage}
-                                alt={item.Product.name}
-                                fill
-                                className="object-cover"
-                              />
+                          <div key={idx} className="flex flex-col gap-2 mb-3 pb-3 border-b last:border-b-0">
+                            <div className="flex gap-3 items-start">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={displayImage}
+                                  alt={item.Product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium line-clamp-2">
+                                  {item.Product.name}
+                                  {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <p className="text-sm font-semibold whitespace-nowrap">
+                                  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+                                </p>
+                                {showReviewButton && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleOpenReviewModal(order.id, item)}
+                                  >
+                                    <Star className="h-3.5 w-3.5 mr-1" />
+                                    Đánh giá
+                                  </Button>
+                                )}
+                                {itemReview && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs text-orange-600 hover:text-orange-700"
+                                    onClick={() => handleOpenReviewModal(order.id, item, itemReview)}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">
-                                {item.Product.name}
-                                {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                            </div>
-                            <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            {itemReview && (
+                              <div className="ml-16 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                                  <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                  {itemReview.rating}/5
+                                  <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                                </div>
+                                {itemReview.comment && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{itemReview.comment}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(itemReview.createdAt).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -765,25 +1082,70 @@ export default function OrderHistoryPage() {
                     </div>
                     <div className="border-t pt-4 mb-4">
                       {order.OrderItem.map((item, idx) => {
-                        const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                        const displayImage = item.ProductVariant?.image || item.Product?.image || '/placeholder.svg'
+                        const reviewKey = `${order.id}-${item.Product.id}`
+                        const itemReview = reviewsMap[reviewKey]
+                        const showReviewButton = canReviewOrder(order) && !itemReview
                         return (
-                          <div key={idx} className="flex gap-3 items-start mb-3 pb-3 border-b last:border-b-0">
-                            <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
-                              <Image
-                                src={displayImage}
-                                alt={item.Product.name}
-                                fill
-                                className="object-cover"
-                              />
+                          <div key={idx} className="flex flex-col gap-2 mb-3 pb-3 border-b last:border-b-0">
+                            <div className="flex gap-3 items-start">
+                              <div className="relative w-16 h-16 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <Image
+                                  src={displayImage}
+                                  alt={item.Product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium line-clamp-2">
+                                  {item.Product.name}
+                                  {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">x{item.quantity}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-2">
+                                <p className="text-sm font-semibold whitespace-nowrap">
+                                  {(item.price * item.quantity).toLocaleString('vi-VN')}₫
+                                </p>
+                                {showReviewButton && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleOpenReviewModal(order.id, item)}
+                                  >
+                                    <Star className="h-3.5 w-3.5 mr-1" />
+                                    Đánh giá
+                                  </Button>
+                                )}
+                                {itemReview && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-xs text-orange-600 hover:text-orange-700"
+                                    onClick={() => handleOpenReviewModal(order.id, item, itemReview)}
+                                  >
+                                    Chỉnh sửa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium line-clamp-2">
-                                {item.Product.name}
-                                {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground">x{item.quantity}</p>
-                            </div>
-                            <p className="text-sm font-semibold whitespace-nowrap">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                            {itemReview && (
+                              <div className="ml-16 rounded-lg border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20 px-3 py-2">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-orange-600">
+                                  <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
+                                  {itemReview.rating}/5
+                                  <span className="text-xs font-normal text-orange-500">Đã đánh giá</span>
+                                </div>
+                                {itemReview.comment && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{itemReview.comment}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(itemReview.createdAt).toLocaleDateString('vi-VN')}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -839,6 +1201,23 @@ export default function OrderHistoryPage() {
           userId={userId}
         />
       )}
+
+      <ReviewModal
+        isOpen={reviewModal.open}
+        onClose={() => setReviewModal({ ...reviewModal, open: false })}
+        productId={reviewModal.productId || 0}
+        productName={reviewModal.productName}
+        orderId={reviewModal.orderId || 0}
+        reviewId={reviewModal.reviewId}
+        initialRating={reviewModal.initialRating}
+        initialComment={reviewModal.initialComment}
+        onReviewSubmitted={() => {
+          fetchOrders()
+          if (userId) {
+            fetchUserReviews(userId)
+          }
+        }}
+      />
     </main>
   )
 }

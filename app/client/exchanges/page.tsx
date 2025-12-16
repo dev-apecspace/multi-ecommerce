@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 
 interface ExchangeRequest {
   id: number
@@ -53,6 +54,7 @@ export default function ClientExchangesPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [userId, setUserId] = useState<number | null>(null)
   const [exchanges, setExchanges] = useState<ExchangeRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,6 +78,7 @@ export default function ClientExchangesPage() {
 
   const fetchExchanges = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/client/returns?userId=${userId}`)
       if (!response.ok) {
@@ -92,6 +95,7 @@ export default function ClientExchangesPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 

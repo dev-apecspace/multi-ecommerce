@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 
 interface SubCategory {
   id: number
@@ -47,18 +49,27 @@ export default function AdminCategoriesPage() {
   const [formData, setFormData] = useState<FormData>({ name: '', icon: '' })
   const [error, setError] = useState('')
   const { toast } = useToast()
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
     fetchCategories()
-  }, [])
+  }, [pagination.page, pagination.limit])
 
   const fetchCategories = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/categories?withSubcategories=true')
+      const url = new URL('/api/categories', window.location.origin)
+      url.searchParams.append('withSubcategories', 'true')
+      url.searchParams.append('page', String(pagination.page))
+      url.searchParams.append('limit', String(pagination.limit))
+      
+      const response = await fetch(url.toString())
       const result = await response.json()
 
-      if (Array.isArray(result)) {
+      if (Array.isArray(result.data)) {
+        setCategories(result.data)
+        pagination.setTotal(result.pagination?.total || 0)
+      } else if (Array.isArray(result)) {
         setCategories(result)
       }
     } catch (err) {
@@ -416,6 +427,16 @@ export default function AdminCategoriesPage() {
                 )
               })}
             </div>
+          )}
+          {categories.length > 0 && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
           )}
         </CardContent>
       </Card>

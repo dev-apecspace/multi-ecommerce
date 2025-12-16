@@ -14,6 +14,8 @@ import { CheckCircle, XCircle, Clock, Plus, Trash2, Lock } from "lucide-react"
 import { useAdminVendors } from "@/hooks/useSupabase"
 import AdminVendorModal from "@/components/admin-vendor-modal"
 import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 
 interface Vendor {
   id: number
@@ -27,6 +29,8 @@ interface Vendor {
     id?: number
     name?: string
     image?: string
+    locked?: boolean
+    lockedReason?: string
     ShopDetail?: {
       email?: string
       phone?: string
@@ -36,7 +40,7 @@ interface Vendor {
       bankAccount?: string
       bankName?: string
     }
-  }
+  } | null
 }
 
 interface VendorDocument {
@@ -57,20 +61,46 @@ export default function AdminVendorsPage() {
   const [isManagementModalOpen, setIsManagementModalOpen] = useState(false)
   const [documents, setDocuments] = useState<VendorDocument[]>([])
   const [loading, setLoading] = useState(false)
-  const { data: allVendorsData, loading: vendorsLoading, error, fetchVendors } = useAdminVendors(status === "all" ? undefined : status)
+  const [vendorsLoading, setVendorsLoading] = useState(true)
+  const [allVendors, setAllVendors] = useState<Vendor[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
   const { toast } = useToast()
+
+  const fetchVendors = async () => {
+    try {
+      setVendorsLoading(true)
+      const url = new URL('/api/admin/vendors', window.location.origin)
+      if (status !== "all") url.searchParams.append('status', status)
+      url.searchParams.append('page', String(pagination.page))
+      url.searchParams.append('limit', String(pagination.limit))
+      
+      const response = await fetch(url.toString())
+      const result = await response.json()
+      setAllVendors(result.data || [])
+      pagination.setTotal(result.pagination?.total || 0)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error loading vendors')
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể tải danh sách nhà cung cấp',
+        variant: 'destructive'
+      })
+    } finally {
+      setVendorsLoading(false)
+    }
+  }
 
   useEffect(() => {
     fetchVendors()
-  }, [status, fetchVendors])
+  }, [status, pagination.page, pagination.limit])
 
   useEffect(() => {
     if (selectedVendor && isDetailsModalOpen) {
       fetchDocuments(selectedVendor.id)
     }
   }, [selectedVendor, isDetailsModalOpen])
-
-  const allVendors = Array.isArray(allVendorsData) ? allVendorsData : []
 
   const fetchDocuments = async (vendorId: number) => {
     try {
@@ -109,7 +139,8 @@ export default function AdminVendorsPage() {
           description: "Cập nhật nhà cung cấp thành công",
         })
         fetchVendors()
-        setIsModalOpen(false)
+        setIsDetailsModalOpen(false)
+        setIsManagementModalOpen(false)
       } else {
         throw new Error("Failed to update vendor")
       }
@@ -137,7 +168,8 @@ export default function AdminVendorsPage() {
           description: "Xóa nhà cung cấp thành công",
         })
         fetchVendors()
-        setIsModalOpen(false)
+        setIsDetailsModalOpen(false)
+        setIsManagementModalOpen(false)
       } else {
         throw new Error("Failed to delete vendor")
       }
@@ -362,6 +394,16 @@ export default function AdminVendorsPage() {
               </tbody>
             </table>
           </div>
+          {allVendors.length > 0 && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
+          )}
         </CardContent>
       </Card>
 

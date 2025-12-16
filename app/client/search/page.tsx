@@ -1,30 +1,69 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { SearchIcon, X } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { SearchIcon, X, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { products } from "@/lib/mockdata"
 import { formatPrice } from "@/lib/utils"
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
 
 export default function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [results, setResults] = useState(products.slice(0, 12))
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialQuery = searchParams.get("q") || ""
+  
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query)
-    if (query.trim()) {
-      const filtered = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query.toLowerCase()) ||
-          p.description.toLowerCase().includes(query.toLowerCase()),
-      )
-      setResults(filtered.slice(0, 50))
-    } else {
-      setResults(products.slice(0, 12))
+  useEffect(() => {
+    const query = searchParams.get("q") || ""
+    if (query !== searchQuery) {
+      setSearchQuery(query)
     }
+    
+    if (query) {
+      fetchProducts(query)
+    } else {
+      setProducts([])
+      pagination.setTotal(0)
+    }
+  }, [searchParams, pagination.page, pagination.limit])
+
+  const fetchProducts = async (query: string) => {
+    try {
+      setLoading(true)
+      const response = await fetch(
+        `/api/products?search=${encodeURIComponent(query)}&limit=${pagination.limit}&offset=${pagination.offset}`
+      )
+      const result = await response.json()
+      setProducts(result.data || [])
+      pagination.setTotal(result.pagination?.total || 0)
+    } catch (error) {
+      console.error("Failed to fetch products:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      pagination.setPage(1)
+      router.push(`/client/search?q=${encodeURIComponent(searchQuery)}`)
+    }
+  }
+
+  const clearSearch = () => {
+    setSearchQuery("")
+    pagination.setPage(1)
+    router.push("/client/search")
   }
 
   return (
@@ -32,61 +71,94 @@ export default function SearchPage() {
       <div className="container-viewport py-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-4">Tìm kiếm sản phẩm</h1>
-          <div className="relative">
+          <form onSubmit={handleSearch} className="relative">
             <SearchIcon className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Nhập sản phẩm cần tìm..."
               value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 h-12 text-base"
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-12 text-base pr-10"
             />
             {searchQuery && (
               <button
-                onClick={() => handleSearch("")}
+                type="button"
+                onClick={clearSearch}
                 className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
             )}
-          </div>
+          </form>
         </div>
 
-        {results.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} className="h-80 animate-pulse">
+                <CardContent className="p-0 h-full bg-gray-200 dark:bg-gray-700" />
+              </Card>
+            ))}
+          </div>
+        ) : products.length > 0 ? (
           <>
             <p className="text-sm text-muted-foreground mb-6">
-              Tìm thấy {results.length} sản phẩm cho "{searchQuery || "tất cả"}"
+              Tìm thấy {pagination.total} sản phẩm cho "{searchParams.get("q")}"
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {results.map((product) => (
-                <Link key={product.id} href={`/client/product/${product.id}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                    <CardContent className="p-3 space-y-2">
-                      <div className="w-full h-32 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+              {products.map((product) => (
+                <Link key={product.id} href={`/client/product/${product.slug || product.id}`}>
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 overflow-hidden relative">
                         <img
                           src={product.image || "/placeholder.svg"}
                           alt={product.name}
                           className="w-full h-full object-cover"
                         />
+                        {product.salePrice && product.salePrice < product.price && (
+                          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                            -{Math.round(((product.price - product.salePrice) / product.price) * 100)}%
+                          </div>
+                        )}
                       </div>
-                      <h3 className="text-sm font-medium line-clamp-2">{product.name}</h3>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-primary font-bold">{formatPrice(product.price)}</span>
-                        <span className="text-xs text-muted-foreground line-through">
-                          {formatPrice(product.originalPrice)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs">
-                        <span className="text-yellow-500">★</span>
-                        <span>{product.rating.toFixed(1)}</span>
-                        <span className="text-muted-foreground">({product.reviews})</span>
+                      <div className="p-3 space-y-2">
+                        <h3 className="text-sm font-medium line-clamp-2 h-10">{product.name}</h3>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-primary font-bold">
+                            {formatPrice(product.salePrice || product.price)}
+                          </span>
+                          {(product.salePrice || product.originalPrice) && (product.salePrice < (product.originalPrice || product.price)) && (
+                            <span className="text-xs text-muted-foreground line-through">
+                              {formatPrice(product.originalPrice || product.price)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          <span>{(product.rating || 0).toFixed(1)}</span>
+                          <span className="text-muted-foreground">({product.reviews || 0})</span>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 </Link>
               ))}
             </div>
+            
+            <Card className="bg-muted/50 border-0">
+              <CardContent className="p-6">
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={pagination.goToPage}
+                  limit={pagination.limit}
+                  onLimitChange={pagination.setPageLimit}
+                  total={pagination.total}
+                />
+              </CardContent>
+            </Card>
           </>
-        ) : (
+        ) : searchParams.get("q") ? (
           <Card className="p-12">
             <CardContent className="text-center">
               <SearchIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
@@ -97,6 +169,10 @@ export default function SearchPage() {
               </Link>
             </CardContent>
           </Card>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Nhập từ khóa để tìm kiếm sản phẩm</p>
+          </div>
         )}
       </div>
     </main>

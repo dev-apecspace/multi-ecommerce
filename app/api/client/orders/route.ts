@@ -83,39 +83,6 @@ export async function POST(request: NextRequest) {
     // Calculate shipping cost based on method
     const shippingCostPerVendor = shippingMethod === "express" ? 30000 : 10000
 
-    // Get active campaigns
-    const now = new Date().toISOString()
-    const { data: rawCampaigns } = await supabase
-      .from('Campaign')
-      .select('*')
-      .eq('status', 'active')
-      .lte('startDate', now)
-      .gte('endDate', now)
-
-    const activeCampaigns = (rawCampaigns || []).filter(isCampaignActive)
-
-    // Get approved campaign products
-    let campaignProducts: any[] = []
-    if (activeCampaigns && activeCampaigns.length > 0) {
-      const { data } = await supabase
-        .from('CampaignProduct')
-        .select('*')
-        .eq('status', 'approved')
-        .in(
-          'campaignId',
-          activeCampaigns.map((c) => c.id)
-        )
-      campaignProducts = data || []
-    }
-
-    // Build campaign map: key = productId-variantId (or productId-null)
-    const campaignMap = new Map()
-    campaignProducts.forEach((cp) => {
-      const key = `${cp.productId}-${cp.variantId || 'null'}`
-      const campaign = activeCampaigns?.find((c) => c.id === cp.campaignId)
-      campaignMap.set(key, campaign)
-    })
-
     // Group cart items by vendorId
     const itemsByVendor: Map<number, any[]> = new Map()
 
@@ -137,62 +104,46 @@ export async function POST(request: NextRequest) {
       let itemsSubtotal = 0
       let discountAmount = 0
 
-      // Calculate subtotal and discount for each item, using server-trusted prices
+      // Calculate subtotal and discount for each item, using frontend prices (which include campaigns)
       const itemsWithDiscounts = []
       for (const item of vendorItems) {
-        const campaignKey = `${item.productId}-${item.variantId || 'null'}`
-        const campaign = campaignMap.get(campaignKey)
-
         let basePrice = 0
         let unitPrice = 0
         let unitOriginal = 0
 
-        // IMPORTANT: If variantId exists, MUST use variant price. Never fallback to product price for variant items.
+        // Get variant name if variantId exists
         if (item.variantId) {
           const { data: variantRow, error: variantErr } = await supabase
             .from('ProductVariant')
-            .select('price, originalPrice, name')
+            .select('name')
             .eq('id', item.variantId)
             .eq('productId', item.productId)
             .single()
           if (variantErr || !variantRow) {
             return NextResponse.json({ error: `Variant ${item.variantId} not found` }, { status: 404 })
           }
-          // Use variant price - if null, it's an error, don't fallback to product
-          if (!variantRow.price && variantRow.price !== 0) {
-            return NextResponse.json({ error: `Variant ${item.variantId} has no price set` }, { status: 400 })
-          }
-          basePrice = variantRow.price
-          unitOriginal = variantRow.originalPrice ?? basePrice
           // Store variant name for order item
           item.variantName = variantRow.name
-        } else {
-          // No variant, use product price
-          const { data: productRow, error: productErr } = await supabase
-            .from('Product')
-            .select('price, originalPrice')
-            .eq('id', item.productId)
-            .single()
-          if (productErr || !productRow) {
-            return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-          }
-          basePrice = productRow.price
-          unitOriginal = productRow.originalPrice ?? basePrice
         }
 
-        // Apply campaign discount if available
+        // Use prices from frontend (which already include campaign discounts from checkout)
+        // Frontend sends: price (display price), basePrice (base price before discount)
+        // If salePrice was provided by frontend, it means a discount was applied
+        const frontendPrice = item.price || 0
+        const frontendBasePrice = item.basePrice || frontendPrice
+        const frontendSalePrice = item.salePrice || null
+
+        // Calculate what the unit price should be
+        // If salePrice exists, use it; otherwise use basePrice
+        unitPrice = frontendSalePrice !== null ? frontendSalePrice : frontendBasePrice
+        basePrice = frontendBasePrice
+        unitOriginal = item.originalPrice || frontendBasePrice
+
+        // Calculate discount based on difference between base and sale price
         let itemDiscount = 0
-        if (campaign) {
-          if (campaign.type === 'percentage') {
-            itemDiscount = (basePrice * campaign.discountValue / 100) * item.quantity
-            unitPrice = basePrice * (1 - campaign.discountValue / 100)
-          } else if (campaign.type === 'fixed') {
-            itemDiscount = campaign.discountValue * item.quantity
-            unitPrice = Math.max(0, basePrice - campaign.discountValue)
-          }
+        if (frontendSalePrice !== null && frontendSalePrice < frontendBasePrice) {
+          itemDiscount = (frontendBasePrice - frontendSalePrice) * item.quantity
           discountAmount += itemDiscount
-        } else {
-          unitPrice = basePrice
         }
 
         const finalPrice = unitPrice * item.quantity
@@ -204,23 +155,13 @@ export async function POST(request: NextRequest) {
           originalPrice: unitOriginal,
           discount: itemDiscount,
           finalPrice: finalPrice,
-          campaign: campaign,
+          campaign: null,
           taxApplied: item.taxApplied || false,
           taxRate: item.taxRate || 0,
         })
       }
 
-      // Calculate tax for this vendor's items
-      let totalTax = 0
-      for (const item of itemsWithDiscounts) {
-        if (item.taxApplied && item.taxRate && item.taxRate > 0) {
-          const unitPrice = item.finalPrice / parseInt(item.quantity)
-          const itemTax = Math.round(unitPrice * (item.taxRate / 100)) * parseInt(item.quantity)
-          totalTax += itemTax
-        }
-      }
-      
-      let vendorTotal = itemsSubtotal + totalTax + shippingCostPerVendor
+      let vendorTotal = itemsSubtotal + shippingCostPerVendor
       
       // Apply voucher discount for this vendor
       const vendorVoucherInfo = vendorVouchers[vendorId.toString()]
@@ -261,15 +202,8 @@ export async function POST(request: NextRequest) {
       const orderId = orderData[0].id
       createdOrders.push(orderData[0])
 
-      // Create OrderItems for this vendor with final price (after discount and tax)
+      // Create OrderItems for this vendor with final price (prices already include tax from frontend)
       const orderItems = itemsWithDiscounts.map((item: any) => {
-        let unitPrice = item.price
-        
-        let taxAmount = 0
-        if (item.taxApplied && item.taxRate && item.taxRate > 0) {
-          taxAmount = Math.round(unitPrice * (item.taxRate / 100))
-        }
-        
         return {
           orderId,
           productId: parseInt(item.productId),
@@ -277,7 +211,7 @@ export async function POST(request: NextRequest) {
           variantId: item.variantId ? parseInt(item.variantId) : null,
           variantName: item.variantName || null,
           quantity: parseInt(item.quantity),
-          price: unitPrice + taxAmount
+          price: item.price
         }
       })
 

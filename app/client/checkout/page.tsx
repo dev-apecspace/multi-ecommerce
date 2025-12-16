@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
+import { useLoading } from "@/hooks/use-loading"
 import { CheckoutAddressDialog } from "@/components/client/checkout-address-dialog"
 import { computePrice } from "@/lib/price-utils"
 
@@ -52,6 +53,7 @@ export default function CheckoutPage() {
   const { toast } = useToast()
   const { user } = useAuth()
   const { refetchCart } = useCart()
+  const { setIsLoading } = useLoading()
   const [step, setStep] = useState<"shipping" | "payment" | "review" | "success">("shipping")
   const [cartItems, setCartItems] = useState<CheckoutItem[]>([])
   const [userId, setUserId] = useState<number | null>(null)
@@ -391,6 +393,7 @@ export default function CheckoutPage() {
       }
 
       setLoading(true)
+      setIsLoading(true)
       try {
         const response = await fetch('/api/client/orders', {
           method: 'POST',
@@ -403,6 +406,8 @@ export default function CheckoutPage() {
               quantity: item.quantity,
               price: item.price,
               basePrice: item.basePrice,
+              salePrice: item.salePrice,
+              originalPrice: item.originalPrice,
               taxApplied: item.taxApplied,
               taxRate: item.taxRate,
               vendorId: item.vendorId,
@@ -440,6 +445,7 @@ export default function CheckoutPage() {
         toast({ title: 'Lỗi', description: 'Không thể tạo đơn hàng', variant: 'destructive' })
       } finally {
         setLoading(false)
+        setIsLoading(false)
       }
     }
   }

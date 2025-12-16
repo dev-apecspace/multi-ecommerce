@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 
 type CampaignStatus = 'draft' | 'upcoming' | 'active' | 'ended'
 
@@ -98,18 +100,24 @@ export default function AdminCampaignsPage() {
     status: 'draft' as CampaignStatus,
   })
   const { toast } = useToast()
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
     fetchCampaigns()
     fetchProductRegistrations()
     fetchApprovedProducts()
-  }, [])
+  }, [pagination.page, pagination.limit])
 
   const fetchCampaigns = async () => {
     try {
-      const response = await fetch('/api/admin/campaigns')
+      const url = new URL('/api/admin/campaigns', window.location.origin)
+      url.searchParams.append('page', String(pagination.page))
+      url.searchParams.append('limit', String(pagination.limit))
+      
+      const response = await fetch(url.toString())
       const data = await response.json()
       setCampaigns(data.data || [])
+      pagination.setTotal(data.pagination?.total || 0)
     } catch (error) {
       toast({
         title: 'Lỗi',
@@ -577,6 +585,16 @@ export default function AdminCampaignsPage() {
                   </tbody>
                 </table>
               </div>
+              {campaigns.length > 0 && (
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={pagination.goToPage}
+                  limit={pagination.limit}
+                  onLimitChange={pagination.setPageLimit}
+                  total={pagination.total}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'approved'
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
+    const search = searchParams.get('search')
+    const sortBy = searchParams.get('sortBy')
 
     let query = supabase
       .from('Vendor')
@@ -24,8 +26,19 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
+    if (search) {
+      query = query.ilike('name', `%${search}%`)
+    }
+
+    if (sortBy === 'followers') {
+      query = query.order('followers', { ascending: false })
+    } else if (sortBy === 'newest') {
+      query = query.order('created_at', { ascending: false })
+    } else {
+      query = query.order('rating', { ascending: false })
+    }
+
     const { data, error, count } = await query
-      .order('rating', { ascending: false })
       .range(offset, offset + limit - 1)
 
     if (error) {
@@ -94,10 +107,10 @@ export async function GET(request: NextRequest) {
             .eq('vendorId', vendor.id)
             .maybeSingle()
           
-          const shop = shopData || {}
+          const shop = shopData || null
           let shopDetail = {}
           
-          if (shop?.id) {
+          if (shop && shop.id) {
             const { data: detailData } = await supabase
               .from('ShopDetail')
               .select('*')
@@ -113,10 +126,10 @@ export async function GET(request: NextRequest) {
             rating: calculatedRating,
             reviews_count: reviewsCount,
             followers_count: followersCount || vendor.followers || 0,
-            Shop: {
+            Shop: shop ? {
               ...shop,
               ShopDetail: shopDetail,
-            },
+            } : null,
           }
         })
       )

@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const offset = parseInt(searchParams.get('offset') || '0')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
 
     let query = supabase
       .from('Order')
@@ -50,10 +51,11 @@ export async function GET(request: NextRequest) {
     }
 
     const transformedData = data || []
+    const totalPages = Math.ceil((count || 0) / limit)
 
     return NextResponse.json({
       data: transformedData,
-      pagination: { total: count, limit, offset }
+      pagination: { total: count, limit, page, totalPages }
     })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

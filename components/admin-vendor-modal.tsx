@@ -46,6 +46,8 @@ interface Vendor {
     id?: number
     name?: string
     image?: string
+    locked?: boolean
+    lockedReason?: string
     ShopDetail?: {
       email?: string
       phone?: string
@@ -55,7 +57,7 @@ interface Vendor {
       bankAccount?: string
       bankName?: string
     }
-  }
+  } | null
 }
 
 interface VendorDocument {
@@ -312,8 +314,8 @@ export default function AdminVendorModal({
                 <p className="mt-2 text-sm text-muted-foreground">{vendor.products}</p>
               </div>
               <div>
-                <Label>Người theo dõi</Label>
-                <p className="mt-2 text-sm text-muted-foreground">{vendor.followers}</p>
+                <Label>Đánh giá</Label>
+                <p className="mt-2 text-sm text-muted-foreground">{vendor.rating}/5</p>
               </div>
             </div>
           </TabsContent>
@@ -508,7 +510,7 @@ export default function AdminVendorModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Tên shop</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">{vendor.Shop.name || '-'}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{vendor.name || '-'}</p>
                   </div>
                   <div>
                     <Label>Email</Label>
@@ -554,6 +556,13 @@ export default function AdminVendorModal({
                     </p>
                   </div>
                 </div>
+
+                <div>
+                  <Label>Số giấy phép kinh doanh</Label>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {vendor.Shop.ShopDetail?.businessLicense || '-'}
+                  </p>
+                </div>
               </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -565,13 +574,6 @@ export default function AdminVendorModal({
 
         {showDetailsTab && (
           <DialogFooter className="gap-2">
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={loading}
-            >
-              Xóa
-            </Button>
             <Button
               variant="outline"
               onClick={onClose}

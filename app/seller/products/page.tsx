@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Eye, Copy, ChevronDown, ChevronRight, RotateCw } fr
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
@@ -33,31 +34,41 @@ interface Product {
   ProductVariant?: ProductVariant[]
 }
 
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
+
 export default function SellerProductsPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(new Set())
+  
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
   useEffect(() => {
     if (user?.id) {
       fetchProducts()
     }
-  }, [user?.id])
+  }, [user?.id, pagination.page, pagination.limit])
 
   const fetchProducts = async () => {
     try {
-      setLoading(true)
-      const response = await fetch(`/api/seller/products`, {
+      if (!refreshing) {
+        setIsLoading(true)
+        setLoading(true)
+      }
+      const response = await fetch(`/api/seller/products?limit=${pagination.limit}&offset=${pagination.offset}`, {
         credentials: 'include'
       })
       const data = await response.json()
       setProducts(data.data || [])
+      pagination.setTotal(data.pagination?.total || 0)
     } catch (error) {
       toast({
         title: "Lỗi",
@@ -66,36 +77,30 @@ export default function SellerProductsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
+      setRefreshing(false)
     }
   }
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    try {
-      const response = await fetch(`/api/seller/products`, {
-        credentials: 'include'
-      })
-      const data = await response.json()
-      setProducts(data.data || [])
-      toast({
-        title: "Thành công",
-        description: "Đã cập nhật danh sách sản phẩm",
-      })
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: "Không thể cập nhật danh sách sản phẩm",
-        variant: "destructive",
-      })
-    } finally {
-      setRefreshing(false)
-    }
+    pagination.setPage(1) // Reset to first page on refresh
+    // fetchProducts will be triggered by useEffect if page changes, 
+    // but if page is already 1, we need to call it manually or add refreshing to dependency?
+    // Better to just call fetchProducts directly here if page doesn't change, 
+    // or rely on the fact that we want to reload current page?
+    // Let's just call fetchProducts directly to be safe and keep current page or reset?
+    // Usually refresh means reload current view.
+    // But if I want to reset to page 1, I should do that.
+    // Let's keep it simple: reload current page.
+    fetchProducts()
   }
 
   const handleDelete = async (productId: number) => {
     if (!confirm('Bạn chắc chắn muốn xóa sản phẩm này?')) return
 
     try {
+      setIsLoading(true)
       setDeletingId(productId)
       const response = await fetch(`/api/seller/products/${productId}`, {
         method: 'DELETE',
@@ -120,11 +125,13 @@ export default function SellerProductsPage() {
       })
     } finally {
       setDeletingId(null)
+      setIsLoading(false)
     }
   }
 
   const handleDuplicate = async (productId: number) => {
     try {
+      setIsLoading(true)
       setDuplicatingId(productId)
       const response = await fetch(`/api/seller/products/${productId}/duplicate`, {
         method: 'POST',
@@ -150,6 +157,7 @@ export default function SellerProductsPage() {
       })
     } finally {
       setDuplicatingId(null)
+      setIsLoading(false)
     }
   }
 
@@ -177,6 +185,7 @@ export default function SellerProductsPage() {
     if (!confirm('Bạn chắc chắn muốn xóa variant này?')) return
 
     try {
+      setIsLoading(true)
       const response = await fetch(`/api/seller/products/${productId}/variants/${variantId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -202,6 +211,8 @@ export default function SellerProductsPage() {
         description: error instanceof Error ? error.message : "Không thể xóa variant",
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -389,6 +400,17 @@ export default function SellerProductsPage() {
               </table>
             </div>
           )}
+          
+          <div className="mt-4">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
+          </div>
         </CardContent>
       </Card>
     </main>

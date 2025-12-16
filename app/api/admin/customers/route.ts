@@ -11,10 +11,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const status = searchParams.get('status')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
 
     let query = supabase
       .from('User')
-      .select('id, name, email, phone, status, joinDate, createdAt')
+      .select('id, name, email, phone, status, joinDate, createdAt', { count: 'exact' })
       .eq('role', 'customer')
 
     if (status) {
@@ -25,8 +28,9 @@ export async function GET(request: NextRequest) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
     }
 
-    const { data: users, error } = await query
+    const { data: users, error, count } = await query
       .order('createdAt', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -58,9 +62,11 @@ export async function GET(request: NextRequest) {
       orders: orderMap.get(user.id)?.orders || 0
     })) || []
 
+    const totalPages = Math.ceil((count || 0) / limit)
+
     return NextResponse.json({
       data: enrichedUsers,
-      pagination: { total: enrichedUsers.length, limit: enrichedUsers.length, offset: 0 }
+      pagination: { total: count || 0, limit, page, totalPages }
     })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

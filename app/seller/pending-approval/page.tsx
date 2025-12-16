@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { useLoading } from '@/hooks/use-loading'
 import Link from 'next/link'
 import { Clock, FileText, User, Settings, AlertCircle, CheckCircle, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -62,6 +63,7 @@ const RESTRICTED_FEATURES = [
 
 export default function PendingApprovalPage() {
   const { user, logout, refreshUser } = useAuth()
+  const { setIsLoading } = useLoading()
   const router = useRouter()
 
   useEffect(() => {
@@ -81,7 +83,12 @@ export default function PendingApprovalPage() {
   }, [user?.id, refreshUser, router])
 
   const handleLogout = async () => {
-    await logout()
+    setIsLoading(true)
+    try {
+      await logout()
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

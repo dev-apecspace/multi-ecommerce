@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import { formatPrice } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
@@ -47,17 +49,24 @@ export default function AdminProductsPage() {
   const [activeTab, setActiveTab] = useState('pending')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(new Set())
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
     fetchProducts()
-  }, [activeTab])
+  }, [activeTab, pagination.page, pagination.limit])
 
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/products?status=${activeTab}`)
+      const url = new URL('/api/admin/products', window.location.origin)
+      url.searchParams.append('status', activeTab)
+      url.searchParams.append('page', String(pagination.page))
+      url.searchParams.append('limit', String(pagination.limit))
+      
+      const response = await fetch(url.toString())
       const data = await response.json()
       setProducts(data.data || [])
+      pagination.setTotal(data.pagination?.total || 0)
     } catch (error) {
       toast({
         title: "Lỗi",
@@ -234,85 +243,97 @@ export default function AdminProductsPage() {
                   <p className="text-muted-foreground">Không có sản phẩm nào chờ duyệt</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {products.map((product) => (
-                    <div key={product.id}>
-                      <div className="border rounded-lg p-4 hover:bg-muted">
-                        <div className="flex items-start gap-4">
-                          <button
-                            onClick={() => toggleExpandProduct(product.id)}
-                            className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded mt-1"
-                          >
-                            {expandedProductIds.has(product.id) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </button>
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                              <p className="text-sm text-muted-foreground">Shop: {product.Vendor?.name || 'N/A'}</p>
-                              <p className="text-sm text-muted-foreground">Danh mục: {product.Category?.name || 'N/A'}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Ngày gửi: {new Date(product.createdAt).toLocaleDateString('vi-VN')}
-                              </p>
-                            </div>
-                            <div className="flex flex-col justify-between">
+                <>
+                  <div className="space-y-4">
+                    {products.map((product) => (
+                      <div key={product.id}>
+                        <div className="border rounded-lg p-4 hover:bg-muted">
+                          <div className="flex items-start gap-4">
+                            <button
+                              onClick={() => toggleExpandProduct(product.id)}
+                              className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded mt-1"
+                            >
+                              {expandedProductIds.has(product.id) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <p className="text-sm text-muted-foreground">Giá bán {product.taxApplied && '(sau thuế)'}</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                  {getDisplayPrice(product)}
+                                <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
+                                <p className="text-sm text-muted-foreground">Shop: {product.Vendor?.name || 'N/A'}</p>
+                                <p className="text-sm text-muted-foreground">Danh mục: {product.Category?.name || 'N/A'}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Ngày gửi: {new Date(product.createdAt).toLocaleDateString('vi-VN')}
                                 </p>
-                                {product.taxApplied && product.taxRate && (
-                                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                    Thuế: {product.taxRate}%
-                                  </p>
-                                )}
                               </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  onClick={() => router.push(`/admin/products/${product.id}`)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  Xem chi tiết
-                                </Button>
-                                <Button
-                                  onClick={() => handleApprove(product)}
-                                  className="flex-1 bg-green-600 hover:bg-green-700"
-                                >
-                                  <Check className="h-4 w-4 mr-2" />
-                                  Phê duyệt
-                                </Button>
-                                <Button
-                                  onClick={() => handleReject(product)}
-                                  variant="outline"
-                                  className="flex-1 text-red-600 hover:text-red-700"
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Từ chối
-                                </Button>
+                              <div className="flex flex-col justify-between">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Giá bán {product.taxApplied && '(sau thuế)'}</p>
+                                  <p className="text-2xl font-bold text-blue-600">
+                                    {getDisplayPrice(product)}
+                                  </p>
+                                  {product.taxApplied && product.taxRate && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                      Thuế: {product.taxRate}%
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={() => router.push(`/admin/products/${product.id}`)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Xem chi tiết
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleApprove(product)}
+                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                  >
+                                    <Check className="h-4 w-4 mr-2" />
+                                    Phê duyệt
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleReject(product)}
+                                    variant="outline"
+                                    className="flex-1 text-red-600 hover:text-red-700"
+                                  >
+                                    <X className="h-4 w-4 mr-2" />
+                                    Từ chối
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
+                        {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
+                          <div className="border-l-2 border-b border-r rounded-b-lg p-4 bg-gray-50 dark:bg-slate-800/50 space-y-2">
+                            {product.ProductVariant.map((variant) => (
+                              <div key={`variant-${variant.id}`} className="pl-4">
+                                <p className="text-sm font-medium">{variant.name}</p>
+                                <p className="text-sm text-muted-foreground">Giá: {formatPrice(variant.price)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
-                        <div className="border-l-2 border-b border-r rounded-b-lg p-4 bg-gray-50 dark:bg-slate-800/50 space-y-2">
-                          {product.ProductVariant.map((variant) => (
-                            <div key={`variant-${variant.id}`} className="pl-4">
-                              <p className="text-sm font-medium">{variant.name}</p>
-                              <p className="text-sm text-muted-foreground">Giá: {formatPrice(variant.price)}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                  {products.length > 0 && (
+                    <Pagination
+                      currentPage={pagination.page}
+                      totalPages={pagination.totalPages}
+                      onPageChange={pagination.goToPage}
+                      limit={pagination.limit}
+                      onLimitChange={pagination.setPageLimit}
+                      total={pagination.total}
+                    />
+                  )}
+                </>
               )}
             </TabsContent>
 
@@ -322,72 +343,84 @@ export default function AdminProductsPage() {
               ) : products.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">Không có sản phẩm nào được duyệt</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-2 w-8"></th>
-                        <th className="text-left py-3 px-4">Sản phẩm</th>
-                        <th className="text-left py-3 px-4">Shop</th>
-                        <th className="text-left py-3 px-4">Giá</th>
-                        <th className="text-left py-3 px-4">Trạng thái</th>
-                        <th className="text-left py-3 px-4">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((product) => (
-                        <React.Fragment key={product.id}>
-                          <tr className="border-b border-border hover:bg-muted">
-                            <td className="py-3 px-2">
-                              <button
-                                onClick={() => toggleExpandProduct(product.id)}
-                                className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded"
-                              >
-                                {expandedProductIds.has(product.id) ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-2 w-8"></th>
+                          <th className="text-left py-3 px-4">Sản phẩm</th>
+                          <th className="text-left py-3 px-4">Shop</th>
+                          <th className="text-left py-3 px-4">Giá</th>
+                          <th className="text-left py-3 px-4">Trạng thái</th>
+                          <th className="text-left py-3 px-4">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {products.map((product) => (
+                          <React.Fragment key={product.id}>
+                            <tr className="border-b border-border hover:bg-muted">
+                              <td className="py-3 px-2">
+                                <button
+                                  onClick={() => toggleExpandProduct(product.id)}
+                                  className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded"
+                                >
+                                  {expandedProductIds.has(product.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </td>
+                              <td className="py-3 px-4">{product.name}</td>
+                              <td className="py-3 px-4">{product.Vendor?.name || 'N/A'}</td>
+                              <td className="py-3 px-4 font-semibold">
+                                {getDisplayPrice(product)}
+                                {product.taxApplied && product.taxRate && (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">({product.taxRate}%)</span>
                                 )}
-                              </button>
-                            </td>
-                            <td className="py-3 px-4">{product.name}</td>
-                            <td className="py-3 px-4">{product.Vendor?.name || 'N/A'}</td>
-                            <td className="py-3 px-4 font-semibold">
-                              {getDisplayPrice(product)}
-                              {product.taxApplied && product.taxRate && (
-                                <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">({product.taxRate}%)</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
-                            <td className="py-3 px-4">
-                              <Button
-                                onClick={() => router.push(`/admin/products/${product.id}`)}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                          {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
-                            <>
-                              {product.ProductVariant.map((variant) => (
-                                <tr key={`variant-${variant.id}`} className="border-b border-border bg-gray-50 dark:bg-slate-800/50">
-                                  <td colSpan={2} className="py-3 px-4 pl-12">
-                                    <div className="text-sm font-medium">{variant.name}</div>
-                                  </td>
-                                  <td className="py-3 px-4"></td>
-                                  <td className="py-3 px-4">{formatPrice(variant.price)}</td>
-                                  <td colSpan={2}></td>
-                                </tr>
-                              ))}
-                            </>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                              <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
+                              <td className="py-3 px-4">
+                                <Button
+                                  onClick={() => router.push(`/admin/products/${product.id}`)}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                            {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
+                              <>
+                                {product.ProductVariant.map((variant) => (
+                                  <tr key={`variant-${variant.id}`} className="border-b border-border bg-gray-50 dark:bg-slate-800/50">
+                                    <td colSpan={2} className="py-3 px-4 pl-12">
+                                      <div className="text-sm font-medium">{variant.name}</div>
+                                    </td>
+                                    <td className="py-3 px-4"></td>
+                                    <td className="py-3 px-4">{formatPrice(variant.price)}</td>
+                                    <td colSpan={2}></td>
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {products.length > 0 && (
+                    <Pagination
+                      currentPage={pagination.page}
+                      totalPages={pagination.totalPages}
+                      onPageChange={pagination.goToPage}
+                      limit={pagination.limit}
+                      onLimitChange={pagination.setPageLimit}
+                      total={pagination.total}
+                    />
+                  )}
+                </>
               )}
             </TabsContent>
 
@@ -397,72 +430,84 @@ export default function AdminProductsPage() {
               ) : products.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">Không có sản phẩm nào bị từ chối</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-2 w-8"></th>
-                        <th className="text-left py-3 px-4">Sản phẩm</th>
-                        <th className="text-left py-3 px-4">Shop</th>
-                        <th className="text-left py-3 px-4">Giá</th>
-                        <th className="text-left py-3 px-4">Trạng thái</th>
-                        <th className="text-left py-3 px-4">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((product) => (
-                        <React.Fragment key={product.id}>
-                          <tr className="border-b border-border hover:bg-muted">
-                            <td className="py-3 px-2">
-                              <button
-                                onClick={() => toggleExpandProduct(product.id)}
-                                className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded"
-                              >
-                                {expandedProductIds.has(product.id) ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-2 w-8"></th>
+                          <th className="text-left py-3 px-4">Sản phẩm</th>
+                          <th className="text-left py-3 px-4">Shop</th>
+                          <th className="text-left py-3 px-4">Giá</th>
+                          <th className="text-left py-3 px-4">Trạng thái</th>
+                          <th className="text-left py-3 px-4">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {products.map((product) => (
+                          <React.Fragment key={product.id}>
+                            <tr className="border-b border-border hover:bg-muted">
+                              <td className="py-3 px-2">
+                                <button
+                                  onClick={() => toggleExpandProduct(product.id)}
+                                  className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded"
+                                >
+                                  {expandedProductIds.has(product.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </button>
+                              </td>
+                              <td className="py-3 px-4">{product.name}</td>
+                              <td className="py-3 px-4">{product.Vendor?.name || 'N/A'}</td>
+                              <td className="py-3 px-4 font-semibold">
+                                {getDisplayPrice(product)}
+                                {product.taxApplied && product.taxRate && (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">({product.taxRate}%)</span>
                                 )}
-                              </button>
-                            </td>
-                            <td className="py-3 px-4">{product.name}</td>
-                            <td className="py-3 px-4">{product.Vendor?.name || 'N/A'}</td>
-                            <td className="py-3 px-4 font-semibold">
-                              {getDisplayPrice(product)}
-                              {product.taxApplied && product.taxRate && (
-                                <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">({product.taxRate}%)</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
-                            <td className="py-3 px-4">
-                              <Button
-                                onClick={() => router.push(`/admin/products/${product.id}`)}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                          {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
-                            <>
-                              {product.ProductVariant.map((variant) => (
-                                <tr key={`variant-${variant.id}`} className="border-b border-border bg-gray-50 dark:bg-slate-800/50">
-                                  <td colSpan={2} className="py-3 px-4 pl-12">
-                                    <div className="text-sm font-medium">{variant.name}</div>
-                                  </td>
-                                  <td className="py-3 px-4"></td>
-                                  <td className="py-3 px-4">{formatPrice(variant.price)}</td>
-                                  <td colSpan={2}></td>
-                                </tr>
-                              ))}
-                            </>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                              <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
+                              <td className="py-3 px-4">
+                                <Button
+                                  onClick={() => router.push(`/admin/products/${product.id}`)}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                            {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
+                              <>
+                                {product.ProductVariant.map((variant) => (
+                                  <tr key={`variant-${variant.id}`} className="border-b border-border bg-gray-50 dark:bg-slate-800/50">
+                                    <td colSpan={2} className="py-3 px-4 pl-12">
+                                      <div className="text-sm font-medium">{variant.name}</div>
+                                    </td>
+                                    <td className="py-3 px-4"></td>
+                                    <td className="py-3 px-4">{formatPrice(variant.price)}</td>
+                                    <td colSpan={2}></td>
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {products.length > 0 && (
+                    <Pagination
+                      currentPage={pagination.page}
+                      totalPages={pagination.totalPages}
+                      onPageChange={pagination.goToPage}
+                      limit={pagination.limit}
+                      onLimitChange={pagination.setPageLimit}
+                      total={pagination.total}
+                    />
+                  )}
+                </>
               )}
             </TabsContent>
           </Tabs>

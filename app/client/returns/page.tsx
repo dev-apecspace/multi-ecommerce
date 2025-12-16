@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 
 interface ReturnRequest {
   id: number
@@ -59,6 +60,7 @@ export default function ClientReturnsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [userId, setUserId] = useState<number | null>(null)
   const [returns, setReturns] = useState<ReturnRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,6 +84,7 @@ export default function ClientReturnsPage() {
 
   const fetchReturns = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/client/returns?userId=${userId}`)
       if (!response.ok) {
@@ -97,6 +100,7 @@ export default function ClientReturnsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 

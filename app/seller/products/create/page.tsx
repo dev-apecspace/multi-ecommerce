@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { ProductImageUpload } from "@/components/product-image-upload"
 import { ProductMultiImageUpload } from "@/components/product-multi-image-upload"
 import Image from "next/image"
@@ -58,6 +59,7 @@ export default function SellerCreateProductPage() {
   const { toast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const attributeInputRef = useRef<HTMLInputElement>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [subcategories, setSubcategories] = useState<SubCategory[]>([])
@@ -89,6 +91,7 @@ export default function SellerCreateProductPage() {
 
   const fetchCategories = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch('/api/categories?withSubcategories=true')
       if (!response.ok) {
@@ -105,6 +108,7 @@ export default function SellerCreateProductPage() {
       setCategories([])
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -304,6 +308,7 @@ export default function SellerCreateProductPage() {
     }
 
     try {
+      setIsLoading(true)
       setSubmitting(true)
       const filteredVariants = variants.filter(v => v.name && v.price)
       const stockToSend = filteredVariants.length > 0 ? 0 : formData.stock
@@ -350,6 +355,7 @@ export default function SellerCreateProductPage() {
       })
     } finally {
       setSubmitting(false)
+      setIsLoading(false)
     }
   }
 

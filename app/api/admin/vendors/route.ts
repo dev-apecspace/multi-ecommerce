@@ -11,8 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
 
     let query = supabase
       .from('Vendor')
@@ -30,38 +31,58 @@ export async function GET(request: NextRequest) {
     if (data && data.length > 0) {
       enrichedData = await Promise.all(
         data.map(async (vendor: any) => {
-          const { data: shopData } = await supabase
-            .from('Shop')
-            .select('*')
-            .eq('vendorId', vendor.id)
+          const { data: userData } = await supabase
+            .from('User')
+            .select('email, phone')
+            .eq('id', vendor.userId)
             .maybeSingle()
           
-          const shop = shopData || {}
-          let shopDetail = {}
+          const { count: productCount } = await supabase
+            .from('Product')
+            .select('*', { count: 'exact', head: true })
+            .eq('vendorId', vendor.id)
+            .eq('status', 'approved')
           
-          if (shop?.id) {
-            const { data: detailData } = await supabase
-              .from('ShopDetail')
-              .select('*')
-              .eq('shopId', shop.id)
-              .maybeSingle()
-            shopDetail = detailData || {}
-          }
+          const { data: reviews } = await supabase
+            .from('ProductReview')
+            .select('rating')
+            .in('productId', 
+              (await supabase
+                .from('Product')
+                .select('id')
+                .eq('vendorId', vendor.id)
+              ).data?.map((p: any) => p.id) || []
+            )
+          
+          const avgRating = reviews && reviews.length > 0 
+            ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length).toFixed(1)
+            : 0
           
           return {
             ...vendor,
+            products: productCount || 0,
+            rating: parseFloat(avgRating as string) || 0,
             Shop: {
-              ...shop,
-              ShopDetail: shopDetail,
+              ShopDetail: {
+                email: userData?.email || '',
+                phone: userData?.phone || '',
+                address: vendor.businessAddress || '',
+                taxId: vendor.taxId || '',
+                businessLicense: vendor.businessLicense || '',
+                bankAccount: vendor.bankAccount || '',
+                bankName: vendor.bankName || '',
+              },
             },
           }
         })
       )
     }
     
+    const totalPages = Math.ceil((count || 0) / limit)
+    
     return NextResponse.json({
       data: enrichedData,
-      pagination: { total: count, limit, offset },
+      pagination: { total: count, limit, page, totalPages },
     })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

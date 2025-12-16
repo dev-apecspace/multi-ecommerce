@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VendorApprovalBanner } from "@/components/vendor-approval-banner"
 import { ProductImageUpload } from "@/components/product-image-upload"
 import { useToast } from "@/hooks/use-toast"
+import { useLoading } from "@/hooks/use-loading"
 
 interface ShopData {
   shopName: string
@@ -44,6 +45,7 @@ interface PaymentData {
 
 export default function SellerSettingsPage() {
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -84,6 +86,8 @@ export default function SellerSettingsPage() {
 
   const fetchShopSettings = async () => {
     try {
+      setIsLoading(true)
+      setLoading(true)
       const response = await fetch('/api/seller/vendor')
       if (!response.ok) throw new Error('Failed to fetch vendor settings')
       
@@ -91,8 +95,9 @@ export default function SellerSettingsPage() {
       const vendor = data.vendor
       const user = data.user
       const userProfile = data.userProfile
+      const shopDetail = data.shopDetail
       
-      console.log('Fetched vendor data:', { vendor, user, userProfile })
+      console.log('Fetched vendor data:', { vendor, user, userProfile, shopDetail })
       
       setShopData(prev => ({
         ...prev,
@@ -100,15 +105,15 @@ export default function SellerSettingsPage() {
         shopLogo: vendor?.coverImage || '',
         vendorLogo: vendor?.logo || userProfile?.avatar || '',
         shopDescription: vendor?.description || '',
-        ownerName: user?.name || '',
-        email: user?.email || '',
-        phone: user?.phone || '',
-        address: vendor?.businessAddress || '',
-        taxId: vendor?.taxId || '',
-        businessLicense: vendor?.businessLicense || '',
-        bankAccount: vendor?.bankAccount || '',
-        bankName: vendor?.bankName || '',
-        bankBranch: vendor?.bankBranch || '',
+        ownerName: shopDetail?.ownerName || user?.name || '',
+        email: shopDetail?.email || user?.email || '',
+        phone: shopDetail?.phone || user?.phone || '',
+        address: shopDetail?.address || vendor?.businessAddress || '',
+        taxId: shopDetail?.taxId || vendor?.taxId || '',
+        businessLicense: shopDetail?.businessLicense || vendor?.businessLicense || '',
+        bankAccount: shopDetail?.bankAccount || vendor?.bankAccount || '',
+        bankName: shopDetail?.bankName || vendor?.bankName || '',
+        bankBranch: shopDetail?.bankBranch || vendor?.bankBranch || '',
       }))
     } catch (error) {
       console.error('Error fetching vendor settings:', error)
@@ -119,11 +124,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const handleSaveGeneral = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       const response = await fetch('/api/seller/vendor', {
         method: 'PATCH',
@@ -145,11 +152,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleSavePolicy = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       toast({
         title: "Thành công",
@@ -163,11 +172,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleSaveShipping = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       toast({
         title: "Thành công",
@@ -181,11 +192,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleSavePayment = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       toast({
         title: "Thành công",
@@ -199,6 +212,7 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
@@ -362,6 +376,41 @@ export default function SellerSettingsPage() {
                     onChange={(e) => setShopData(prev => ({ ...prev, ownerName: e.target.value }))}
                     className="mt-2"
                     placeholder="Nhập tên chủ shop"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Thông tin ngân hàng</h3>
+                
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <Label>Số tài khoản</Label>
+                    <Input 
+                      value={shopData.bankAccount}
+                      onChange={(e) => setShopData(prev => ({ ...prev, bankAccount: e.target.value }))}
+                      className="mt-2"
+                      placeholder="Nhập số tài khoản"
+                    />
+                  </div>
+                  <div>
+                    <Label>Tên ngân hàng</Label>
+                    <Input 
+                      value={shopData.bankName}
+                      onChange={(e) => setShopData(prev => ({ ...prev, bankName: e.target.value }))}
+                      className="mt-2"
+                      placeholder="Nhập tên ngân hàng"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Chi nhánh ngân hàng</Label>
+                  <Input 
+                    value={shopData.bankBranch}
+                    onChange={(e) => setShopData(prev => ({ ...prev, bankBranch: e.target.value }))}
+                    className="mt-2"
+                    placeholder="Nhập chi nhánh ngân hàng"
                   />
                 </div>
               </div>

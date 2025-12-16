@@ -8,6 +8,7 @@ import { Trash2, ShoppingCart } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
+import { useLoading } from "@/hooks/use-loading"
 import { computePrice } from "@/lib/price-utils"
 
 interface CartLine {
@@ -33,6 +34,7 @@ export default function CartPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   useCart()
   const [lines, setLines] = useState<CartLine[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,11 +46,13 @@ export default function CartPage() {
 
   const fetchCart = async () => {
     setLoading(true)
+    setIsLoading(true)
     try {
       // If the user is not logged in, do not call the API (it requires userId)
       if (!user) {
         setLines([])
         setLoading(false)
+        setIsLoading(false)
         return
       }
 
@@ -68,6 +72,7 @@ export default function CartPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -207,9 +212,9 @@ export default function CartPage() {
         productName: l.productName,
         quantity: l.quantity,
         price: cp.displayPrice,
-        basePrice: cp.canonicalPreTaxPrice ?? 0,
+        basePrice: l.basePrice,
         originalPrice: cp.displayOriginalPrice,
-        salePrice: cp.displayPrice,
+        salePrice: typeof l.salePrice === 'number' ? l.salePrice : null,
         taxApplied: l.taxApplied,
         taxRate: l.taxRate,
         image: l.image,
