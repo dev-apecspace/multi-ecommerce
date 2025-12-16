@@ -18,10 +18,24 @@ export async function GET(request: NextRequest) {
     const slug = searchParams.get('slug')
     const showPending = searchParams.get('showPending') === 'true'
     const isFlashSale = searchParams.get('isFlashSale') === 'true'
+    const subcategory = searchParams.get('subcategory')
+    const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : null
+    const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : null
+    const minRating = searchParams.get('rating') ? parseFloat(searchParams.get('rating')!) : null
+    const sortBy = searchParams.get('sortBy')
+    const inStock = searchParams.get('inStock') === 'true'
+
+    let selectString = '*, Category(name, slug), Vendor!inner(name, status, slug, logo, rating, followers), ProductVariant(*), ProductAttribute(id, name, ProductAttributeValue(id, value))'
+    
+    if (subcategory) {
+       selectString += ', SubCategory!inner(name, slug)'
+    } else {
+       selectString += ', SubCategory(name, slug)'
+    }
 
     let query = supabase
       .from('Product')
-      .select('*, Category(name, slug), SubCategory(name, slug), Vendor(name, status, slug, logo, rating, followers), ProductVariant(*), ProductAttribute(id, name, ProductAttributeValue(id, value))', { count: 'exact' })
+      .select(selectString, { count: 'exact' })
 
     if (isFlashSale) {
       const now = new Date().toISOString()
@@ -59,6 +73,7 @@ export async function GET(request: NextRequest) {
 
     if (!showPending) {
       query = query.eq('status', 'approved')
+      query = query.eq('Vendor.status', 'approved')
     }
 
     if (categoryId) {
@@ -77,20 +92,35 @@ export async function GET(request: NextRequest) {
       query = query.ilike('name', `%${search}%`)
     }
 
+    if (subcategory) {
+      query = query.eq('SubCategory.slug', subcategory)
+    }
+
+    if (minPrice !== null) query = query.gte('price', minPrice)
+    if (maxPrice !== null) query = query.lte('price', maxPrice)
+    if (minRating !== null) query = query.gte('rating', minRating)
+    if (inStock) query = query.gt('stock', 0)
+
+    if (sortBy === 'price-low') {
+      query = query.order('price', { ascending: true })
+    } else if (sortBy === 'price-high') {
+      query = query.order('price', { ascending: false })
+    } else if (sortBy === 'most-sold') {
+      query = query.order('sold', { ascending: false })
+    } else if (sortBy === 'rating') {
+      query = query.order('rating', { ascending: false })
+    } else {
+      query = query.order('createdAt', { ascending: false })
+    }
+
     const { data, error, count } = await query
-      .order('createdAt', { ascending: false })
       .range(offset, offset + limit - 1)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    let filteredData = data?.filter((product: any) => {
-      if (showPending) {
-        return true
-      }
-      return product.Vendor?.status === 'approved'
-    }) || []
+    let filteredData = data || []
 
     // Enrich Vendor data with avatar and calculated rating
     if (filteredData.length > 0) {
@@ -297,7 +327,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: filteredData,
       pagination: {
-        total: filteredData.length,
+        total: count,
         limit,
         offset,
       },

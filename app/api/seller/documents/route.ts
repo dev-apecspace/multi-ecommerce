@@ -15,12 +15,16 @@ export async function GET(request: NextRequest) {
     }
 
     const vendorId = auth.vendorId
+    const { searchParams } = new URL(request.url)
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20
+    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0
 
-    const { data: documents, error: docError } = await supabase
+    const { data: documents, error: docError, count } = await supabase
       .from('VendorDocument')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('vendorId', vendorId)
       .order('uploadedAt', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (docError) {
       return NextResponse.json({ error: docError.message }, { status: 400 })
@@ -28,6 +32,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ 
       data: documents,
+      pagination: {
+        total: count,
+        limit,
+        offset,
+      },
       vendorId: vendorId
     })
   } catch (error) {

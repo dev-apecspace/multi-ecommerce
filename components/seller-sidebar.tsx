@@ -46,8 +46,8 @@ const sellerLinks = [
   { href: "/seller/vouchers", label: "Voucher", icon: Percent, restricted: true },
   { href: "/seller/chat", label: "Chat với khách", icon: MessageSquare, restricted: true },
   { href: "/seller/reviews", label: "Đánh giá shop", icon: Star, restricted: true },
-  { href: "/seller/wallet", label: "Ví tiền & Doanh thu", icon: Wallet, restricted: true },
-  { href: "/seller/withdraw", label: "Yêu cầu rút tiền", icon: Download, restricted: true },
+  // { href: "/seller/wallet", label: "Ví tiền & Doanh thu", icon: Wallet, restricted: true },
+  // { href: "/seller/withdraw", label: "Yêu cầu rút tiền", icon: Download, restricted: true },
   { href: "/seller/documents", label: "Tài liệu shop", icon: FileText, restricted: false },
   { href: "/seller/settings", label: "Hồ sơ & Cài đặt shop", icon: Settings, restricted: false },
 ]

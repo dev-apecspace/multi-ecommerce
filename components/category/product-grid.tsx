@@ -13,6 +13,9 @@ import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
 import { computePrice, isCampaignActive } from "@/lib/price-utils"
 
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
+
 interface ProductGridProps {
   category?: string
   subcategory?: string
@@ -33,6 +36,13 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [variantModalOpen, setVariantModalOpen] = useState(false)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
+  
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    pagination.setPage(1)
+  }, [category, subcategory, filters, sortBy])
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -48,15 +58,31 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
         const allCategories = await categoriesResponse.json()
         const categoryObj = allCategories.find((c: any) => c.slug === category)
 
-        let url = '/api/products?limit=50'
+        let url = `/api/products?limit=${pagination.limit}&offset=${pagination.offset}`
         
         if (categoryObj?.id) {
           url += `&categoryId=${categoryObj.id}`
         }
 
+        if (subcategory) {
+          url += `&subcategory=${subcategory}`
+        }
+
+        if (filters) {
+          if (filters.priceMin) url += `&minPrice=${filters.priceMin}`
+          if (filters.priceMax && filters.priceMax < 100000000) url += `&maxPrice=${filters.priceMax}`
+          if (filters.rating) url += `&rating=${filters.rating}`
+          if (filters.inStock) url += `&inStock=true`
+        }
+
+        if (sortBy) {
+          url += `&sortBy=${sortBy}`
+        }
+
         const response = await fetch(url)
         const result = await response.json()
         setProducts(result.data || [])
+        pagination.setTotal(result.pagination?.total || 0)
       } catch (error) {
         console.error('Failed to fetch products:', error)
       } finally {
@@ -66,7 +92,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     }
 
     fetchProducts()
-  }, [category])
+  }, [category, subcategory, filters, sortBy, pagination.page, pagination.limit])
 
   const toggleFavorite = (id: string) => {
     if (!user) {
@@ -140,43 +166,6 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     }
   }
 
-  let displayProducts = products
-
-  if (subcategory) {
-    displayProducts = displayProducts.filter((p) => p.SubCategory?.slug === subcategory)
-  }
-  
-  displayProducts = displayProducts.slice(0, 50)
-
-  if (filters) {
-    displayProducts = displayProducts.filter((p) => {
-      if (p.price < filters.priceMin || p.price > filters.priceMax) return false
-      if (filters.rating > 0 && p.rating < filters.rating) return false
-      if (!filters.inStock && p.stock <= 0) return false
-      return true
-    })
-  }
-
-  // Sort products
-  if (sortBy && sortBy !== "relevant") {
-    displayProducts = [...displayProducts].sort((a, b) => {
-      switch (sortBy) {
-        case "price-low":
-          return a.price - b.price
-        case "price-high":
-          return b.price - a.price
-        case "newest":
-          return b.id.localeCompare(a.id)
-        case "most-sold":
-          return b.sold - a.sold
-        case "rating":
-          return b.rating - a.rating
-        default:
-          return 0
-      }
-    })
-  }
-
   if (loading) {
     return (
       <div>
@@ -198,7 +187,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     <div>
       {/* Sort Bar */}
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-        <p className="text-sm text-muted-foreground">Hiển thị {displayProducts.length} sản phẩm</p>
+        <p className="text-sm text-muted-foreground">Hiển thị {products.length} sản phẩm</p>
         <Select value={sortBy} onValueChange={(val) => onSortChange?.(val)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Sắp xếp" />
@@ -216,7 +205,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
 
       {/* Product Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-        {displayProducts.map((product) => {
+        {products.map((product) => {
           const vendorName = product.Vendor?.name || "Shop"
           
           let basePrice = product.price
@@ -330,10 +319,24 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
       </div>
 
       {/* No Results */}
-      {displayProducts.length === 0 && (
+      {products.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-4">Không tìm thấy sản phẩm nào</p>
           <Button variant="outline">Xóa bộ lọc</Button>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {products.length > 0 && (
+        <div className="mt-8">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.goToPage}
+            limit={pagination.limit}
+            onLimitChange={pagination.setPageLimit}
+            total={pagination.total}
+          />
         </div>
       )}
 

@@ -10,6 +10,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { File, Upload, Trash2, Clock, CheckCircle, XCircle, Download } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/hooks/use-toast'
+import { useLoading } from '@/hooks/use-loading'
+import { usePagination } from '@/hooks/use-pagination'
+import { Pagination } from '@/components/pagination'
 import { VendorApprovalBanner } from '@/components/vendor-approval-banner'
 
 interface Document {
@@ -28,6 +31,7 @@ interface Document {
 export default function SellerDocumentsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -35,23 +39,30 @@ export default function SellerDocumentsPage() {
     documentName: '',
     file: null as File | null,
   })
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
   useEffect(() => {
     if (user?.id) {
       fetchDocuments()
     }
-  }, [user?.id])
+  }, [user?.id, pagination.page, pagination.limit])
 
   const fetchDocuments = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/seller/documents`, {
+      setIsLoading(true)
+      const url = new URL('/api/seller/documents', typeof window !== 'undefined' ? window.location.origin : '')
+      url.searchParams.append('limit', pagination.limit.toString())
+      url.searchParams.append('offset', pagination.offset.toString())
+      
+      const response = await fetch(url.toString(), {
         credentials: 'include'
       })
       const data = await response.json()
 
       if (response.ok) {
         setDocuments(data.data || [])
+        pagination.setTotal(data.pagination?.total || 0)
       } else {
         toast({
           title: 'Lỗi',
@@ -67,6 +78,7 @@ export default function SellerDocumentsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -386,6 +398,19 @@ export default function SellerDocumentsPage() {
                       </div>
                     </div>
                   ))}
+              </div>
+            )}
+            
+            {documents.length > 0 && (
+              <div className="mt-6 border-t pt-4">
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={pagination.goToPage}
+                  limit={pagination.limit}
+                  onLimitChange={pagination.setPageLimit}
+                  total={pagination.total}
+                />
               </div>
             )}
           </CardContent>

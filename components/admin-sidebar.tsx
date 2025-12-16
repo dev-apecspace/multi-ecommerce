@@ -48,7 +48,7 @@ const adminLinks: AdminLink[] = [
   { href: "/admin/vouchers", label: "Quản lý Voucher", icon: Percent },
   { href: "/admin/users", label: "Người dùng khách hàng", icon: Users },
   { href: "/admin/banners", label: "Banner & Quảng cáo", icon: Image },
-  { href: "/admin/withdraw-requests", label: "Quản lý yêu cầu rút tiền", icon: Download },
+  // { href: "/admin/withdraw-requests", label: "Quản lý yêu cầu rút tiền", icon: Download },
   { href: "/admin/reports", label: "Báo cáo & Thống kê", icon: TrendingUp },
   { href: "/admin/settings", label: "Cài đặt hệ thống", icon: Settings },
 ]

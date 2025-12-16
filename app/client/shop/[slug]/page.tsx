@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { ProductGrid } from "@/components/category/product-grid"
 import { useLoading } from "@/hooks/use-loading"
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
 
 interface ShopPageProps {
   params: Promise<{ slug: string }>
@@ -22,6 +24,8 @@ export default function ShopPage({ params }: ShopPageProps) {
   const [products, setProducts] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
   useEffect(() => {
     const fetchShopData = async () => {
@@ -70,10 +74,6 @@ export default function ShopPage({ params }: ShopPageProps) {
             },
           })
 
-          const productsResponse = await fetch(`/api/products?vendorId=${vendor.id}&limit=100`)
-          const productsResult = await productsResponse.json()
-          setProducts(productsResult.data || [])
-
           const reviewsResponse = await fetch(`/api/reviews?vendorId=${vendor.id}&limit=100`)
           const reviewsResult = await reviewsResponse.json()
           setReviews(reviewsResult.data || [])
@@ -88,6 +88,23 @@ export default function ShopPage({ params }: ShopPageProps) {
 
     fetchShopData()
   }, [resolvedParams.slug])
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!shop?.id) return
+      
+      try {
+        const productsResponse = await fetch(`/api/products?vendorId=${shop.id}&limit=${pagination.limit}&offset=${pagination.offset}`)
+        const productsResult = await productsResponse.json()
+        setProducts(productsResult.data || [])
+        pagination.setTotal(productsResult.pagination?.total || 0)
+      } catch (error) {
+        console.error('Error fetching products:', error)
+      }
+    }
+
+    fetchProducts()
+  }, [shop?.id, pagination.page, pagination.limit])
 
 
   if (loading) {
@@ -197,30 +214,42 @@ export default function ShopPage({ params }: ShopPageProps) {
           {/* Products Tab */}
           <TabsContent value="products" className="mt-6">
             {products.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {products.map((product: any) => (
-                  <Link key={product.id} href={`/client/product/${product.slug}`}>
-                    <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                      <CardContent className="p-3">
-                        <div className="relative w-full aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
-                          <Image
-                            src={product.media[0].url || "/placeholder.svg"}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <h3 className="font-semibold text-sm line-clamp-2 mb-1">{product.name}</h3>
-                        <p className="text-primary font-bold mb-2">{product.price.toLocaleString('vi-VN')} ₫</p>
-                        <div className="flex items-center gap-1 text-xs">
-                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          <span>{product.rating || 0}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {products.map((product: any) => (
+                    <Link key={product.id} href={`/client/product/${product.slug}`}>
+                      <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                        <CardContent className="p-3">
+                          <div className="relative w-full aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+                            <Image
+                              src={product.media[0].url || "/placeholder.svg"}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <h3 className="font-semibold text-sm line-clamp-2 mb-1">{product.name}</h3>
+                          <p className="text-primary font-bold mb-2">{product.price.toLocaleString('vi-VN')} ₫</p>
+                          <div className="flex items-center gap-1 text-xs">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span>{product.rating || 0}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+                <div className="mt-8">
+                  <Pagination
+                    currentPage={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onPageChange={pagination.goToPage}
+                    limit={pagination.limit}
+                    onLimitChange={pagination.setPageLimit}
+                    total={pagination.total}
+                  />
+                </div>
+              </>
             ) : (
               <Card className="p-6">
                 <CardContent className="p-0 text-center py-12">
@@ -356,32 +385,39 @@ export default function ShopPage({ params }: ShopPageProps) {
             {reviews.length > 0 ? (
               <div className="space-y-4">
                 {reviews.map((review: any) => (
-                  <Card key={review.id} className="p-4">
-                    <CardContent className="p-0 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-sm">{review.reviewer_name || "Khách hàng"}</h4>
-                          <p className="text-xs text-muted-foreground">
-                            {review.date ? new Date(review.date).toLocaleDateString("vi-VN") : ""}
-                          </p>
+                  <Card key={review.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
+                            {review.User?.name?.charAt(0) || "U"}
+                          </div>
                         </div>
-                        <div className="flex gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${
-                                i < (review.rating || 0)
-                                  ? "fill-yellow-400 text-yellow-400"
-                                  : "text-gray-300"
-                              }`}
-                            />
-                          ))}
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="font-semibold">{review.User?.name || "Người dùng"}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(review.createdAt).toLocaleDateString("vi-VN")}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 mb-2">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3 w-3 ${
+                                  i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          {review.Product && (
+                            <Link href={`/client/product/${review.Product.id}`} className="text-xs text-muted-foreground hover:text-primary mb-2 block">
+                              Sản phẩm: {review.Product.name}
+                            </Link>
+                          )}
+                          <p className="text-sm">{review.comment}</p>
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">{review.content || review.comment}</p>
-                      {review.Product?.name && (
-                        <p className="text-xs text-muted-foreground">Sản phẩm: {review.Product.name}</p>
-                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -389,7 +425,7 @@ export default function ShopPage({ params }: ShopPageProps) {
             ) : (
               <Card className="p-6">
                 <CardContent className="p-0 text-center py-12">
-                  <p className="text-muted-foreground">Cửa hàng chưa có đánh giá</p>
+                  <p className="text-muted-foreground">Chưa có đánh giá nào</p>
                 </CardContent>
               </Card>
             )}

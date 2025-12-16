@@ -34,6 +34,9 @@ interface Product {
   ProductVariant?: ProductVariant[]
 }
 
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
+
 export default function SellerProductsPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -45,22 +48,27 @@ export default function SellerProductsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(new Set())
+  
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
   useEffect(() => {
     if (user?.id) {
       fetchProducts()
     }
-  }, [user?.id])
+  }, [user?.id, pagination.page, pagination.limit])
 
   const fetchProducts = async () => {
     try {
-      setIsLoading(true)
-      setLoading(true)
-      const response = await fetch(`/api/seller/products`, {
+      if (!refreshing) {
+        setIsLoading(true)
+        setLoading(true)
+      }
+      const response = await fetch(`/api/seller/products?limit=${pagination.limit}&offset=${pagination.offset}`, {
         credentials: 'include'
       })
       const data = await response.json()
       setProducts(data.data || [])
+      pagination.setTotal(data.pagination?.total || 0)
     } catch (error) {
       toast({
         title: "Lỗi",
@@ -70,32 +78,22 @@ export default function SellerProductsPage() {
     } finally {
       setLoading(false)
       setIsLoading(false)
+      setRefreshing(false)
     }
   }
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/seller/products`, {
-        credentials: 'include'
-      })
-      const data = await response.json()
-      setProducts(data.data || [])
-      toast({
-        title: "Thành công",
-        description: "Đã cập nhật danh sách sản phẩm",
-      })
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: "Không thể cập nhật danh sách sản phẩm",
-        variant: "destructive",
-      })
-    } finally {
-      setRefreshing(false)
-      setIsLoading(false)
-    }
+    pagination.setPage(1) // Reset to first page on refresh
+    // fetchProducts will be triggered by useEffect if page changes, 
+    // but if page is already 1, we need to call it manually or add refreshing to dependency?
+    // Better to just call fetchProducts directly here if page doesn't change, 
+    // or rely on the fact that we want to reload current page?
+    // Let's just call fetchProducts directly to be safe and keep current page or reset?
+    // Usually refresh means reload current view.
+    // But if I want to reset to page 1, I should do that.
+    // Let's keep it simple: reload current page.
+    fetchProducts()
   }
 
   const handleDelete = async (productId: number) => {
@@ -402,6 +400,17 @@ export default function SellerProductsPage() {
               </table>
             </div>
           )}
+          
+          <div className="mt-4">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
+          </div>
         </CardContent>
       </Card>
     </main>

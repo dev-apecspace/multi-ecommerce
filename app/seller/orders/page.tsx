@@ -68,6 +68,9 @@ function formatShippingAddress(address: string): string {
   }
 }
 
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
+
 export default function SellerOrdersPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -82,6 +85,8 @@ export default function SellerOrdersPage() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [activeTab, setActiveTab] = useState<string>("all")
+  
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
   const vendorId = user?.vendorId
 
@@ -89,7 +94,7 @@ export default function SellerOrdersPage() {
     if (vendorId) {
       fetchOrders()
     }
-  }, [vendorId])
+  }, [vendorId, pagination.page, pagination.limit, activeTab])
 
   const fetchOrders = async () => {
     if (!vendorId) return
@@ -99,12 +104,20 @@ export default function SellerOrdersPage() {
       const origin = typeof window !== 'undefined' ? window.location.origin : ''
       const ordersUrl = new URL(`/api/seller/orders`, origin)
       ordersUrl.searchParams.append('vendorId', vendorId.toString())
+      ordersUrl.searchParams.append('limit', pagination.limit.toString())
+      ordersUrl.searchParams.append('offset', pagination.offset.toString())
+      
+      if (activeTab !== 'all') {
+        ordersUrl.searchParams.append('status', activeTab)
+      }
+
       const response = await fetch(ordersUrl.toString())
       if (!response.ok) {
         throw new Error('Failed to fetch orders')
       }
       const result = await response.json()
       setAllOrders(result.data || [])
+      pagination.setTotal(result.pagination?.total || 0)
 
       try {
         const returnsUrl = new URL(`/api/seller/returns`, origin)
@@ -135,9 +148,13 @@ export default function SellerOrdersPage() {
     }
   }
 
-  const orders = activeTab === "all" 
-    ? allOrders 
-    : allOrders.filter(o => o.status === activeTab)
+  // No longer need client-side filtering since we do it on server
+  const orders = allOrders
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    pagination.setPage(1)
+  }
 
   const handleReturnNavigate = (orderId: number) => {
     const returnId = returnsMap[orderId]
@@ -329,7 +346,7 @@ export default function SellerOrdersPage() {
     <main className="p-6">
       <h1 className="text-3xl font-bold mb-8">Quản lý đơn hàng</h1>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-8">
         <TabsList>
           <TabsTrigger value="all">Tất cả</TabsTrigger>
           <TabsTrigger value="pending">Chờ tiếp nhận</TabsTrigger>
@@ -438,6 +455,17 @@ export default function SellerOrdersPage() {
               </table>
             </div>
           )}
+          
+          <div className="mt-4">
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.goToPage}
+              limit={pagination.limit}
+              onLimitChange={pagination.setPageLimit}
+              total={pagination.total}
+            />
+          </div>
         </CardContent>
       </Card>
 

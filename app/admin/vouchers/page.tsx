@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { Pagination } from "@/components/pagination"
+import { usePagination } from "@/hooks/use-pagination"
 
 type VoucherStatus = 'pending' | 'approved' | 'rejected'
 type DiscountType = 'percentage' | 'fixed'
@@ -67,10 +69,11 @@ export default function AdminVouchersPage() {
   const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejecting, setRejecting] = useState(false)
+  const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
     fetchVouchers()
-  }, [activeTab])
+  }, [activeTab, pagination.page, pagination.limit])
 
   useEffect(() => {
     fetchStats()
@@ -79,10 +82,16 @@ export default function AdminVouchersPage() {
   const fetchVouchers = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/vouchers?status=${activeTab}&limit=100`)
+      const url = new URL('/api/admin/vouchers', window.location.origin)
+      url.searchParams.append('status', activeTab)
+      url.searchParams.append('page', String(pagination.page))
+      url.searchParams.append('limit', String(pagination.limit))
+      
+      const response = await fetch(url.toString())
       if (!response.ok) throw new Error('Failed to fetch vouchers')
-      const { data } = await response.json()
-      setVouchers(data || [])
+      const result = await response.json()
+      setVouchers(result.data || [])
+      pagination.setTotal(result.pagination?.total || 0)
     } catch (error) {
       toast({
         title: 'Lỗi',
@@ -351,6 +360,18 @@ export default function AdminVouchersPage() {
                     </CardContent>
                   </Card>
                 ))}
+                {vouchers.length > 0 && (
+                  <div className="mt-6">
+                    <Pagination
+                      currentPage={pagination.page}
+                      totalPages={pagination.totalPages}
+                      onPageChange={pagination.goToPage}
+                      limit={pagination.limit}
+                      onLimitChange={pagination.setPageLimit}
+                      total={pagination.total}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>

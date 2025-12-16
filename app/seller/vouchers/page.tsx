@@ -10,6 +10,8 @@ import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
 import { useRouter } from "next/navigation"
+import { usePagination } from "@/hooks/use-pagination"
+import { Pagination } from "@/components/pagination"
 
 type VoucherStatus = 'pending' | 'approved' | 'rejected'
 type VoucherType = 'private' | 'public'
@@ -66,21 +68,28 @@ export default function SellerVouchersPage() {
   const { user } = useAuth()
   const { setIsLoading } = useLoading()
   const router = useRouter()
+  const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
   useEffect(() => {
     if (user?.id) {
       fetchVouchers()
     }
-  }, [user, activeTab])
+  }, [user, activeTab, pagination.page, pagination.limit])
 
   const fetchVouchers = async () => {
     try {
       setIsLoading(true)
       setLoading(true)
-      const response = await fetch(`/api/seller/vouchers?status=${activeTab}`)
+      const url = new URL('/api/seller/vouchers', typeof window !== 'undefined' ? window.location.origin : '')
+      url.searchParams.append('status', activeTab)
+      url.searchParams.append('limit', pagination.limit.toString())
+      url.searchParams.append('offset', pagination.offset.toString())
+      
+      const response = await fetch(url.toString())
       if (!response.ok) throw new Error('Failed to fetch vouchers')
-      const { data } = await response.json()
-      setVouchers(data || [])
+      const result = await response.json()
+      setVouchers(result.data || [])
+      pagination.setTotal(result.pagination?.total || 0)
     } catch (error) {
       toast({
         title: 'Lỗi',
@@ -128,6 +137,11 @@ export default function SellerVouchersPage() {
       title: 'Thành công',
       description: 'Mã voucher đã được sao chép',
     })
+  }
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    pagination.setPage(1)
   }
 
   const isExpired = (endDate: string) => new Date(endDate) < new Date()
@@ -184,11 +198,11 @@ export default function SellerVouchersPage() {
         </Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTrigger value="approved">Đã duyệt ({vouchers.filter(v => v.status === 'approved').length})</TabsTrigger>
-          <TabsTrigger value="pending">Chờ duyệt ({vouchers.filter(v => v.status === 'pending').length})</TabsTrigger>
-          <TabsTrigger value="rejected">Bị từ chối ({vouchers.filter(v => v.status === 'rejected').length})</TabsTrigger>
+          <TabsTrigger value="approved">Đã duyệt</TabsTrigger>
+          <TabsTrigger value="pending">Chờ duyệt</TabsTrigger>
+          <TabsTrigger value="rejected">Bị từ chối</TabsTrigger>
         </TabsList>
 
         {['approved', 'pending', 'rejected'].map(status => (
@@ -316,6 +330,19 @@ export default function SellerVouchersPage() {
                   </Card>
                 ))}
               </div>
+              
+              {vouchers.length > 0 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={pagination.page}
+                    totalPages={pagination.totalPages}
+                    onPageChange={pagination.goToPage}
+                    limit={pagination.limit}
+                    onLimitChange={pagination.setPageLimit}
+                    total={pagination.total}
+                  />
+                </div>
+              )}
             )}
           </TabsContent>
         ))}

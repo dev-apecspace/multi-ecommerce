@@ -128,6 +128,10 @@ export async function GET(request: NextRequest) {
     const productId = searchParams.get('productId')
     const userId = searchParams.get('userId')
     const orderId = searchParams.get('orderId')
+    const vendorId = searchParams.get('vendorId')
+    const rating = searchParams.get('rating')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const offset = parseInt(searchParams.get('offset') || '0')
 
     let query = supabase
       .from('ProductReview')
@@ -139,8 +143,9 @@ export async function GET(request: NextRequest) {
         rating,
         comment,
         createdAt,
-        User:userId(id, name, email)
-      `)
+        User:userId(id, name, email),
+        Product:productId(id, name)
+      `, { count: 'exact' })
       .order('createdAt', { ascending: false })
 
     if (productId) {
@@ -155,11 +160,37 @@ export async function GET(request: NextRequest) {
       query = query.eq('orderId', parseInt(orderId))
     }
 
-    const { data, error } = await query
+    if (rating) {
+      query = query.eq('rating', parseInt(rating))
+    }
+    
+    if (vendorId) {
+      // Find products by this vendor first
+      const { data: products } = await supabase
+        .from('Product')
+        .select('id')
+        .eq('vendorId', parseInt(vendorId))
+      
+      if (products && products.length > 0) {
+        const productIds = products.map(p => p.id)
+        query = query.in('productId', productIds)
+      } else {
+        // Vendor has no products, so no reviews
+        return NextResponse.json({ 
+          data: [],
+          pagination: { total: 0, limit, offset }
+        })
+      }
+    }
+
+    const { data, error, count } = await query.range(offset, offset + limit - 1)
 
     if (error) throw error
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ 
+      data,
+      pagination: { total: count, limit, offset }
+    })
   } catch (error) {
     console.error('Error fetching reviews:', error)
     return NextResponse.json(

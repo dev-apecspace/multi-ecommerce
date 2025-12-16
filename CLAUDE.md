@@ -2,6 +2,56 @@
 
 ## Latest Fixes
 
+### 7. Vendor Shop Information Columns (PENDING)
+**Issue**: `/seller/settings` failed when saving vendor information with error: "Could not find the 'businessLicense' column of 'Vendor' in the schema cache"
+
+**Solution Applied**:
+- **Created migration**: `supabase/migrations/add_vendor_shop_columns.sql`
+  - Adds `logo` column for vendor avatar/logo
+  - Adds `coverImage` column for shop cover image
+  - Adds `description` column for shop description
+  - Adds `businessAddress` column for vendor business address
+
+**TODO: Run this migration in Supabase SQL Editor**:
+```sql
+-- Add shop and business information columns to Vendor table
+
+DO $$ 
+BEGIN
+    -- Add logo column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'Vendor' AND column_name = 'logo'
+    ) THEN
+        ALTER TABLE "Vendor" ADD COLUMN "logo" VARCHAR(255);
+    END IF;
+
+    -- Add coverImage column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'Vendor' AND column_name = 'coverImage'
+    ) THEN
+        ALTER TABLE "Vendor" ADD COLUMN "coverImage" VARCHAR(255);
+    END IF;
+
+    -- Add description column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'Vendor' AND column_name = 'description'
+    ) THEN
+        ALTER TABLE "Vendor" ADD COLUMN "description" TEXT;
+    END IF;
+
+    -- Add businessAddress column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'Vendor' AND column_name = 'businessAddress'
+    ) THEN
+        ALTER TABLE "Vendor" ADD COLUMN "businessAddress" VARCHAR(255);
+    END IF;
+END $$;
+```
+
 ### 6. Global Loading Overlay (DONE)
 **Feature**: Added a global loading effect that displays across the entire web application.
 
