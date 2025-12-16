@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 
 interface ReturnRequest {
   id: number
@@ -69,6 +70,7 @@ export default function SellerReturnsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [vendorId, setVendorId] = useState<number | null>(null)
   const [returns, setReturns] = useState<ReturnRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,6 +98,7 @@ export default function SellerReturnsPage() {
 
   const fetchReturns = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/seller/returns?vendorId=${vendorId}`)
       if (!response.ok) {
@@ -111,6 +114,7 @@ export default function SellerReturnsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -120,6 +124,7 @@ export default function SellerReturnsPage() {
     errorMessage: string
   ) => {
     try {
+      setIsLoading(true)
       setProcessingReturnId(payload.returnId)
       const response = await fetch(`/api/seller/returns`, {
         method: "PATCH",
@@ -147,6 +152,7 @@ export default function SellerReturnsPage() {
       return false
     } finally {
       setProcessingReturnId(null)
+      setIsLoading(false)
     }
   }
 

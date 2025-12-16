@@ -3,11 +3,15 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { User, ShoppingBag, Heart, MapPin, Settings, LogOut, Package, Award, ChevronRight } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { User, ShoppingBag, Heart, MapPin, Settings, LogOut, Package, Award, ChevronRight, Trash2, Edit2, Camera } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { useToast } from "@/hooks/use-toast"
 import { AddressManagement } from "@/components/client/address-management"
 import Image from "next/image"
@@ -33,7 +37,8 @@ interface ReturnRequest {
 }
 
 export default function AccountContent() {
-  const { user: authUser } = useAuth()
+  const { user: authUser, refreshUser } = useAuth()
+  const { setIsLoading } = useLoading()
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -45,6 +50,17 @@ export default function AccountContent() {
   const [exchanges, setExchanges] = useState<ReturnRequest[]>([])
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [loadingReturns, setLoadingReturns] = useState(false)
+  
+  const [favorites, setFavorites] = useState<any[]>([])
+  const [loadingFavorites, setLoadingFavorites] = useState(false)
+  
+  // Profile Edit State
+  const [editProfileOpen, setEditProfileOpen] = useState(false)
+  const [profileForm, setProfileForm] = useState({ name: "", phone: "", email: "" })
+  
+  // Password Change State
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" })
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     if (authUser) {
@@ -69,11 +85,13 @@ export default function AccountContent() {
     if (userId && isLoggedIn) {
       fetchOrders()
       fetchReturns()
+      fetchFavorites()
     }
   }, [userId, isLoggedIn])
 
   const fetchOrders = async () => {
     try {
+      setIsLoading(true)
       setLoadingOrders(true)
       const response = await fetch(`/api/client/orders?userId=${userId}`)
       const result = await response.json()
@@ -88,11 +106,13 @@ export default function AccountContent() {
       toast({ title: "Lỗi", description: "Không thể tải đơn hàng", variant: "destructive" })
     } finally {
       setLoadingOrders(false)
+      setIsLoading(false)
     }
   }
 
   const fetchReturns = async () => {
     try {
+      setIsLoading(true)
       setLoadingReturns(true)
       const response = await fetch(`/api/client/returns?userId=${userId}&limit=100`)
       const result = await response.json()
@@ -103,6 +123,113 @@ export default function AccountContent() {
       toast({ title: "Lỗi", description: "Không thể tải trả hàng", variant: "destructive" })
     } finally {
       setLoadingReturns(false)
+      setIsLoading(false)
+    }
+  }
+
+  const fetchFavorites = async () => {
+    try {
+      setLoadingFavorites(true)
+      const response = await fetch(`/api/favorites?userId=${userId}`)
+      const data = await response.json()
+      setFavorites(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error fetching favorites:", error)
+    } finally {
+      setLoadingFavorites(false)
+    }
+  }
+
+  const handleRemoveFavorite = async (productId: number) => {
+    try {
+      const response = await fetch(`/api/favorites?userId=${userId}&productId=${productId}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        toast({ title: "Thành công", description: "Đã xóa khỏi yêu thích" })
+        fetchFavorites()
+      }
+    } catch (error) {
+      toast({ title: "Lỗi", description: "Không thể xóa yêu thích", variant: "destructive" })
+    }
+  }
+
+  const handleOpenEditProfile = () => {
+    if (authUser) {
+      setProfileForm({
+        name: authUser.name || "",
+        phone: authUser.phone || "",
+        email: authUser.email || ""
+      })
+      setEditProfileOpen(true)
+    }
+  }
+
+  const handleUpdateProfile = async () => {
+    try {
+      setIsLoading(true)
+      
+      const response = await fetch(`/api/users?id=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileForm.name,
+          phone: profileForm.phone
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update")
+      }
+      
+      toast({ title: "Thành công", description: "Cập nhật thông tin thành công" })
+      setEditProfileOpen(false)
+      
+      await refreshUser()
+    } catch (error: any) {
+      toast({ title: "Lỗi", description: error.message || "Không thể cập nhật thông tin", variant: "destructive" })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({ title: "Lỗi", description: "Mật khẩu xác nhận không khớp", variant: "destructive" })
+      return
+    }
+    
+    if (passwordForm.newPassword.length < 6) {
+      toast({ title: "Lỗi", description: "Mật khẩu phải có ít nhất 6 ký tự", variant: "destructive" })
+      return
+    }
+
+    try {
+      setChangingPassword(true)
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          oldPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to change password")
+      }
+      
+      toast({ title: "Thành công", description: "Đổi mật khẩu thành công" })
+      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" })
+    } catch (error: any) {
+      toast({ title: "Lỗi", description: error.message, variant: "destructive" })
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -176,8 +303,8 @@ export default function AccountContent() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="icon">
-                  <Settings className="h-5 w-5" />
+                <Button variant="outline" size="icon" onClick={handleOpenEditProfile}>
+                  <Edit2 className="h-5 w-5" />
                 </Button>
                 <Button variant="outline" onClick={() => setIsLoggedIn(false)}>
                   <LogOut className="h-4 w-4 mr-2" />
@@ -429,36 +556,208 @@ export default function AccountContent() {
           </TabsContent>
 
           <TabsContent value="favorites" className="mt-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-12">
-                  <Heart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Chưa có sản phẩm yêu thích</p>
-                </div>
-              </CardContent>
-            </Card>
+            {loadingFavorites ? (
+              <Card><CardContent className="p-6 text-center">Đang tải yêu thích...</CardContent></Card>
+            ) : favorites.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center py-12">
+                    <Heart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">Chưa có sản phẩm yêu thích</p>
+                    <Link href="/">
+                      <Button>Bắt đầu thêm yêu thích</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {favorites.map((item: any) => (
+                  <Card key={item.id} className="hover:shadow-md transition-shadow overflow-hidden">
+                    <div className="aspect-square relative bg-gray-100">
+                      {item.Product?.image ? (
+                        <Image
+                          src={item.Product.image}
+                          alt={item.Product.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingBag className="h-12 w-12 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold text-sm line-clamp-2 mb-2">
+                        {item.Product?.name}
+                      </h3>
+                      <p className="text-lg font-bold text-orange-600 mb-3">
+                        {item.Product?.price?.toLocaleString('vi-VN')}₫
+                      </p>
+                      <div className="flex gap-2">
+                        <Link href={`/products/${item.Product?.id}`} className="flex-1">
+                          <Button variant="outline" size="sm" className="w-full">
+                            Xem chi tiết
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveFavorite(item.Product?.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="settings" className="mt-4">
+          <TabsContent value="settings" className="mt-4 space-y-4">
             <Card>
-              <CardContent className="p-6 space-y-4">
-                <div>
-                  <h3 className="font-bold mb-2">Cài đặt bảo mật</h3>
-                  <Button variant="outline" size="sm">
-                    Đổi mật khẩu
-                  </Button>
+              <CardHeader>
+                <CardTitle>Cài đặt bảo mật</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <Label htmlFor="old-password">Mật khẩu cũ</Label>
+                  <Input
+                    id="old-password"
+                    type="password"
+                    placeholder="Nhập mật khẩu cũ"
+                    value={passwordForm.oldPassword}
+                    onChange={(e) =>
+                      setPasswordForm({ ...passwordForm, oldPassword: e.target.value })
+                    }
+                  />
                 </div>
-                <div className="border-t border-border pt-4">
-                  <h3 className="font-bold mb-2">Thông báo</h3>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" defaultChecked />
-                    <span className="text-sm">Nhận thông báo qua email</span>
-                  </label>
+                <div className="space-y-3">
+                  <Label htmlFor="new-password">Mật khẩu mới</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Nhập mật khẩu mới"
+                    value={passwordForm.newPassword}
+                    onChange={(e) =>
+                      setPasswordForm({ ...passwordForm, newPassword: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Mật khẩu phải có ít nhất 6 ký tự
+                  </p>
                 </div>
+                <div className="space-y-3">
+                  <Label htmlFor="confirm-password">Xác nhận mật khẩu</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="Xác nhận mật khẩu mới"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
+                    }
+                  />
+                </div>
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={changingPassword}
+                  className="w-full"
+                >
+                  {changingPassword ? "Đang cập nhật..." : "Đổi mật khẩu"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Thông báo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer p-3 hover:bg-muted rounded">
+                  <input type="checkbox" defaultChecked className="w-4 h-4" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">Thông báo qua email</p>
+                    <p className="text-xs text-muted-foreground">
+                      Nhận cập nhật về đơn hàng và khuyến mãi
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer p-3 hover:bg-muted rounded">
+                  <input type="checkbox" defaultChecked className="w-4 h-4" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">Thông báo SMS</p>
+                    <p className="text-xs text-muted-foreground">
+                      Nhận tin nhắn SMS về trạng thái đơn hàng
+                    </p>
+                  </div>
+                </label>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={editProfileOpen} onOpenChange={setEditProfileOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Chỉnh sửa thông tin cá nhân</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-name">Họ tên</Label>
+                <Input
+                  id="edit-name"
+                  value={profileForm.name}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, name: e.target.value })
+                  }
+                  placeholder="Nhập họ tên"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={profileForm.email}
+                  disabled
+                  placeholder="Email"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email không thể thay đổi
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="edit-phone">Số điện thoại</Label>
+                <Input
+                  id="edit-phone"
+                  value={profileForm.phone}
+                  onChange={(e) =>
+                    setProfileForm({ ...profileForm, phone: e.target.value })
+                  }
+                  placeholder="Nhập số điện thoại"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditProfileOpen(false)}
+              >
+                Hủy
+              </Button>
+              <Button 
+                onClick={handleUpdateProfile}
+                disabled={!userId || !profileForm.name}
+              >
+                Lưu thay đổi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

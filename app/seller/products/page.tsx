@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Eye, Copy, ChevronDown, ChevronRight, RotateCw } fr
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
@@ -37,6 +38,7 @@ export default function SellerProductsPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -52,6 +54,7 @@ export default function SellerProductsPage() {
 
   const fetchProducts = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/seller/products`, {
         credentials: 'include'
@@ -66,11 +69,13 @@ export default function SellerProductsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const handleRefresh = async () => {
     setRefreshing(true)
+    setIsLoading(true)
     try {
       const response = await fetch(`/api/seller/products`, {
         credentials: 'include'
@@ -89,6 +94,7 @@ export default function SellerProductsPage() {
       })
     } finally {
       setRefreshing(false)
+      setIsLoading(false)
     }
   }
 
@@ -96,6 +102,7 @@ export default function SellerProductsPage() {
     if (!confirm('Bạn chắc chắn muốn xóa sản phẩm này?')) return
 
     try {
+      setIsLoading(true)
       setDeletingId(productId)
       const response = await fetch(`/api/seller/products/${productId}`, {
         method: 'DELETE',
@@ -120,11 +127,13 @@ export default function SellerProductsPage() {
       })
     } finally {
       setDeletingId(null)
+      setIsLoading(false)
     }
   }
 
   const handleDuplicate = async (productId: number) => {
     try {
+      setIsLoading(true)
       setDuplicatingId(productId)
       const response = await fetch(`/api/seller/products/${productId}/duplicate`, {
         method: 'POST',
@@ -150,6 +159,7 @@ export default function SellerProductsPage() {
       })
     } finally {
       setDuplicatingId(null)
+      setIsLoading(false)
     }
   }
 
@@ -177,6 +187,7 @@ export default function SellerProductsPage() {
     if (!confirm('Bạn chắc chắn muốn xóa variant này?')) return
 
     try {
+      setIsLoading(true)
       const response = await fetch(`/api/seller/products/${productId}/variants/${variantId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -202,6 +213,8 @@ export default function SellerProductsPage() {
         description: error instanceof Error ? error.message : "Không thể xóa variant",
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 

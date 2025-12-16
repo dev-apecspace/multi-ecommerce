@@ -10,6 +10,7 @@ import { generateSlug } from "@/lib/utils"
 import { VariantSelectionModal } from "@/components/product/variant-selection-modal"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { computePrice, isCampaignActive } from "@/lib/price-utils"
 
 interface ProductGridProps {
@@ -25,6 +26,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
   const pathname = usePathname()
   const { user } = useAuth()
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const [favorites, setFavorites] = useState<string[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +37,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        setIsLoading(true)
         if (!category || category === "all") {
           setProducts([])
           setLoading(false)
@@ -58,6 +61,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
         console.error('Failed to fetch products:', error)
       } finally {
         setLoading(false)
+        setIsLoading(false)
       }
     }
 
@@ -97,6 +101,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     }
 
     try {
+      setIsLoading(true)
       setIsAddingToCart(true)
       const userId = user.id
 
@@ -131,6 +136,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
       })
     } finally {
       setIsAddingToCart(false)
+      setIsLoading(false)
     }
   }
 

@@ -279,7 +279,24 @@ export function useReviews(productId: number | null, limit = 10, offset = 0) {
     [fetchReviews]
   )
 
-  return { ...state, fetchReviews, addReview }
+  const updateReview = useCallback(
+    async (id: number, updates: Record<string, any>) => {
+      try {
+        const response = await fetch('/api/reviews', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, ...updates }),
+        })
+        if (!response.ok) throw new Error('Failed to update review')
+        await fetchReviews()
+      } catch (error) {
+        console.error('Update review error:', error)
+      }
+    },
+    [fetchReviews]
+  )
+
+  return { ...state, fetchReviews, addReview, updateReview }
 }
 
 export function useBanners(status = 'active') {

@@ -7,14 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSellerWallet } from "@/hooks/useSupabase"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 
 export default function SellerWalletPage() {
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const { data: walletData, loading, error, fetchWallet } = useSellerWallet(user?.vendorId || null)
 
   useEffect(() => {
     if (user?.vendorId) {
-      fetchWallet()
+      setIsLoading(true)
+      fetchWallet().finally(() => setIsLoading(false))
     }
   }, [user?.vendorId, fetchWallet])
 

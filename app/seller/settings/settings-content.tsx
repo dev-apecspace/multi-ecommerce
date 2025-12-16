@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VendorApprovalBanner } from "@/components/vendor-approval-banner"
 import { ProductImageUpload } from "@/components/product-image-upload"
 import { useToast } from "@/hooks/use-toast"
+import { useLoading } from "@/hooks/use-loading"
 
 interface ShopData {
   shopName: string
@@ -44,6 +45,7 @@ interface PaymentData {
 
 export default function SellerSettingsPage() {
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -84,6 +86,8 @@ export default function SellerSettingsPage() {
 
   const fetchShopSettings = async () => {
     try {
+      setIsLoading(true)
+      setLoading(true)
       const response = await fetch('/api/seller/vendor')
       if (!response.ok) throw new Error('Failed to fetch vendor settings')
       
@@ -119,11 +123,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const handleSaveGeneral = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       const response = await fetch('/api/seller/vendor', {
         method: 'PATCH',
@@ -145,11 +151,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleSavePolicy = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       toast({
         title: "Thành công",
@@ -163,11 +171,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleSaveShipping = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       toast({
         title: "Thành công",
@@ -181,11 +191,13 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 
   const handleSavePayment = async () => {
     setSaving(true)
+    setIsLoading(true)
     try {
       toast({
         title: "Thành công",
@@ -199,6 +211,7 @@ export default function SellerSettingsPage() {
       })
     } finally {
       setSaving(false)
+      setIsLoading(false)
     }
   }
 

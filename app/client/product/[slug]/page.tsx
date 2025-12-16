@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useReviews } from "@/hooks/useSupabase"
 import { useToast } from "@/hooks/use-toast"
+import { useLoading } from "@/hooks/use-loading"
 import { VariantSelectionModal } from "@/components/product/variant-selection-modal"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -25,6 +26,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { toast } = useToast()
   const { user } = useAuth()
   const { addToCart } = useCart()
+  const { setIsLoading } = useLoading()
   const resolvedParams = use(params)
   const productSlug = resolvedParams.slug
   const [quantity, setQuantity] = useState(1)
@@ -39,6 +41,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   useEffect(() => {
     const fetchProduct = async () => {
+      setLoading(true)
+      setIsLoading(true)
       try {
         const response = await fetch(`/api/products?slug=${encodeURIComponent(productSlug)}&limit=1&offset=0`)
         const result = await response.json()
@@ -103,6 +107,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         console.error('Failed to fetch product:', error)
       } finally {
         setLoading(false)
+        setIsLoading(false)
       }
     }
 
@@ -112,6 +117,23 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   }, [productSlug, fetchReviews])
 
   const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : []
+  const reviewCount = reviews.length > 0 ? reviews.length : Number(product?.reviews) || 0
+  const averageRating =
+    reviews.length > 0
+      ? Number(
+          (
+            reviews.reduce((sum: number, review: any) => sum + (Number(review.rating) || 0), 0) /
+            reviews.length
+          ).toFixed(1)
+        )
+      : Number(product?.rating) || 0
+  const formattedReviews = reviews.map((review: any) => ({
+    id: review.id,
+    author: review.User?.name || 'Khách hàng ẩn danh',
+    date: review.createdAt ? new Date(review.createdAt).toLocaleDateString('vi-VN') : '',
+    rating: Number(review.rating) || 0,
+    comment: review.comment || '',
+  }))
 
   const isPromotionActive = () => {
     return isCampaignActive(product?.appliedCampaign)
@@ -345,8 +367,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     taxApplied: product.taxApplied || false,
     taxIncluded: product.taxIncluded || true,
     taxRate: product.taxRate || 0,
-    rating: product.rating || 4.8,
-    reviews: product.reviews || 0,
+    rating: averageRating || 4.8,
+    reviews: reviewCount || 0,
     sold: product.sold || 0,
     images: product.images || ["/placeholder.svg"],
     description: product.description || `${product.name}`,
@@ -649,35 +671,36 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               <TabsContent value="reviews" className="mt-4">
                 {reviewsLoading ? (
                   <p className="text-center py-6">Đang tải đánh giá...</p>
-                ) : reviews.length === 0 ? (
+                ) : formattedReviews.length === 0 ? (
                   <p className="text-center py-6 text-muted-foreground">Chưa có đánh giá nào</p>
                 ) : (
-                <div className="space-y-4">
-                  {reviews.map((review: any) => (
-                    <Card key={review.id} className="p-4">
-                      <CardContent className="p-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="font-medium">{review.author}</p>
-                            <p className="text-xs text-muted-foreground">{review.date}</p>
+                  <div className="space-y-4">
+                    {formattedReviews.map((review) => (
+                      <Card key={review.id} className="p-4">
+                        <CardContent className="p-0">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="font-medium">{review.author}</p>
+                              <p className="text-xs text-muted-foreground">{review.date || 'Vừa cập nhật'}</p>
+                            </div>
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-3 w-3 ${
+                                    i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                                  }`}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex gap-0.5">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`h-3 w-3 ${
-                                  i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="font-medium mb-1">{review.title}</p>
-                        <p className="text-sm text-muted-foreground">{review.content}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {review.comment || 'Không có nội dung'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import {
   Dialog,
   DialogContent,
@@ -71,6 +72,7 @@ export default function SellerOrdersPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [allOrders, setAllOrders] = useState<Order[]>([])
   const [returnsMap, setReturnsMap] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
@@ -92,6 +94,7 @@ export default function SellerOrdersPage() {
   const fetchOrders = async () => {
     if (!vendorId) return
     try {
+      setIsLoading(true)
       setLoading(true)
       const origin = typeof window !== 'undefined' ? window.location.origin : ''
       const ordersUrl = new URL(`/api/seller/orders`, origin)
@@ -128,6 +131,7 @@ export default function SellerOrdersPage() {
       toast({ title: 'Lỗi', description: 'Không thể tải đơn hàng', variant: 'destructive' })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -147,6 +151,7 @@ export default function SellerOrdersPage() {
   const handleConfirmPayment = async () => {
     if (!selectedOrder || !vendorId) return
 
+    setIsLoading(true)
     setUpdating(true)
     try {
       const response = await fetch(`/api/orders/${selectedOrder.id}/confirm-payment`, {
@@ -174,12 +179,14 @@ export default function SellerOrdersPage() {
       toast({ title: 'Lỗi', description: 'Không thể xác nhận thanh toán', variant: 'destructive' })
     } finally {
       setUpdating(false)
+      setIsLoading(false)
     }
   }
 
   const handleApproveOrder = async () => {
     if (!selectedOrder || !vendorId) return
 
+    setIsLoading(true)
     setUpdating(true)
     try {
       const response = await fetch(`/api/seller/orders`, {
@@ -205,12 +212,14 @@ export default function SellerOrdersPage() {
       toast({ title: 'Lỗi', description: 'Không thể duyệt đơn hàng', variant: 'destructive' })
     } finally {
       setUpdating(false)
+      setIsLoading(false)
     }
   }
 
   const handleRejectOrder = async () => {
     if (!selectedOrder || !vendorId) return
 
+    setIsLoading(true)
     setUpdating(true)
     try {
       const response = await fetch(`/api/seller/orders`, {
@@ -235,6 +244,7 @@ export default function SellerOrdersPage() {
       toast({ title: 'Lỗi', description: 'Không thể từ chối đơn hàng', variant: 'destructive' })
     } finally {
       setUpdating(false)
+      setIsLoading(false)
     }
   }
 
@@ -242,6 +252,7 @@ export default function SellerOrdersPage() {
     const statusValue = statusToUpdate || newStatus
     if (!selectedOrder || !statusValue || !vendorId) return
 
+    setIsLoading(true)
     setUpdating(true)
     try {
       const response = await fetch(`/api/seller/orders`, {
@@ -269,6 +280,7 @@ export default function SellerOrdersPage() {
       toast({ title: 'Lỗi', description: 'Không thể cập nhật', variant: 'destructive' })
     } finally {
       setUpdating(false)
+      setIsLoading(false)
     }
   }
 

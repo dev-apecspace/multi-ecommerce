@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Copy, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { useLoading } from "@/hooks/use-loading"
 import Image from "next/image"
 import { formatPrice } from "@/lib/utils"
 
@@ -62,6 +63,7 @@ export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { setIsLoading } = useLoading()
   const productId = params.id as string
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,6 +77,7 @@ export default function ProductDetailPage() {
 
   const fetchProduct = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/seller/products/${productId}`, {
         credentials: 'include',
@@ -101,6 +104,7 @@ export default function ProductDetailPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -108,6 +112,7 @@ export default function ProductDetailPage() {
     if (!confirm('Bạn chắc chắn muốn xóa sản phẩm này?')) return
 
     try {
+      setIsLoading(true)
       setDeleting(true)
       const response = await fetch(`/api/seller/products/${productId}`, {
         method: 'DELETE',
@@ -132,11 +137,13 @@ export default function ProductDetailPage() {
       })
     } finally {
       setDeleting(false)
+      setIsLoading(false)
     }
   }
 
   const handleDuplicate = async () => {
     try {
+      setIsLoading(true)
       setDuplicating(true)
       const response = await fetch(`/api/seller/products/${productId}/duplicate`, {
         method: 'POST',
@@ -162,6 +169,7 @@ export default function ProductDetailPage() {
       })
     } finally {
       setDuplicating(false)
+      setIsLoading(false)
     }
   }
 

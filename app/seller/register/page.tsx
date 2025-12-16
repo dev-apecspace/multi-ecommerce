@@ -5,8 +5,10 @@ import { FileCheck, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useLoading } from "@/hooks/use-loading"
 
 export default function SellerRegisterPage() {
+  const { setIsLoading } = useLoading()
   const [step, setStep] = useState<"personal" | "business" | "documents" | "review">("personal")
   const [formData, setFormData] = useState({
     firstName: "",
@@ -25,8 +27,15 @@ export default function SellerRegisterPage() {
     setFormData((prev) => ({ ...prev, [key]: file }))
   }
 
-  const handleSubmit = () => {
-    alert("Đăng ký cửa hàng thành công! Chúng tôi sẽ kiểm duyệt trong vòng 24-48 giờ.")
+  const handleSubmit = async () => {
+    setIsLoading(true)
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      alert("Đăng ký cửa hàng thành công! Chúng tôi sẽ kiểm duyệt trong vòng 24-48 giờ.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const steps = [

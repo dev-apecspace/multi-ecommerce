@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { ProductGrid } from "@/components/category/product-grid"
+import { useLoading } from "@/hooks/use-loading"
 
 interface ShopPageProps {
   params: Promise<{ slug: string }>
@@ -16,6 +17,7 @@ interface ShopPageProps {
 
 export default function ShopPage({ params }: ShopPageProps) {
   const resolvedParams = use(params)
+  const { setIsLoading } = useLoading()
   const [shop, setShop] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
@@ -24,6 +26,7 @@ export default function ShopPage({ params }: ShopPageProps) {
   useEffect(() => {
     const fetchShopData = async () => {
       try {
+        setIsLoading(true)
         const vendorResponse = await fetch(`/api/vendors?slug=${encodeURIComponent(resolvedParams.slug)}`)
         const vendorResult = await vendorResponse.json()
         const vendor = vendorResult.data?.[0]
@@ -79,6 +82,7 @@ export default function ShopPage({ params }: ShopPageProps) {
         console.error('Error fetching shop data:', error)
       } finally {
         setLoading(false)
+        setIsLoading(false)
       }
     }
 

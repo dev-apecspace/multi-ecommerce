@@ -8,10 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSellerDashboard } from "@/hooks/useSupabase"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function SellerDashboardPage() {
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const [activeTab, setActiveTab] = useState("overview")
   const { data: dashboardData, loading, error, fetchDashboard } = useSellerDashboard(user?.vendorId || null)
   
@@ -19,7 +21,8 @@ export default function SellerDashboardPage() {
 
   useEffect(() => {
     if (user?.vendorId) {
-      fetchDashboard()
+      setIsLoading(true)
+      fetchDashboard().finally(() => setIsLoading(false))
     }
   }, [user?.vendorId, fetchDashboard])
 

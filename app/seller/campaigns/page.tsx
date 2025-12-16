@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { useRouter } from "next/navigation"
 
 type CampaignStatus = 'draft' | 'upcoming' | 'active' | 'ended'
@@ -92,6 +93,7 @@ export default function SellerCampaignsPage() {
   const [products, setProducts] = useState<SellerProduct[]>([])
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const router = useRouter()
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function SellerCampaignsPage() {
 
   const fetchData = async () => {
     try {
+      setIsLoading(true)
       // Fetch current vendor via authenticated endpoint to avoid wrong vendorId
       const vendorResponse = await fetch('/api/seller/vendor')
       const vendorData = await vendorResponse.json()
@@ -139,6 +142,7 @@ export default function SellerCampaignsPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -155,6 +159,7 @@ export default function SellerCampaignsPage() {
     if (!vendorId) return
 
     try {
+      setIsLoading(true)
       const response = await fetch(`/api/seller/campaigns/products?campaignId=${campaignId}&vendorId=${vendorId}`)
       const products = await response.json()
       
@@ -167,11 +172,14 @@ export default function SellerCampaignsPage() {
         description: 'Không thể tải danh sách sản phẩm',
         variant: 'destructive',
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleRemoveProduct = async (campaignProductId: number) => {
     try {
+      setIsLoading(true)
       const response = await fetch('/api/seller/campaigns/products', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -194,6 +202,8 @@ export default function SellerCampaignsPage() {
         description: 'Không thể xóa sản phẩm',
         variant: 'destructive',
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 

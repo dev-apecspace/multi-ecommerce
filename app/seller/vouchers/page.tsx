@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
+import { useLoading } from "@/hooks/use-loading"
 import { useRouter } from "next/navigation"
 
 type VoucherStatus = 'pending' | 'approved' | 'rejected'
@@ -63,6 +64,7 @@ export default function SellerVouchersPage() {
   const [deleting, setDeleting] = useState<number | null>(null)
   const { toast } = useToast()
   const { user } = useAuth()
+  const { setIsLoading } = useLoading()
   const router = useRouter()
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function SellerVouchersPage() {
 
   const fetchVouchers = async () => {
     try {
+      setIsLoading(true)
       setLoading(true)
       const response = await fetch(`/api/seller/vouchers?status=${activeTab}`)
       if (!response.ok) throw new Error('Failed to fetch vouchers')
@@ -86,6 +89,7 @@ export default function SellerVouchersPage() {
       })
     } finally {
       setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -93,6 +97,7 @@ export default function SellerVouchersPage() {
     if (!confirm('Bạn chắc chắn muốn xóa voucher này?')) return
 
     try {
+      setIsLoading(true)
       setDeleting(id)
       const response = await fetch(`/api/seller/vouchers?id=${id}`, {
         method: 'DELETE',
@@ -113,6 +118,7 @@ export default function SellerVouchersPage() {
       })
     } finally {
       setDeleting(null)
+      setIsLoading(false)
     }
   }
 
