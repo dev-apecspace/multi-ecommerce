@@ -34,6 +34,23 @@ export function useRealtimeOrder({ userId, orderId, vendorId, onUpdate }: UseRea
       .on(
         'postgres_changes',
         {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'Order',
+          filter: filter,
+        },
+        (payload) => {
+          console.log('Order inserted:', payload)
+          if (onUpdate) {
+            onUpdate()
+          } else {
+            router.refresh()
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           schema: 'public',
           table: 'Order',
