@@ -34,6 +34,23 @@ export function useRealtimeReturn({ userId, returnId, vendorId, onUpdate }: UseR
       .on(
         'postgres_changes',
         {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'Return',
+          filter: filter,
+        },
+        (payload) => {
+          console.log('Return inserted:', payload)
+          if (onUpdate) {
+            onUpdate()
+          } else {
+            router.refresh()
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           schema: 'public',
           table: 'Return',
