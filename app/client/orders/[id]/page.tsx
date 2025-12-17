@@ -10,6 +10,7 @@ import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
+import { useRealtimeOrder } from "@/hooks/use-realtime-order"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
 import { ReviewModal } from "@/components/review/review-modal"
@@ -71,6 +72,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   const { setIsLoading } = useLoading()
   const resolvedParams = use(params)
   const orderId = resolvedParams.id
+  const parsedOrderId = parseInt(orderId)
 
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
@@ -124,13 +126,17 @@ export default function OrderDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     if (userId && orderId) {
-      const parsedOrderId = parseInt(orderId)
       if (Number.isNaN(parsedOrderId)) return
       fetchOrder()
       fetchOrderReturns(userId, parsedOrderId)
       fetchOrderReviews(userId, parsedOrderId)
     }
   }, [userId, orderId])
+
+  useRealtimeOrder({ 
+    orderId: !Number.isNaN(parsedOrderId) ? parsedOrderId : null, 
+    onUpdate: () => { if (userId && !Number.isNaN(parsedOrderId)) fetchOrder() }
+  })
 
   const fetchOrderReturns = async (currentUserId: number, currentOrderId: number) => {
     try {
@@ -210,7 +216,7 @@ export default function OrderDetailPage({ params }: PageProps) {
       return
     }
 
-    const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+    const displayImage = item.ProductVariant?.image || item.Product.image || '/placeholder.svg'
     const productName = (item.variantName || item.ProductVariant)
       ? `${item.Product.name} - ${item.variantName || item.ProductVariant?.name}`
       : item.Product.name
@@ -254,8 +260,11 @@ export default function OrderDetailPage({ params }: PageProps) {
     delivered: { label: "Đã giao", color: "bg-green-100 text-green-800", icon: <Truck className="h-4 w-4" /> },
     completed: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800", icon: <CheckCircle className="h-4 w-4" /> },
     cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800", icon: <Package className="h-4 w-4" /> },
-    return_requested: { label: "Đã gửi yêu cầu đổi/trả hàng", color: "bg-purple-100 text-purple-800", icon: <Package className="h-4 w-4" /> },
-    returned: { label: "Đã đổi trả", color: "bg-indigo-100 text-indigo-800", icon: <CheckCircle className="h-4 w-4" /> }
+    return_pending: { label: "Đã gửi yêu cầu trả hàng", color: "bg-purple-100 text-purple-800", icon: <Package className="h-4 w-4" /> },
+    return_approved: { label: "Đã duyệt yêu cầu trả hàng", color: "bg-blue-100 text-blue-800", icon: <Package className="h-4 w-4" /> },
+    return_refund_confirmed: { label: "Đã hoàn tiền hàng", color: "bg-teal-100 text-teal-800", icon: <Package className="h-4 w-4" /> },
+    return_shipped: { label: "Đã trả hàng", color: "bg-emerald-100 text-emerald-800", icon: <CheckCircle className="h-4 w-4" /> },
+    returned: { label: "Đã trả hàng", color: "bg-indigo-100 text-indigo-800", icon: <CheckCircle className="h-4 w-4" /> }
   }
 
   const handleConfirmReceipt = async () => {
@@ -326,11 +335,40 @@ export default function OrderDetailPage({ params }: PageProps) {
     }
   })()
 
+  const getOrderStatusKey = () => {
+    const returnStatusValues = Object.values(returnStatuses)
+    
+    if (returnStatusValues.length > 0) {
+      const latestReturnStatus = returnStatusValues[0]
+      
+      if (['shipped', 'received', 'restocked'].includes(latestReturnStatus)) {
+        return 'return_shipped'
+      }
+      
+      if (latestReturnStatus === 'pending') {
+        return 'return_pending'
+      }
+      
+      if (latestReturnStatus === 'approved') {
+        return 'return_approved'
+      }
+      
+      if (latestReturnStatus === 'refund_confirmed') {
+        return 'return_refund_confirmed'
+      }
+      
+      if (latestReturnStatus === 'completed') {
+        return 'returned'
+      }
+    }
+
+    return order.status
+  }
+
   const returnStatusValues = Object.values(returnStatuses)
   const hasActiveReturn = returnStatusValues.some((status) => status !== 'completed')
-  const hasCompletedReturn = order.status === 'returned' || returnStatusValues.some((status) => status === 'completed')
   const shouldDisableConfirm = returnStatusValues.length > 0
-  const statusKey = hasCompletedReturn ? 'returned' : hasActiveReturn ? 'return_requested' : order.status
+  const statusKey = getOrderStatusKey()
 
   return (
     <main className="container-viewport py-8">
@@ -421,7 +459,7 @@ export default function OrderDetailPage({ params }: PageProps) {
             <CardContent>
               <div className="space-y-4">
                 {order.OrderItem.map((item) => {
-                  const displayImage = item.ProductVariant?.image || '/placeholder.svg'
+                  const displayImage = item.ProductVariant?.image || item.Product.image || '/placeholder.svg'
                   const itemReturnStatus = returnStatuses[item.id]
                   const itemHasReturnRecord = Boolean(itemReturnStatus)
                   const productReview = orderReviews[item.Product.id]
@@ -492,31 +530,29 @@ export default function OrderDetailPage({ params }: PageProps) {
                           </p>
                         </div>
                       )}
-                      {isReturnable(order) && (
-                        itemHasReturnRecord ? (
-                          <div className="mt-2 flex justify-end">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-purple-600 hover:text-purple-700 border-purple-200 hover:bg-purple-50"
-                              onClick={() => setReturnStatusModal({ open: true, orderItemId: item.id })}
-                            >
-                              Xem trạng thái đổi/trả
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="mt-2 flex justify-end">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
-                              onClick={() => handleOpenReturnModal(order.id, item)}
-                            >
-                              Trả hàng hoàn tiền
-                            </Button>
-                          </div>
-                        )
-                      )}
+                      {itemHasReturnRecord ? (
+                        <div className="mt-2 flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-purple-600 hover:text-purple-700 border-purple-200 hover:bg-purple-50"
+                            onClick={() => setReturnStatusModal({ open: true, orderItemId: item.id })}
+                          >
+                            Xem trạng thái đổi/trả
+                          </Button>
+                        </div>
+                      ) : isReturnable(order) ? (
+                        <div className="mt-2 flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
+                            onClick={() => handleOpenReturnModal(order.id, item)}
+                          >
+                            Trả hàng hoàn tiền
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   )
                 })}

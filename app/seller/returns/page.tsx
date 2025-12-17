@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
 import { usePagination } from "@/hooks/use-pagination"
 import { Pagination } from "@/components/pagination"
+import { useRealtimeReturn } from "@/hooks/use-realtime-return"
 
 interface ReturnRequest {
   id: number
@@ -35,7 +36,8 @@ interface ReturnRequest {
   trackingNumber: string | null
   trackingUrl: string | null
   Order: { id: number; orderNumber: string; status: string; paymentMethod?: string | null; paymentStatus?: string | null }
-  Product?: { id: number; name?: string | null; ProductImage?: { imageUrl: string }[] | null } | null
+  Product?: { id: number; name?: string | null; ProductImage?: Array<{ imageUrl: string; type: string; isMain: boolean; order: number }> } | null
+  ProductImage?: Array<{ imageUrl: string; type: string; isMain: boolean; order: number }> | null
   ProductVariant: { id: number; name: string; image?: string | null } | null
   User: { id: number; email: string }
   Vendor?: { id: number; name: string } | null
@@ -87,6 +89,8 @@ export default function SellerReturnsPage() {
       fetchReturns()
     }
   }, [vendorId, pagination.page, pagination.limit, activeTab])
+
+  useRealtimeReturn({ vendorId, onUpdate: () => { if (vendorId) fetchReturns() } })
 
   const fetchReturns = async () => {
     try {

@@ -558,13 +558,20 @@ export default function CampaignProductsPage() {
                                 />
                                 <div className="flex-1">
                                   <div className="flex gap-3">
-                                    {product.image && (
-                                      <img 
-                                        src={product.image} 
-                                        alt={product.name}
-                                        className="w-16 h-16 object-cover rounded border"
-                                      />
-                                    )}
+                                    {(() => {
+                                      let imageUrl = null
+                                      if (product.media && Array.isArray(product.media) && product.media.length > 0) {
+                                        const mainMedia = product.media.find((m: any) => m.isMain) || product.media[0]
+                                        imageUrl = mainMedia.url
+                                      }
+                                      return imageUrl && (
+                                        <img 
+                                          src={imageUrl} 
+                                          alt={product.name}
+                                          className="w-16 h-16 object-cover rounded border"
+                                        />
+                                      )
+                                    })()}
                                     <div>
                                       <p className="font-medium">{product.name}</p>
                                       <p className="text-xs">
@@ -613,6 +620,13 @@ export default function CampaignProductsPage() {
                                               toggleVariantSelection(product.id, variant.id)
                                             }}
                                           />
+                                          {variant.image && (
+                                            <img 
+                                              src={variant.image} 
+                                              alt={variant.name}
+                                              className="w-8 h-8 object-cover rounded border"
+                                            />
+                                          )}
                                           <span className={`text-sm flex-1 ${variantConflict ? 'text-muted-foreground' : ''}`}>
                                             {variant.name}{' '}
                                             <span className={variantHasSale ? "text-green-600 font-semibold" : "text-muted-foreground"}>

@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
+import { useRealtimeReturn } from "@/hooks/use-realtime-return"
 
 interface ReturnRequest {
   id: number
@@ -81,6 +82,8 @@ export default function ClientReturnsPage() {
       fetchReturns()
     }
   }, [userId])
+
+  useRealtimeReturn({ userId, onUpdate: () => { if (userId) fetchReturns() } })
 
   const fetchReturns = async () => {
     try {

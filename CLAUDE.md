@@ -2,6 +2,39 @@
 
 ## Latest Fixes
 
+### 8. Supabase Realtime for Order & Return Tables (DONE)
+**Feature**: Added real-time updates for order and return status tracking across client and seller pages.
+
+**Implementation**:
+1. **Created hooks**: 
+   - `hooks/use-realtime-order.ts` - Subscribes to Order table updates
+   - `hooks/use-realtime-return.ts` - Subscribes to Return table updates
+   - Both support filters for `userId`, `vendorId`, and `orderId`/`returnId`
+   - Automatically refresh data when database changes occur
+
+2. **Integrated hooks into pages**:
+   - **Order Pages**:
+     - `app/client/order-history/page.tsx` - Client order history with userId filter
+     - `app/client/orders/[id]/page.tsx` - Order detail view with orderId filter
+     - `app/seller/orders/page.tsx` - Seller order list with vendorId filter
+   
+   - **Return Pages**:
+     - `app/client/returns/page.tsx` - Client return history with userId filter
+     - `app/seller/returns/page.tsx` - Seller return list with vendorId filter
+     - `app/seller/returns/[id]/page.tsx` - Return detail view with returnId filter
+
+**TODO: Enable Realtime on both tables in Supabase SQL Editor**:
+```sql
+-- Enable realtime for Order table
+ALTER PUBLICATION supabase_realtime ADD TABLE "Order";
+
+-- Enable realtime for Return table
+ALTER PUBLICATION supabase_realtime ADD TABLE "Return";
+```
+
+**Usage**:
+The hooks are already integrated into all order and return pages. When tables are updated in the database, pages will automatically refresh to show the latest status.
+
 ### 7. Vendor Shop Information Columns (PENDING)
 **Issue**: `/seller/settings` failed when saving vendor information with error: "Could not find the 'businessLicense' column of 'Vendor' in the schema cache"
 

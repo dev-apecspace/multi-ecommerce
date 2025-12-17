@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        Product(id, name, slug, price, originalPrice, taxApplied, taxRate, taxIncluded),
-        ProductVariant(id, name, price, originalPrice)
+        Product(id, name, slug, price, originalPrice, taxApplied, taxRate, taxIncluded, media),
+        ProductVariant(id, name, price, originalPrice, image)
       `
       )
       .eq('campaignId', campaignId)

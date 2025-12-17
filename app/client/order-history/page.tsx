@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
+import { useRealtimeOrder } from "@/hooks/use-realtime-order"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
 import { ReviewModal } from "@/components/review/review-modal"
@@ -120,6 +121,8 @@ export default function OrderHistoryPage() {
       fetchUserReviews(userId)
     }
   }, [userId])
+
+  useRealtimeOrder({ userId, onUpdate: () => { if (userId) fetchOrders() } })
 
   const fetchOrders = async () => {
     try {
@@ -240,8 +243,11 @@ export default function OrderHistoryPage() {
     delivered: { label: "Đã giao", color: "bg-green-100 text-green-800" },
     completed: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800" },
     cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
-    return_requested: { label: "Đã gửi yêu cầu đổi/trả hàng", color: "bg-purple-100 text-purple-800" },
-    returned: { label: "Đã đổi trả", color: "bg-indigo-100 text-indigo-800" }
+    return_pending: { label: "Đã gửi yêu cầu trả hàng", color: "bg-purple-100 text-purple-800" },
+    return_approved: { label: "Đã duyệt yêu cầu trả hàng", color: "bg-blue-100 text-blue-800" },
+    return_refund_confirmed: { label: "Đã hoàn tiền hàng", color: "bg-teal-100 text-teal-800" },
+    return_shipped: { label: "Đã trả hàng", color: "bg-emerald-100 text-emerald-800" },
+    returned: { label: "Đã trả hàng", color: "bg-indigo-100 text-indigo-800" }
   }
 
   const canReviewOrder = (order: Order) => order.status === 'completed'
@@ -268,16 +274,32 @@ export default function OrderHistoryPage() {
   }
 
   const getOrderStatusKey = (order: Order) => {
-    const statuses = order.OrderItem
+    const returnStatusesInOrder = order.OrderItem
       .map((item) => returnStatuses[item.id])
       .filter((status): status is string => Boolean(status))
 
-    if (order.status === 'returned' || statuses.some((status) => status === 'completed')) {
-      return 'returned'
-    }
-
-    if (statuses.some((status) => status !== 'completed')) {
-      return 'return_requested'
+    if (returnStatusesInOrder.length > 0) {
+      const latestReturnStatus = returnStatusesInOrder[0]
+      
+      if (['shipped', 'received', 'restocked'].includes(latestReturnStatus)) {
+        return 'return_shipped'
+      }
+      
+      if (latestReturnStatus === 'pending') {
+        return 'return_pending'
+      }
+      
+      if (latestReturnStatus === 'approved') {
+        return 'return_approved'
+      }
+      
+      if (latestReturnStatus === 'refund_confirmed') {
+        return 'return_refund_confirmed'
+      }
+      
+      if (latestReturnStatus === 'completed') {
+        return 'returned'
+      }
     }
 
     return order.status

@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('User')
-      .select('id, name, email, phone, status, joinDate, createdAt', { count: 'exact' })
-      .eq('role', 'customer')
+      .select('id, name, email, phone, status, joinDate, createdAt, role', { count: 'exact' })
+      .in('role', ['customer', 'vendor'])
 
     if (status) {
       query = query.eq('status', status)
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
       status: user.status,
       joinDate: user.joinDate,
       createdAt: user.createdAt,
+      role: user.role || 'customer',
       totalSpent: orderMap.get(user.id)?.totalSpent || 0,
       orders: orderMap.get(user.id)?.orders || 0
     })) || []

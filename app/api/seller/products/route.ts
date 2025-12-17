@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('Product')
-      .select('id, name, slug, price, originalPrice, stock, status, taxApplied, taxRate, taxIncluded, Category(name, slug), SubCategory(name, slug), ProductVariant(id, name, price, stock), CampaignProduct(id, campaignId, variantId, Campaign(id, name, status, startDate, endDate))', { count: 'exact' })
+      .select('id, name, slug, price, originalPrice, stock, status, taxApplied, taxRate, taxIncluded, media, Category(name, slug), SubCategory(name, slug), ProductVariant(id, name, price, stock, image), CampaignProduct(id, campaignId, variantId, Campaign(id, name, status, startDate, endDate))', { count: 'exact' })
       .eq('vendorId', vendorId)
 
     if (status) {

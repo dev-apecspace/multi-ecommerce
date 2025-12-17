@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { CheckCircle, Clock, AlertCircle, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -64,7 +64,7 @@ const NON_COD_STEP_DEFS = [
   { key: "pending", label: "Yêu cầu đã gửi", icon: Clock, color: "bg-blue-100 text-blue-800" },
   { key: "approved", label: "Đã duyệt", icon: CheckCircle, color: "bg-blue-100 text-blue-800" },
   { key: "refund_confirmed", label: "Đã hoàn tiền", icon: CheckCircle, color: "bg-teal-100 text-teal-800" },
-  { key: "completed", label: "Hoàn thành", icon: CheckCircle, color: "bg-green-100 text-green-800" },
+  { key: "completed", label: "Đã trả hàng", icon: CheckCircle, color: "bg-green-100 text-green-800" },
 ] as const
 
 type StepKey = (typeof NON_COD_STEP_DEFS)[number]["key"]
@@ -141,6 +141,9 @@ export function ReturnStatusModal({
       pending: "Chờ duyệt",
       approved: "Đã duyệt",
       shipped: "Đang vận chuyển",
+      received: "Đã nhận hàng",
+      restocked: "Đã nhập kho",
+      refund_confirmed: "Đã hoàn tiền",
       completed: "Hoàn thành",
       rejected: "Bị từ chối",
       cancelled: "Đã hủy",
@@ -190,6 +193,12 @@ export function ReturnStatusModal({
     if (statusFlow.includes(returnData.status as StepKey)) {
       return returnData.status as StepKey
     }
+    
+    // Map intermediate statuses to 'completed' step
+    if (["shipped", "received", "restocked"].includes(returnData.status)) {
+      return "completed" as StepKey
+    }
+
     if (!requiresRefundStep && ["approved", "refund_confirmed"].includes(returnData.status)) {
       return "completed"
     }
@@ -214,9 +223,6 @@ export function ReturnStatusModal({
                 Theo dõi tiến trình xử lý yêu cầu của bạn
               </DialogDescription>
             </div>
-            <Badge className={getStatusColor(returnData.status)}>
-              {getStatusLabel(returnData.status)}
-            </Badge>
           </div>
         </DialogHeader>
 

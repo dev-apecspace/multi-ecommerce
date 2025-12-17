@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
           originalPrice,
           stock,
           vendorId,
+          media,
           Vendor!inner(id, name)
         ),
         ProductVariant(id, name, sku, barcode, price, originalPrice, image)
@@ -104,13 +105,21 @@ export async function GET(request: NextRequest) {
       })
       const saleUnit = applied ? bestPrice : null
       const finalUnit = saleUnit ?? baseUnit
+
+      // Extract image from media
+      let productImage = null
+      if (product.media && Array.isArray(product.media) && product.media.length > 0) {
+         const mainImage = product.media.find((m: any) => m.isMain)
+         productImage = mainImage ? mainImage.url : product.media[0].url
+      }
+
       return {
         id: item.id,
         productId: product.id,
         variantId: item.variantId,
         variantName: variant?.name,
         productName: product.name,
-        image: variant?.image,
+        image: variant?.image || productImage,
         quantity: item.quantity,
         basePrice: baseUnit,
         originalPrice: originalUnit,

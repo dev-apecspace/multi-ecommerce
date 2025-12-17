@@ -15,6 +15,7 @@ interface Customer {
   phone: string
   joinDate: string
   status: 'active' | 'locked'
+  role: 'customer' | 'vendor' | 'admin'
   totalSpent: number
   orders: number
 }
@@ -58,6 +59,7 @@ export default function AdminUsersPage() {
         phone: user.phone || 'N/A',
         joinDate: new Date(user.joinDate).toLocaleDateString('vi-VN'),
         status: user.status as 'active' | 'locked',
+        role: user.role as 'customer' | 'vendor' | 'admin',
         totalSpent: user.totalSpent || 0,
         orders: user.orders || 0
       }))
@@ -193,6 +195,7 @@ export default function AdminUsersPage() {
                     <th className="text-left py-3 px-4">Tên</th>
                     <th className="text-left py-3 px-4">Email</th>
                     <th className="text-left py-3 px-4">Điện thoại</th>
+                    <th className="text-left py-3 px-4">Loại</th>
                     <th className="text-left py-3 px-4">Ngày tham gia</th>
                     <th className="text-left py-3 px-4">Đơn hàng</th>
                     <th className="text-left py-3 px-4">Chi tiêu</th>
@@ -207,6 +210,17 @@ export default function AdminUsersPage() {
                       <td className="py-3 px-4 font-semibold">{customer.name}</td>
                       <td className="py-3 px-4">{customer.email}</td>
                       <td className="py-3 px-4">{customer.phone}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          customer.role === 'vendor'
+                            ? 'bg-purple-100 text-purple-800'
+                            : customer.role === 'admin'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {customer.role === 'vendor' ? 'Nhà cung cấp' : customer.role === 'admin' ? 'Admin' : 'Khách hàng'}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">{customer.joinDate}</td>
                       <td className="py-3 px-4">{customer.orders}</td>
                       <td className="py-3 px-4">{customer.totalSpent.toLocaleString('vi-VN')} ₫</td>
