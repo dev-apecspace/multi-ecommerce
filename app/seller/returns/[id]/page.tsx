@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { useRealtimeReturn } from "@/hooks/use-realtime-return"
 
 interface Return {
   id: number
@@ -36,7 +37,8 @@ interface Return {
   trackingNumber: string | null
   trackingUrl: string | null
   Order: { id: number; orderNumber: string; status: string; paymentMethod?: string | null; paymentStatus?: string | null }
-  Product?: { id: number; name?: string | null }
+  Product?: { id: number; name?: string | null; image?: string; ProductImage?: Array<{ imageUrl: string; type: string; isMain: boolean; order: number }> }
+  ProductImage?: Array<{ imageUrl: string; type: string; isMain: boolean; order: number }> | null
   ProductVariant: { id: number; name: string; image?: string | null } | null
   User: { id: number; email: string }
 }
@@ -106,6 +108,11 @@ export default function ReturnDetailPage({ params }: PageProps) {
       fetchReturnDetail()
     }
   }, [vendorId, returnId])
+
+  useRealtimeReturn({ 
+    returnId, 
+    onUpdate: () => { if (vendorId) fetchReturnDetail() }
+  })
 
   const fetchReturnDetail = async () => {
     try {
@@ -312,7 +319,11 @@ export default function ReturnDetailPage({ params }: PageProps) {
   }
 
   const displayImage =
-    returnData.ProductVariant?.image || "/placeholder.svg"
+    returnData.ProductVariant?.image ||
+    returnData.ProductImage?.[0]?.imageUrl ||
+    returnData.Product?.ProductImage?.[0]?.imageUrl ||
+    returnData.Product?.image ||
+    "/placeholder.svg"
   const productName = returnData.Product?.name
     ? returnData.ProductVariant
       ? `${returnData.Product.name} - ${returnData.ProductVariant.name}`

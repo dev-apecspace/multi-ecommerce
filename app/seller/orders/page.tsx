@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
+import { useRealtimeOrder } from "@/hooks/use-realtime-order"
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ interface OrderItem {
   price: number
   variantId: number | null
   variantName?: string | null
-  Product: { id: number; name: string }
+  Product: { id: number; name: string; image?: string }
   ProductVariant: { id: number; name: string; image?: string } | null
 }
 
@@ -95,6 +96,8 @@ export default function SellerOrdersPage() {
       fetchOrders()
     }
   }, [vendorId, pagination.page, pagination.limit, activeTab])
+
+  useRealtimeOrder({ vendorId, onUpdate: () => { if (vendorId) fetchOrders() } })
 
   const fetchOrders = async () => {
     if (!vendorId) return
@@ -514,9 +517,9 @@ export default function SellerOrdersPage() {
                     <div key={item.id} className="flex gap-3 pb-3 border-b last:border-0">
                       {/* Product Image */}
                       <div className="flex-shrink-0">
-                        {item.ProductVariant?.image ? (
+                        {item.ProductVariant?.image || item.Product.image ? (
                           <Image
-                            src={item.ProductVariant.image}
+                            src={item.ProductVariant?.image || item.Product.image || ''}
                             alt={item.Product.name}
                             width={80}
                             height={80}

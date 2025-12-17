@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           variantId,
           variantName,
           productId,
-          Product(id, name),
+          Product(id, name, media),
           ProductVariant(id, name, image)
         )
       `, { count: 'exact' })
@@ -60,8 +60,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    // Transform media to image for frontend compatibility
+    const transformedData = data?.map((order: any) => {
+      if (order.OrderItem) {
+        order.OrderItem = order.OrderItem.map((item: any) => {
+          if (item.Product && item.Product.media) {
+            const media = item.Product.media
+            let image = null
+            if (Array.isArray(media) && media.length > 0) {
+              const mainImage = media.find((m: any) => m.isMain)
+              image = mainImage ? mainImage.url : media[0].url
+            }
+            item.Product.image = image
+          }
+          return item
+        })
+      }
+      return order
+    })
+
     return NextResponse.json({
-      data,
+      data: transformedData,
       pagination: { total: count, limit, offset }
     })
   } catch (error) {
@@ -332,13 +351,32 @@ export async function POST(request: NextRequest) {
           variantId,
           variantName,
           productId,
-          Product(id, name),
+          Product(id, name, media),
           ProductVariant(id, name, image)
         )
       `)
       .in('id', createdOrders.map(o => o.id))
 
-    return NextResponse.json({ data: allOrders }, { status: 201 })
+    // Transform media to image for frontend compatibility
+    const transformedOrders = allOrders?.map((order: any) => {
+      if (order.OrderItem) {
+        order.OrderItem = order.OrderItem.map((item: any) => {
+          if (item.Product && item.Product.media) {
+            const media = item.Product.media
+            let image = null
+            if (Array.isArray(media) && media.length > 0) {
+              const mainImage = media.find((m: any) => m.isMain)
+              image = mainImage ? mainImage.url : media[0].url
+            }
+            item.Product.image = image
+          }
+          return item
+        })
+      }
+      return order
+    })
+
+    return NextResponse.json({ data: transformedOrders }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

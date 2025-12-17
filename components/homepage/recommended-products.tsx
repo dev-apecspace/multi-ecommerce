@@ -9,6 +9,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatPrice, generateSlug } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 export function RecommendedProducts() {
   const router = useRouter()
@@ -16,6 +25,9 @@ export function RecommendedProducts() {
   const { user } = useAuth()
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
+  const limit = 12
 
   const handleAddToCart = (e: React.MouseEvent, product: any) => {
     e.preventDefault()
@@ -39,28 +51,136 @@ export function RecommendedProducts() {
     }
   }
 
+  const fetchProducts = async (page: number) => {
+    setLoading(true)
+    try {
+      const offset = (page - 1) * limit
+      const response = await fetch(`/api/products?limit=${limit}&offset=${offset}`)
+      const result = await response.json()
+      setProducts(result.data || [])
+      const total = result.pagination?.total || 0
+      setTotalPages(Math.ceil(total / limit))
+    } catch (error) {
+      console.error('Failed to fetch products:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch('/api/products?limit=8')
-        const result = await response.json()
-        setProducts(result.data || [])
-      } catch (error) {
-        console.error('Failed to fetch products:', error)
-      } finally {
-        setLoading(false)
+    fetchProducts(currentPage)
+  }, [currentPage])
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return
+    setCurrentPage(page)
+    // Scroll to top of section
+    const element = document.getElementById('recommended-products')
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  const renderPaginationItems = () => {
+    const items = []
+    const maxVisiblePages = 5
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              href="#"
+              isActive={currentPage === i}
+              onClick={(e) => {
+                e.preventDefault()
+                handlePageChange(i)
+              }}
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        )
       }
+    } else {
+      // Always show first page
+      items.push(
+        <PaginationItem key={1}>
+          <PaginationLink
+            href="#"
+            isActive={currentPage === 1}
+            onClick={(e) => {
+              e.preventDefault()
+              handlePageChange(1)
+            }}
+          >
+            1
+          </PaginationLink>
+        </PaginationItem>
+      )
+
+      if (currentPage > 3) {
+        items.push(
+          <PaginationItem key="ellipsis-start">
+            <PaginationEllipsis />
+          </PaginationItem>
+        )
+      }
+
+      const start = Math.max(2, currentPage - 1)
+      const end = Math.min(totalPages - 1, currentPage + 1)
+
+      for (let i = start; i <= end; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              href="#"
+              isActive={currentPage === i}
+              onClick={(e) => {
+                e.preventDefault()
+                handlePageChange(i)
+              }}
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        )
+      }
+
+      if (currentPage < totalPages - 2) {
+        items.push(
+          <PaginationItem key="ellipsis-end">
+            <PaginationEllipsis />
+          </PaginationItem>
+        )
+      }
+
+      // Always show last page
+      items.push(
+        <PaginationItem key={totalPages}>
+          <PaginationLink
+            href="#"
+            isActive={currentPage === totalPages}
+            onClick={(e) => {
+              e.preventDefault()
+              handlePageChange(totalPages)
+            }}
+          >
+            {totalPages}
+          </PaginationLink>
+        </PaginationItem>
+      )
     }
 
-    fetchProducts()
-  }, [])
+    return items
+  }
 
-  if (loading) {
+  if (loading && products.length === 0) {
     return (
-      <div>
+      <div id="recommended-products">
         <h2 className="text-xl font-bold mb-4">Sản phẩm được đề xuất</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: limit }).map((_, i) => (
             <Card key={i} className="h-full animate-pulse">
               <CardContent className="p-3 space-y-2">
                 <div className="relative h-40 bg-gray-200 dark:bg-gray-700 rounded-lg" />
@@ -77,9 +197,9 @@ export function RecommendedProducts() {
   }
 
   return (
-    <div>
+    <div id="recommended-products">
       <h2 className="text-xl font-bold mb-4">Sản phẩm được đề xuất</h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         {products.map((product) => (
           <Link key={product.id} href={`/client/product/${product.slug || generateSlug(product.name)}`}>
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
@@ -141,6 +261,36 @@ export function RecommendedProducts() {
           </Link>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                href="#" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  handlePageChange(currentPage - 1)
+                }}
+                className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+            
+            {renderPaginationItems()}
+
+            <PaginationItem>
+              <PaginationNext 
+                href="#" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  handlePageChange(currentPage + 1)
+                }}
+                className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   )
 }

@@ -30,14 +30,30 @@ const formatReturnRecords = (records: any[] | null | undefined) => {
       .filter((img) => Boolean(img))
 
     const variantImage = record.ProductVariant?.image
-
-    if ((!productImages || productImages.length === 0) && variantImage) {
-      productImages.push({
+    
+    // Prioritize variant image if available
+    if (variantImage) {
+      // Check if variant image is already in the list to avoid duplicates if needed, 
+      // but usually we just want to ensure it's first or the main one.
+      // The requirement is: Variant Image > Main Product Image.
+      
+      // We can prepend it or replace the main image.
+      // Let's prepend it as the main image.
+      
+      // First, unset isMain for others
+      productImages.forEach((img: any) => img.isMain = false)
+      
+      productImages.unshift({
         imageUrl: variantImage,
         type: 'image',
         isMain: true,
-        order: 0,
+        order: -1, // Ensure it's first
       })
+    } else if (productImages.length > 0) {
+       // Ensure one is main if no variant image
+       if (!productImages.some((img: any) => img.isMain)) {
+         productImages[0].isMain = true
+       }
     }
 
     const productImageData = productImages.length ? productImages : null
@@ -237,11 +253,6 @@ export async function PATCH(request: NextRequest) {
 
         baseUpdate.approvedAt = now
         baseUpdate.status = 'approved'
-
-        await supabase
-          .from('Order')
-          .update({ status: 'returned' })
-          .eq('id', existingReturn.orderId)
         break
       }
 
@@ -337,6 +348,12 @@ export async function PATCH(request: NextRequest) {
         baseUpdate.status = 'completed'
         if (existingReturn.status !== 'completed') {
           baseUpdate.completedAt = now
+          
+          // Update Order status to 'returned' when return is completed
+          await supabase
+            .from('Order')
+            .update({ status: 'returned' })
+            .eq('id', existingReturn.orderId)
         }
         break
       }

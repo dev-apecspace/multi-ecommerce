@@ -88,12 +88,12 @@ interface CampaignProduct {
 export default function SellerCampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [registeredCampaigns, setRegisteredCampaigns] = useState<Campaign[]>([])
-  const [campaignProducts, setCampaignProducts] = useState<Map<number, CampaignProduct[]>>(new Map())
+  const [campaignProducts, setCampaignProducts] = useState<Record<number, CampaignProduct[]>>({})
   const [loading, setLoading] = useState(true)
   const [vendorId, setVendorId] = useState<number | null>(null)
   const [selectedCampaignForProducts, setSelectedCampaignForProducts] = useState<number | null>(null)
   const [products, setProducts] = useState<SellerProduct[]>([])
-  const [activeTab, setActiveTab] = useState('all')
+  const [activeTab, setActiveTab] = useState('available')
   const { toast } = useToast()
   const { user } = useAuth()
   const { setIsLoading } = useLoading()
@@ -164,17 +164,27 @@ export default function SellerCampaignsPage() {
       return
     }
 
-    if (!vendorId) return
+    const vid = user?.vendorId
+    if (!vid) return
 
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/seller/campaigns/products?campaignId=${campaignId}&vendorId=${vendorId}`)
-      const products = await response.json()
+      const response = await fetch(`/api/seller/campaigns/products?campaignId=${campaignId}&vendorId=${vid}`)
       
-      campaignProducts.set(campaignId, products)
-      setCampaignProducts(new Map(campaignProducts))
+      if (!response.ok) {
+        throw new Error('Failed to fetch products')
+      }
+      
+      const products = await response.json()
+      const productList = Array.isArray(products) ? products : products.data || []
+      
+      setCampaignProducts(prev => ({
+        ...prev,
+        [campaignId]: productList
+      }))
       setSelectedCampaignForProducts(campaignId)
     } catch (error) {
+      console.error('Error fetching campaign products:', error)
       toast({
         title: 'Lỗi',
         description: 'Không thể tải danh sách sản phẩm',
@@ -412,6 +422,7 @@ export default function SellerCampaignsPage() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-border">
+                                <th className="text-left py-3 px-4">Ảnh</th>
                                 <th className="text-left py-3 px-4">Sản phẩm</th>
                                 <th className="text-left py-3 px-4">Số lượng đăng ký</th>
                                 <th className="text-left py-3 px-4">Đã bán</th>
@@ -420,45 +431,66 @@ export default function SellerCampaignsPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {(campaignProducts.get(campaign.id) || []).length === 0 ? (
+                              {(campaignProducts[campaign.id] || []).length === 0 ? (
                                 <tr>
-                                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
                                     Chưa có sản phẩm nào trong chương trình này
                                   </td>
                                 </tr>
                               ) : (
-                                (campaignProducts.get(campaign.id) || []).map((product) => (
-                                  <tr key={product.id} className="border-b border-border hover:bg-muted">
-                                    <td className="py-3 px-4 font-medium">{product.Product.name}</td>
-                                    <td className="py-3 px-4">{product.quantity}</td>
-                                    <td className="py-3 px-4">{product.purchasedQuantity}</td>
-                                    <td className="py-3 px-4">
-                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        product.status === 'approved'
-                                          ? 'bg-green-100 text-green-800'
-                                          : product.status === 'pending'
-                                          ? 'bg-yellow-100 text-yellow-800'
-                                          : 'bg-red-100 text-red-800'
-                                      }`}>
-                                        {product.status === 'approved'
-                                          ? 'Đã duyệt'
-                                          : product.status === 'pending'
-                                          ? 'Chờ duyệt'
-                                          : 'Bị từ chối'}
-                                      </span>
-                                    </td>
-                                    <td className="py-3 px-4">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="text-red-600 hover:text-red-700"
-                                        onClick={() => handleRemoveProduct(product.id)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                ))
+                                (campaignProducts[campaign.id] || []).map((product) => {
+                                  let imageUrl = '/placeholder.svg'
+                                  
+                                  if (product.ProductVariant?.image) {
+                                    imageUrl = product.ProductVariant.image
+                                  } else if (product.Product.media && Array.isArray(product.Product.media) && product.Product.media.length > 0) {
+                                    const mainMedia = product.Product.media.find((m: any) => m.isMain) || product.Product.media[0]
+                                    imageUrl = mainMedia.url || '/placeholder.svg'
+                                  }
+                                  
+                                  return (
+                                    <tr key={product.id} className="border-b border-border hover:bg-muted">
+                                      <td className="py-3 px-4">
+                                        <img
+                                          src={imageUrl}
+                                          alt={product.Product.name}
+                                          className="w-12 h-12 object-cover rounded"
+                                        />
+                                      </td>
+                                      <td className="py-3 px-4 font-medium">
+                                        {product.Product.name}
+                                        {product.ProductVariant && ` - ${product.ProductVariant.name}`}
+                                      </td>
+                                      <td className="py-3 px-4">{product.quantity}</td>
+                                      <td className="py-3 px-4">{product.purchasedQuantity}</td>
+                                      <td className="py-3 px-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                          product.status === 'approved'
+                                            ? 'bg-green-100 text-green-800'
+                                            : product.status === 'pending'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-red-100 text-red-800'
+                                        }`}>
+                                          {product.status === 'approved'
+                                            ? 'Đã duyệt'
+                                            : product.status === 'pending'
+                                            ? 'Chờ duyệt'
+                                            : 'Bị từ chối'}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-4">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="text-red-600 hover:text-red-700"
+                                          onClick={() => handleRemoveProduct(product.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  )
+                                })
                               )}
                             </tbody>
                           </table>

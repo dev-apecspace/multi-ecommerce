@@ -714,7 +714,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             onOpenChange={setVariantModalOpen}
             productId={product.id}
             productName={product.name}
-            productImage={product.image || "/placeholder.svg"}
+            productImage={product.media && Array.isArray(product.media) ? product.media : (product.image || "/placeholder.svg")}
             price={basePrice}
             salePrice={product.campaignPrice}
             originalPrice={originalPrice}

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
           vendorId,
           variantId,
           variantName,
-          Product(id, name),
+          Product(id, name, media),
           ProductVariant(id, name, image)
         )
       `, { count: 'exact' })
@@ -50,7 +50,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    const transformedData = data || []
+    const transformedData = data?.map((order: any) => {
+      if (order.OrderItem) {
+        order.OrderItem = order.OrderItem.map((item: any) => {
+          if (item.Product && item.Product.media) {
+            const media = item.Product.media
+            let image = null
+            if (Array.isArray(media) && media.length > 0) {
+              const mainImage = media.find((m: any) => m.isMain)
+              image = mainImage ? mainImage.url : media[0].url
+            }
+            item.Product.image = image
+          }
+          return item
+        })
+      }
+      return order
+    }) || []
     const totalPages = Math.ceil((count || 0) / limit)
 
     return NextResponse.json({
@@ -76,7 +92,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    // Fetch existing order to validate allowed transitions
     const { data: existingOrder, error: existingOrderErr } = await supabase
       .from('Order')
       .select('status')
@@ -126,8 +141,8 @@ export async function PATCH(request: NextRequest) {
           vendorId,
           variantId,
           variantName,
-          Product(id, name, image),
-          ProductVariant(id, name)
+          Product(id, name, media),
+          ProductVariant(id, name, image)
         )
       `)
 
@@ -139,7 +154,25 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ data: data[0] })
+    const transformedData = data.map((order: any) => {
+      if (order.OrderItem) {
+        order.OrderItem = order.OrderItem.map((item: any) => {
+          if (item.Product && item.Product.media) {
+            const media = item.Product.media
+            let image = null
+            if (Array.isArray(media) && media.length > 0) {
+              const mainImage = media.find((m: any) => m.isMain)
+              image = mainImage ? mainImage.url : media[0].url
+            }
+            item.Product.image = image
+          }
+          return item
+        })
+      }
+      return order
+    })
+
+    return NextResponse.json({ data: transformedData[0] })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

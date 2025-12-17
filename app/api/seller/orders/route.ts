@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
           price,
           variantId,
           variantName,
-          Product(id, name),
+          Product(id, name, media),
           ProductVariant(id, name, image)
         )
       `, { count: 'exact' })
@@ -57,20 +57,38 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data
-    const transformedData = data?.map((order: any) => ({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      status: order.status,
-      total: order.total,
-      shippingCost: order.shippingCost,
-      date: order.date,
-      paymentMethod: order.paymentMethod,
-      paymentStatus: order.paymentStatus,
-      shippingAddress: order.shippingAddress,
-      estimatedDelivery: order.estimatedDelivery,
-      User: order.User,
-      OrderItem: order.OrderItem?.filter((item: any) => item.Product) || []
-    }))
+    const transformedData = data?.map((order: any) => {
+      const items = order.OrderItem?.filter((item: any) => item.Product) || []
+      
+      // Transform media to image
+      const transformedItems = items.map((item: any) => {
+        if (item.Product && item.Product.media) {
+            const media = item.Product.media
+            let image = null
+            if (Array.isArray(media) && media.length > 0) {
+              const mainImage = media.find((m: any) => m.isMain)
+              image = mainImage ? mainImage.url : media[0].url
+            }
+            item.Product.image = image
+        }
+        return item
+      })
+
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        total: order.total,
+        shippingCost: order.shippingCost,
+        date: order.date,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        shippingAddress: order.shippingAddress,
+        estimatedDelivery: order.estimatedDelivery,
+        User: order.User,
+        OrderItem: transformedItems
+      }
+    })
 
     return NextResponse.json({
       data: transformedData,
@@ -157,7 +175,7 @@ export async function PATCH(request: NextRequest) {
           price,
           variantId,
           variantName,
-          Product(id, name),
+          Product(id, name, media),
           ProductVariant(id, name, image)
         )
       `)
@@ -171,6 +189,22 @@ export async function PATCH(request: NextRequest) {
     }
 
     const order = data[0]
+    
+    const items = order.OrderItem?.filter((item: any) => item.Product) || []
+    // Transform media to image
+    const transformedItems = items.map((item: any) => {
+      if (item.Product && item.Product.media) {
+          const media = item.Product.media
+          let image = null
+          if (Array.isArray(media) && media.length > 0) {
+            const mainImage = media.find((m: any) => m.isMain)
+            image = mainImage ? mainImage.url : media[0].url
+          }
+          item.Product.image = image
+      }
+      return item
+    })
+
     const transformedData = {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -183,7 +217,7 @@ export async function PATCH(request: NextRequest) {
       shippingAddress: order.shippingAddress,
       estimatedDelivery: order.estimatedDelivery,
       User: order.User,
-      OrderItem: order.OrderItem?.filter((item: any) => item.Product) || []
+      OrderItem: transformedItems
     }
 
     return NextResponse.json({ data: transformedData })

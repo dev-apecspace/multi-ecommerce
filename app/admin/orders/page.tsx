@@ -38,7 +38,7 @@ interface Order {
     variantId: number | null
     variantName?: string | null
     Product: { id: number; name: string; image?: string }
-    ProductVariant: { id: number; name: string } | null
+    ProductVariant: { id: number; name: string; image?: string } | null
   }>
 }
 
@@ -286,28 +286,31 @@ export default function AdminOrdersPage() {
 
               <div className="border-t pt-4">
                 <p className="font-semibold mb-3">Sản phẩm</p>
-                {selectedOrder.OrderItem.map((item, idx) => (
-                  <div key={idx} className="flex gap-4 py-3 border-b last:border-b-0">
-                    {item.Product.image && (
-                      <img
-                        src={item.Product.image}
-                        alt={item.Product.name}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-medium">{item.Product.name}</p>
-                      {(item.variantName || item.ProductVariant) && (
-                        <p className="text-sm text-muted-foreground">({item.variantName || item.ProductVariant?.name})</p>
+                {selectedOrder.OrderItem.map((item, idx) => {
+                  const displayImage = item.ProductVariant?.image || item.Product.image
+                  return (
+                    <div key={idx} className="flex gap-4 py-3 border-b last:border-b-0">
+                      {displayImage && (
+                        <img
+                          src={displayImage}
+                          alt={item.Product.name}
+                          className="w-16 h-16 object-cover rounded"
+                        />
                       )}
-                      <p className="text-sm text-muted-foreground">x{item.quantity}</p>
+                      <div className="flex-1">
+                        <p className="font-medium">{item.Product.name}</p>
+                        {(item.variantName || item.ProductVariant) && (
+                          <p className="text-sm text-muted-foreground">({item.variantName || item.ProductVariant?.name})</p>
+                        )}
+                        <p className="text-sm text-muted-foreground">x{item.quantity}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{item.price.toLocaleString('vi-VN')}₫</p>
+                        <p className="text-sm text-muted-foreground">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">{item.price.toLocaleString('vi-VN')}₫</p>
-                      <p className="text-sm text-muted-foreground">{(item.price * item.quantity).toLocaleString('vi-VN')}₫</p>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

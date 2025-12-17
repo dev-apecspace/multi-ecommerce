@@ -48,7 +48,7 @@ interface VariantSelectionModalProps {
   onOpenChange: (open: boolean) => void
   productId: number
   productName: string
-  productImage: string
+  productImage: string | Array<{ url: string; isMain?: boolean }>
   price: number
   salePrice?: number | null
   originalPrice?: number
@@ -169,8 +169,15 @@ export function VariantSelectionModal({
       ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100) 
       : 0)
 
-   
-  const displayImage = selectedVariantData?.image || productImage
+  const getProductImageUrl = () => {
+    if (Array.isArray(productImage)) {
+      const mainImage = productImage.find(img => img.isMain)
+      return mainImage?.url || productImage[0]?.url || "/placeholder.svg"
+    }
+    return productImage || "/placeholder.svg"
+  }
+
+  const displayImage = selectedVariantData?.image || getProductImageUrl()
 
   const content = (
     <div className="space-y-4">
@@ -203,7 +210,7 @@ export function VariantSelectionModal({
           </div>
           {taxApplied && taxRate > 0 && taxIncluded && (
             <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">
-              (Đã bao gồm thuế {taxRate}%)
+              (Đã bao gồm thuế)
             </p>
           )}
         </div>
