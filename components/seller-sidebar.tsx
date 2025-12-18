@@ -20,6 +20,8 @@ import {
   Users,
   Percent,
   RotateCcw,
+  Menu,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -56,6 +58,7 @@ export function SellerSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const [mobileOpen, setMobileOpen] = useState(false)
   
   const isPending = user?.status === 'pending' || user?.status === 'pending_approval'
 
@@ -67,6 +70,7 @@ export function SellerSidebar() {
 
   return (
     <TooltipProvider>
+      <>
       <aside className="w-64 bg-white dark:bg-slate-950 border-r border-border min-h-screen p-4 sticky top-0 hidden md:flex flex-col">
         <Link href="/" className="text-2xl font-bold text-orange-600 dark:text-orange-500 mb-2 block">
           Sàn TMĐT APECSPACE
@@ -179,6 +183,118 @@ export function SellerSidebar() {
           </Button>
         </div>
       </aside>
+
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-white dark:bg-slate-950 border-b border-border p-4 flex items-center justify-between h-16">
+        <Link href="/" className="text-lg font-bold text-orange-600 dark:text-orange-500">
+          APECSPACE
+        </Link>
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 hover:bg-muted rounded">
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+
+      {mobileOpen && (
+        <div className="md:hidden fixed top-16 left-0 right-0 bottom-0 bg-white dark:bg-slate-950 z-20 overflow-y-auto">
+          <nav className="space-y-1 p-4">
+            {sellerLinks.map((link) => {
+              const Icon = link.icon
+              const isActive = pathname === link.href || (link.href !== "/seller" && pathname.startsWith(link.href))
+              const isExpanded = expandedItems.includes(link.href)
+              const hasSubItems = link.subItems && link.subItems.length > 0
+              const isRestricted = isPending && link.restricted
+
+              return (
+                <div key={link.href}>
+                  {isRestricted ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="w-full">
+                          <Button
+                            disabled
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-between gap-2 px-3 opacity-50 cursor-not-allowed",
+                            )}
+                          >
+                            <span className="flex items-center gap-3 flex-1">
+                              <Icon className="h-4 w-4 flex-shrink-0" />
+                              <span className="text-sm">{link.label}</span>
+                            </span>
+                            <Lock className="h-3 w-3 flex-shrink-0 text-yellow-600" />
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Yêu cầu hồ sơ được phê duyệt</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : !hasSubItems ? (
+                    <Link href={link.href} className="w-full block" onClick={() => setMobileOpen(false)}>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "w-full justify-between gap-2 px-3",
+                          isActive &&
+                            "bg-orange-50 dark:bg-slate-800 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-slate-800",
+                        )}
+                      >
+                        <span className="flex items-center gap-3 flex-1">
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="text-sm">{link.label}</span>
+                        </span>
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      onClick={() => toggleExpanded(link.href)}
+                      className={cn(
+                        "w-full justify-between gap-2 px-3",
+                        isActive &&
+                          "bg-orange-50 dark:bg-slate-800 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-slate-800",
+                      )}
+                    >
+                      <span className="flex items-center gap-3 flex-1">
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="text-sm">{link.label}</span>
+                      </span>
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                    </Button>
+                  )}
+
+                  {hasSubItems && isExpanded && !isRestricted && (
+                    <div className="ml-4 space-y-1 border-l border-border pl-3 my-1">
+                      {link.subItems.map((subItem) => (
+                        <Link key={subItem.href} href={subItem.href} onClick={() => setMobileOpen(false)}>
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-start gap-2 text-sm px-3",
+                              pathname === subItem.href &&
+                                "bg-orange-50 dark:bg-slate-800 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-slate-800",
+                            )}
+                          >
+                            {subItem.label}
+                          </Button>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </nav>
+          <div className="p-4 border-t border-border">
+            <Button variant="outline" className="w-full justify-start gap-3 bg-transparent" asChild>
+              <Link href="/">
+                <LogOut className="h-4 w-4" />
+                <span className="text-sm">Quay lại cửa hàng</span>
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+      </>
     </TooltipProvider>
   )
 }

@@ -1,9 +1,9 @@
-import { SellerChatLayout } from './seller-chat-layout'
+import { ChatLayout } from './chat-layout'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { redirect } from 'next/navigation'
 
-export default async function SellerChatPage() {
+export default async function ChatPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get('token')?.value
   
@@ -12,11 +12,12 @@ export default async function SellerChatPage() {
   }
   
   const payload = await verifyToken(token)
-  if (!payload || payload.role !== 'vendor') {
+  if (!payload) {
     redirect('/auth/login')
   }
   
+  // Ensure userId is a number
   const userId = typeof payload.id === 'string' ? parseInt(payload.id) : payload.id
   
-  return <SellerChatLayout userId={userId} />
+  return <ChatLayout userId={userId} />
 }

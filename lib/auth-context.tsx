@@ -145,6 +145,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = data.user
       setUser(userData)
       setStoredUser(userData)
+
+      // Verify auth by fetching current user from backend
+      try {
+        const meResponse = await fetch('/api/auth/me', {
+          credentials: 'include',
+        })
+        if (meResponse.ok) {
+          const meData = await meResponse.json()
+          const verifiedUser = meData.user
+          setUser(verifiedUser)
+          setStoredUser(verifiedUser)
+          return verifiedUser
+        }
+      } catch (err) {
+        console.error('Failed to verify auth after signup:', err)
+        // Still return the signup response data if verification fails
+      }
+
       return userData
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed'
@@ -176,6 +194,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = responseData.user
       setUser(userData)
       setStoredUser(userData)
+
+      // Verify auth by fetching current user from backend
+      try {
+        const meResponse = await fetch('/api/auth/me', {
+          credentials: 'include',
+        })
+        if (meResponse.ok) {
+          const meData = await meResponse.json()
+          const verifiedUser = meData.user
+          setUser(verifiedUser)
+          setStoredUser(verifiedUser)
+          return verifiedUser
+        }
+      } catch (err) {
+        console.error('Failed to verify auth after vendor signup:', err)
+        // Still return the signup response data if verification fails
+      }
+
       return userData
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Vendor registration failed'

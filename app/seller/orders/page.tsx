@@ -338,67 +338,67 @@ export default function SellerOrdersPage() {
 
   if (loading) {
     return (
-      <main className="p-6">
-        <h1 className="text-3xl font-bold mb-8">Quản lý đơn hàng</h1>
+      <main className="p-4 md:p-6">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Quản lý đơn hàng</h1>
         <p className="text-center">Đang tải...</p>
       </main>
     )
   }
 
   return (
-    <main className="p-6">
-      <h1 className="text-3xl font-bold mb-8">Quản lý đơn hàng</h1>
+    <main className="p-4 md:p-6">
+      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-8">Quản lý đơn hàng</h1>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-8">
-        <TabsList>
-          <TabsTrigger value="all">Tất cả</TabsTrigger>
-          <TabsTrigger value="pending">Chờ tiếp nhận</TabsTrigger>
-          <TabsTrigger value="processing">Đã duyệt</TabsTrigger>
-          <TabsTrigger value="shipped">Đang giao</TabsTrigger>
-          <TabsTrigger value="delivered">Đã giao</TabsTrigger>
-          <TabsTrigger value="completed">Hoàn thành</TabsTrigger>
-          <TabsTrigger value="cancelled">Đã hủy</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6 md:mb-8">
+        <TabsList className="flex flex-wrap gap-1 md:gap-0">
+          <TabsTrigger value="all" className="text-xs md:text-sm">Tất cả</TabsTrigger>
+          <TabsTrigger value="pending" className="text-xs md:text-sm">Chờ tiếp nhận</TabsTrigger>
+          <TabsTrigger value="processing" className="text-xs md:text-sm">Đã duyệt</TabsTrigger>
+          <TabsTrigger value="shipped" className="text-xs md:text-sm">Đang giao</TabsTrigger>
+          <TabsTrigger value="delivered" className="text-xs md:text-sm">Đã giao</TabsTrigger>
+          <TabsTrigger value="completed" className="text-xs md:text-sm">Hoàn thành</TabsTrigger>
+          <TabsTrigger value="cancelled" className="text-xs md:text-sm">Đã hủy</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 mb-6 md:mb-8">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-3 md:p-6 pt-4 md:pt-6">
             <div className="text-center">
-              <p className="text-muted-foreground text-sm">Chờ tiếp nhận</p>
-              <p className="text-3xl font-bold text-gray-600">{allOrders.filter(o => o.status === 'pending').length}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Chờ tiếp nhận</p>
+              <p className="text-2xl md:text-3xl font-bold text-gray-600 mt-1">{allOrders.filter(o => o.status === 'pending').length}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-3 md:p-6 pt-4 md:pt-6">
             <div className="text-center">
-              <p className="text-muted-foreground text-sm">Đã duyệt</p>
-              <p className="text-3xl font-bold text-blue-600">{allOrders.filter(o => o.status === 'processing').length}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Đã duyệt</p>
+              <p className="text-2xl md:text-3xl font-bold text-blue-600 mt-1">{allOrders.filter(o => o.status === 'processing').length}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-3 md:p-6 pt-4 md:pt-6">
             <div className="text-center">
-              <p className="text-muted-foreground text-sm">Đang giao</p>
-              <p className="text-3xl font-bold text-yellow-600">{allOrders.filter(o => o.status === 'shipped').length}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Đang giao</p>
+              <p className="text-2xl md:text-3xl font-bold text-yellow-600 mt-1">{allOrders.filter(o => o.status === 'shipped').length}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-3 md:p-6 pt-4 md:pt-6">
             <div className="text-center">
-              <p className="text-muted-foreground text-sm">Đã giao</p>
-              <p className="text-3xl font-bold text-green-600">{allOrders.filter(o => o.status === 'delivered').length}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Đã giao</p>
+              <p className="text-2xl md:text-3xl font-bold text-green-600 mt-1">{allOrders.filter(o => o.status === 'delivered').length}</p>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-3 md:p-6 pt-4 md:pt-6">
             <div className="text-center">
-              <p className="text-muted-foreground text-sm">Hoàn thành</p>
-              <p className="text-3xl font-bold text-emerald-600">{allOrders.filter(o => o.status === 'completed').length}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Hoàn thành</p>
+              <p className="text-2xl md:text-3xl font-bold text-emerald-600 mt-1">{allOrders.filter(o => o.status === 'completed').length}</p>
             </div>
           </CardContent>
         </Card>
@@ -406,48 +406,49 @@ export default function SellerOrdersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách đơn hàng ({orders.length})</CardTitle>
+          <CardTitle className="text-lg md:text-xl">Danh sách đơn hàng ({orders.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {orders.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">Chưa có đơn hàng nào</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4">Mã đơn</th>
-                    <th className="text-left py-3 px-4">Khách hàng</th>
-                    <th className="text-left py-3 px-4">Tổng tiền</th>
-                    <th className="text-left py-3 px-4">Trạng thái</th>
-                    <th className="text-left py-3 px-4">Ngày</th>
-                    <th className="text-left py-3 px-4">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => (
-                    <tr key={order.id} className="border-b border-border hover:bg-surface dark:hover:bg-slate-900">
-                      <td className="py-3 px-4 font-semibold">{order.orderNumber}</td>
-                      <td className="py-3 px-4">
-                        <div>
-                          <p className="font-medium">{order.User.name}</p>
-                          <p className="text-xs text-muted-foreground">{order.User.phone}</p>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">{order.total.toLocaleString("vi-VN")}₫</td>
-                      <td className="py-3 px-4">
-                        {renderStatusBadge(order)}
-                      </td>
-                      <td className="py-3 px-4">{new Date(order.date).toLocaleDateString("vi-VN")}</td>
-                      <td className="py-3 px-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedOrder(order)
-                            setNewStatus(order.status)
-                            setDetailsOpen(true)
-                          }}
+            <div className="space-y-3 md:space-y-0 md:overflow-x-auto">
+              <div className="hidden md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4">Mã đơn</th>
+                      <th className="text-left py-3 px-4">Khách hàng</th>
+                      <th className="text-left py-3 px-4">Tổng tiền</th>
+                      <th className="text-left py-3 px-4">Trạng thái</th>
+                      <th className="text-left py-3 px-4">Ngày</th>
+                      <th className="text-left py-3 px-4">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr key={order.id} className="border-b border-border hover:bg-surface dark:hover:bg-slate-900">
+                        <td className="py-3 px-4 font-semibold">{order.orderNumber}</td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-medium">{order.User.name}</p>
+                            <p className="text-xs text-muted-foreground">{order.User.phone}</p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">{order.total.toLocaleString("vi-VN")}₫</td>
+                        <td className="py-3 px-4">
+                          {renderStatusBadge(order)}
+                        </td>
+                        <td className="py-3 px-4">{new Date(order.date).toLocaleDateString("vi-VN")}</td>
+                        <td className="py-3 px-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedOrder(order)
+                              setNewStatus(order.status)
+                              setDetailsOpen(true)
+                            }}
                         >
                           Xem chi tiết
                         </Button>
@@ -456,6 +457,38 @@ export default function SellerOrdersPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+
+              <div className="md:hidden space-y-3">
+                {orders.map((order) => (
+                  <div key={order.id} className="border rounded-lg p-4 space-y-2 bg-card">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm">{order.orderNumber}</p>
+                        <p className="text-xs text-muted-foreground truncate">{order.User.name}</p>
+                      </div>
+                      {renderStatusBadge(order)}
+                    </div>
+                    <div className="space-y-1 text-xs md:text-sm">
+                      <p><span className="text-muted-foreground">Tổng tiền: </span><span className="font-semibold">{order.total.toLocaleString("vi-VN")}₫</span></p>
+                      <p><span className="text-muted-foreground">Ngày: </span>{new Date(order.date).toLocaleDateString("vi-VN")}</p>
+                      <p><span className="text-muted-foreground">SĐT: </span>{order.User.phone}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                      onClick={() => {
+                        setSelectedOrder(order)
+                        setNewStatus(order.status)
+                        setDetailsOpen(true)
+                      }}
+                    >
+                      Xem chi tiết
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           

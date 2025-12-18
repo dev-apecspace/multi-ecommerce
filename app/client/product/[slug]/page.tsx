@@ -146,6 +146,44 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     return `${product.appliedCampaign.flashSaleStartTime} - ${product.appliedCampaign.flashSaleEndTime}`
   }
 
+  const handleChatWithSeller = async () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    if (!product?.vendorId) return
+
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/client/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendorId: product.vendorId })
+      })
+      const data = await res.json()
+      
+      if (data.conversation) {
+        router.push(`/client/chat?conversationId=${data.conversation.id}`)
+      } else {
+        toast({
+          title: 'Lỗi',
+          description: data.error || 'Không thể bắt đầu trò chuyện',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      console.error('Chat error:', error)
+      toast({
+        title: 'Lỗi',
+        description: 'Đã xảy ra lỗi',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleBuyNow = () => {
     if (!user) {
       router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
@@ -595,7 +633,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     {isAddingToCart ? 'Đang xử lý...' : 'Thêm vào giỏ hàng'}
                   </Button>
 
-                  <Button variant="outline" className="w-full bg-transparent">
+                  <Button variant="outline" className="w-full bg-transparent" onClick={handleChatWithSeller}>
                     <MessageCircle className="h-4 w-4 mr-2" />
                     Hỏi shop
                   </Button>
@@ -634,7 +672,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   <Button>Theo dõi Shop</Button>
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-border">
-                  <Button variant="outline" className="flex-1 bg-transparent" size="sm">
+                  <Button variant="outline" className="flex-1 bg-transparent" size="sm" onClick={handleChatWithSeller}>
                     Trò chuyện
                   </Button>
                   <Link href={`/client/shop/${displayProduct.seller.vendorSlug || displayProduct.seller.vendorId}`} className="flex-1">

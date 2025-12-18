@@ -189,35 +189,35 @@ export default function AdminProductsPage() {
   }
 
   return (
-    <main className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Quản lý sản phẩm</h1>
-        <p className="text-muted-foreground">Phê duyệt sản phẩm do nhà bán hàng đăng tải</p>
+    <main className="p-4 md:p-6">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Quản lý sản phẩm</h1>
+        <p className="text-xs md:text-base text-muted-foreground">Phê duyệt sản phẩm do nhà bán hàng đăng tải</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6 md:mb-8">
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Tổng sản phẩm</p>
-            <p className="text-3xl font-bold text-blue-600 mt-2">{stats.total}</p>
+          <CardContent className="p-3 md:p-6">
+            <p className="text-xs md:text-sm text-muted-foreground">Tổng sản phẩm</p>
+            <p className="text-2xl md:text-3xl font-bold text-blue-600 mt-1 md:mt-2">{stats.total}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Đã duyệt</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">{stats.approved}</p>
+          <CardContent className="p-3 md:p-6">
+            <p className="text-xs md:text-sm text-muted-foreground">Đã duyệt</p>
+            <p className="text-2xl md:text-3xl font-bold text-green-600 mt-1 md:mt-2">{stats.approved}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Từ chối</p>
-            <p className="text-3xl font-bold text-red-600 mt-2">{stats.rejected}</p>
+          <CardContent className="p-3 md:p-6">
+            <p className="text-xs md:text-sm text-muted-foreground">Từ chối</p>
+            <p className="text-2xl md:text-3xl font-bold text-red-600 mt-1 md:mt-2">{stats.rejected}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">Chờ duyệt</p>
-            <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</p>
+          <CardContent className="p-3 md:p-6">
+            <p className="text-xs md:text-sm text-muted-foreground">Chờ duyệt</p>
+            <p className="text-2xl md:text-3xl font-bold text-yellow-600 mt-1 md:mt-2">{stats.pending}</p>
           </CardContent>
         </Card>
       </div>
@@ -244,14 +244,14 @@ export default function AdminProductsPage() {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-4">
+                  <div className="space-y-3 md:space-y-4">
                     {products.map((product) => (
                       <div key={product.id}>
-                        <div className="border rounded-lg p-4 hover:bg-muted">
-                          <div className="flex items-start gap-4">
+                        <div className="border rounded-lg p-3 md:p-4 hover:bg-muted">
+                          <div className="flex items-start gap-3 md:gap-4">
                             <button
                               onClick={() => toggleExpandProduct(product.id)}
-                              className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded mt-1"
+                              className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded mt-1 flex-shrink-0"
                             >
                               {expandedProductIds.has(product.id) ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -259,19 +259,19 @@ export default function AdminProductsPage() {
                                 <ChevronRight className="h-4 w-4" />
                               )}
                             </button>
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                                <p className="text-sm text-muted-foreground">Shop: {product.Vendor?.name || 'N/A'}</p>
-                                <p className="text-sm text-muted-foreground">Danh mục: {product.Category?.name || 'N/A'}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Ngày gửi: {new Date(product.createdAt).toLocaleDateString('vi-VN')}
+                            <div className="flex-1 min-w-0 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
+                              <div className="min-w-0">
+                                <h3 className="font-semibold text-sm md:text-lg mb-1 truncate">{product.name}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground truncate">Shop: {product.Vendor?.name || 'N/A'}</p>
+                                <p className="text-xs md:text-sm text-muted-foreground truncate">Danh mục: {product.Category?.name || 'N/A'}</p>
+                                <p className="text-xs md:text-sm text-muted-foreground">
+                                  Ngày: {new Date(product.createdAt).toLocaleDateString('vi-VN')}
                                 </p>
                               </div>
-                              <div className="flex flex-col justify-between">
+                              <div className="space-y-2">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">Giá bán {product.taxApplied && '(sau thuế)'}</p>
-                                  <p className="text-2xl font-bold text-blue-600">
+                                  <p className="text-xs md:text-sm text-muted-foreground">Giá bán {product.taxApplied && '(sau thuế)'}</p>
+                                  <p className="text-xl md:text-2xl font-bold text-blue-600">
                                     {getDisplayPrice(product)}
                                   </p>
                                   {product.taxApplied && product.taxRate && (
@@ -280,29 +280,31 @@ export default function AdminProductsPage() {
                                     </p>
                                   )}
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col md:flex-row gap-2">
                                   <Button
                                     onClick={() => router.push(`/admin/products/${product.id}`)}
                                     size="sm"
                                     variant="outline"
-                                    className="flex-1"
+                                    className="flex-1 text-xs md:text-sm"
                                   >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Xem chi tiết
+                                    <Eye className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                                    Xem
                                   </Button>
                                   <Button
                                     onClick={() => handleApprove(product)}
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                    className="flex-1 bg-green-600 hover:bg-green-700 text-xs md:text-sm"
+                                    size="sm"
                                   >
-                                    <Check className="h-4 w-4 mr-2" />
+                                    <Check className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                                     Phê duyệt
                                   </Button>
                                   <Button
                                     onClick={() => handleReject(product)}
                                     variant="outline"
-                                    className="flex-1 text-red-600 hover:text-red-700"
+                                    className="flex-1 text-red-600 hover:text-red-700 text-xs md:text-sm"
+                                    size="sm"
                                   >
-                                    <X className="h-4 w-4 mr-2" />
+                                    <X className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                                     Từ chối
                                   </Button>
                                 </div>

@@ -61,6 +61,19 @@ export default function VendorRegisterPage() {
     }
 
     try {
+      // Clear old session first
+      if (loading === false) {
+        try {
+          await fetch('/api/auth/logout', { 
+            method: 'POST',
+            credentials: 'include',
+          })
+        } catch (err) {
+          // Ignore logout errors, proceed with signup
+          console.error('Logout error during vendor register:', err)
+        }
+      }
+
       await vendorSignup(formData)
       router.push('/auth/vendor-pending')
     } catch (err) {

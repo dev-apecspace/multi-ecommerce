@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Plus, Settings, Bell, LogOut, TrendingUp, Eye, Download, AlertCircle } from "lucide-react"
+import { Plus, Settings, Bell, LogOut, TrendingUp, Eye, Download, AlertCircle, ShoppingCart, Users, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,6 +10,7 @@ import { useSellerDashboard } from "@/hooks/useSupabase"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 export default function SellerDashboardPage() {
   const { user } = useAuth()
@@ -37,6 +38,8 @@ export default function SellerDashboardPage() {
     followers: dashboardData?.vendor?.followers ?? 0,
   }
 
+  const recentOrders = dashboardData?.recentOrders || []
+  const topProducts = dashboardData?.topProducts || []
   const monthlyData = [
     { month: "Jan", revenue: 45000000, orders: 300 },
     { month: "Feb", revenue: 52000000, orders: 350 },
@@ -44,54 +47,6 @@ export default function SellerDashboardPage() {
     { month: "Apr", revenue: 61000000, orders: 410 },
     { month: "May", revenue: 98750000, orders: 580 },
     { month: "Jun", revenue: 125450000, orders: 650 },
-  ]
-
-  const recentOrders = [
-    {
-      id: "ORD001",
-      buyer: "Nguyễn Văn A",
-      products: "Điện thoại Samsung Galaxy A15",
-      amount: 4999000,
-      status: "Delivered",
-      date: "2025-01-15",
-    },
-    {
-      id: "ORD002",
-      buyer: "Trần Thị B",
-      products: "Tai nghe Bluetooth",
-      amount: 999000,
-      status: "Processing",
-      date: "2025-01-14",
-    },
-    {
-      id: "ORD003",
-      buyer: "Phạm Công C",
-      products: "Laptop ASUS VivoBook",
-      amount: 18990000,
-      status: "Pending",
-      date: "2025-01-13",
-    },
-  ]
-
-  const topProducts = [
-    {
-      id: 1,
-      name: "Điện thoại Samsung Galaxy A15",
-      sales: 450,
-      revenue: 2249550000,
-    },
-    {
-      id: 2,
-      name: "Tai nghe Bluetooth",
-      sales: 320,
-      revenue: 319680000,
-    },
-    {
-      id: 3,
-      name: "Laptop ASUS VivoBook",
-      sales: 85,
-      revenue: 1614150000,
-    },
   ]
 
   if (loading) {
@@ -115,24 +70,24 @@ export default function SellerDashboardPage() {
 
   return (
     <main className="min-h-screen bg-surface dark:bg-slate-950">
-      <div className="container-viewport py-6">
+      <div className="px-4 md:px-6 py-4 md:py-6">
         {isPending && (
-          <Alert className="mb-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <Alert className="mb-4 md:mb-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
+            <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
             <AlertDescription>
               <div className="text-yellow-800 dark:text-yellow-300">
-                <p className="font-semibold mb-2">⏳ Hồ sơ đang chờ phê duyệt</p>
-                <p className="text-sm mb-3">
+                <p className="font-semibold mb-2 text-sm md:text-base">⏳ Hồ sơ đang chờ phê duyệt</p>
+                <p className="text-xs md:text-sm mb-3">
                   Bạn có thể tiếp tục hoàn thành hồ sơ và tải lên tài liệu. Các tính năng khác sẽ được mở khóa sau khi phê duyệt.
                 </p>
-                <div className="flex gap-2">
-                  <Link href="/seller/documents">
-                    <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                <div className="flex gap-2 flex-col md:flex-row">
+                  <Link href="/seller/documents" className="flex-1 md:flex-initial">
+                    <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 w-full md:w-auto">
                       Quản lý tài liệu
                     </Button>
                   </Link>
-                  <Link href="/seller/pending-approval">
-                    <Button size="sm" variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30">
+                  <Link href="/seller/pending-approval" className="flex-1 md:flex-initial">
+                    <Button size="sm" variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30 w-full md:w-auto">
                       Xem chi tiết
                     </Button>
                   </Link>
@@ -143,69 +98,69 @@ export default function SellerDashboardPage() {
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">{seller.shopName}</h1>
-            <p className="text-muted-foreground">Bảng điều khiển bán hàng {isPending && '(Chừa duyệt)'}</p>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 md:mb-8">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold truncate">{seller.shopName}</h1>
+            <p className="text-xs md:text-base text-muted-foreground">Bảng điều khiển bán hàng {isPending && '(Chờ duyệt)'}</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon">
-              <Bell className="h-5 w-5" />
+          <div className="flex gap-2 w-full md:w-auto flex-shrink-0">
+            <Button variant="outline" size="icon" className="h-9 w-9 md:h-10 md:w-10">
+              <Bell className="h-4 md:h-5 w-4 md:w-5" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Settings className="h-5 w-5" />
+            <Button variant="outline" size="icon" className="h-9 w-9 md:h-10 md:w-10">
+              <Settings className="h-4 md:h-5 w-4 md:w-5" />
             </Button>
-            <Button variant="outline">
-              <LogOut className="h-4 w-4 mr-2" />
+            <Button variant="outline" className="hidden md:flex gap-2">
+              <LogOut className="h-4 w-4" />
               Đăng xuất
             </Button>
           </div>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6 md:mb-8">
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">DOANH THU THÁNG NÀY</p>
-                  <p className="text-2xl font-bold mt-1">{(stats.totalRevenue / 1000000).toFixed(1)}M₫</p>
-                  <p className="text-xs text-green-600 font-semibold mt-2">↑ 26% so với tháng trước</p>
+            <CardContent className="p-3 md:p-6">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs md:text-xs text-muted-foreground font-medium">DOANH THU THÁNG NÀY</p>
+                  <p className="text-lg md:text-2xl font-bold mt-1">{(stats.totalRevenue / 1000000).toFixed(1)}M₫</p>
+                  <p className="text-xs text-green-600 font-semibold mt-1 md:mt-2 hidden md:block">↑ 26%</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-500" />
+                <TrendingUp className="h-6 w-6 md:h-8 md:w-8 text-green-500 flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 md:p-6">
               <div>
-                <p className="text-xs text-muted-foreground font-medium">ĐƠN HÀNG THÁNG NÀY</p>
-                <p className="text-2xl font-bold mt-1">{stats.completedOrders}</p>
-                <p className="text-xs text-muted-foreground mt-2">{stats.orderCount} tổng cộng</p>
+                <p className="text-xs md:text-xs text-muted-foreground font-medium">ĐƠN HÀNG THÁNG NÀY</p>
+                <p className="text-lg md:text-2xl font-bold mt-1">{stats.completedOrders}</p>
+                <p className="text-xs text-muted-foreground mt-1 md:mt-2">{stats.orderCount} tổng</p>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 md:p-6">
               <div>
-                <p className="text-xs text-muted-foreground font-medium">SẢN PHẨM</p>
-                <p className="text-2xl font-bold mt-1">{stats.productCount}</p>
-                <Button size="sm" variant="link" className="mt-2 px-0 text-xs">
-                  <Plus className="h-3 w-3 mr-1" /> Thêm sản phẩm
+                <p className="text-xs md:text-xs text-muted-foreground font-medium">SẢN PHẨM</p>
+                <p className="text-lg md:text-2xl font-bold mt-1">{stats.productCount}</p>
+                <Button size="sm" variant="link" className="mt-1 md:mt-2 px-0 text-xs p-0 h-auto">
+                  <Plus className="h-3 w-3 mr-1" /> Thêm
                 </Button>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 md:p-6">
               <div>
-                <p className="text-xs text-muted-foreground font-medium">ĐÁNH GIÁ</p>
-                <p className="text-2xl font-bold mt-1">{stats.averageRating}★</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {stats.followers.toLocaleString("vi-VN")} người theo dõi
+                <p className="text-xs md:text-xs text-muted-foreground font-medium">ĐÁNH GIÁ</p>
+                <p className="text-lg md:text-2xl font-bold mt-1">{stats.averageRating}★</p>
+                <p className="text-xs text-muted-foreground mt-1 md:mt-2 truncate">
+                  {(stats.followers / 1000).toFixed(0)}K người
                 </p>
               </div>
             </CardContent>
@@ -238,34 +193,45 @@ export default function SellerDashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {recentOrders.map((order) => (
+                      {recentOrders.map((order: any) => (
                         <div
                           key={order.id}
-                          className="flex items-center justify-between p-3 bg-surface dark:bg-slate-800 rounded-lg"
+                          className="p-3 bg-surface dark:bg-slate-800 rounded-lg border border-border hover:shadow-md transition-shadow"
                         >
-                          <div className="flex-1">
-                            <p className="font-semibold text-sm">{order.id}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {order.buyer} · {order.products}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-sm">{order.amount.toLocaleString("vi-VN")}₫</p>
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="font-semibold text-sm">#{order.id}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{order.date}</p>
+                            </div>
                             <span
-                              className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                                order.status === "Delivered"
-                                  ? "bg-green-100 text-green-600"
-                                  : order.status === "Processing"
-                                    ? "bg-blue-100 text-blue-600"
-                                    : "bg-yellow-100 text-yellow-600"
+                              className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ml-2 ${
+                                order.status === "delivered" || order.status === "completed"
+                                  ? "bg-green-100 text-green-600 dark:bg-green-900/30"
+                                  : order.status === "processing"
+                                    ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30"
+                                    : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30"
                               }`}
                             >
-                              {order.status === "Delivered"
+                              {order.status === "delivered" || order.status === "completed"
                                 ? "Đã giao"
-                                : order.status === "Processing"
+                                : order.status === "processing"
                                   ? "Đang xử lý"
                                   : "Chờ xử lý"}
                             </span>
+                          </div>
+                          <div className="mb-2">
+                            <p className="text-xs text-muted-foreground">Khách hàng</p>
+                            <p className="text-sm font-medium">{order.buyer}</p>
+                          </div>
+                          <div className="mb-2">
+                            <p className="text-xs text-muted-foreground">Sản phẩm ({order.productCount})</p>
+                            <p className="text-sm line-clamp-2">{order.products}</p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-border">
+                            <p className="font-bold text-primary">{order.amount.toLocaleString("vi-VN")}₫</p>
+                            <Button variant="ghost" size="sm" className="text-xs">
+                              Xem chi tiết
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -281,7 +247,7 @@ export default function SellerDashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {topProducts.map((product) => (
+                    {topProducts.map((product: any) => (
                       <div key={product.id} className="pb-4 border-b border-border last:border-b-0">
                         <p className="font-semibold text-sm line-clamp-2">{product.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">{product.sales} bán</p>
@@ -304,7 +270,7 @@ export default function SellerDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {recentOrders.map((order) => (
+                  {recentOrders.map((order: any) => (
                     <div
                       key={order.id}
                       className="flex items-center justify-between p-4 bg-surface dark:bg-slate-800 rounded-lg hover:shadow-md transition-shadow"
@@ -339,7 +305,7 @@ export default function SellerDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {topProducts.map((product) => (
+                  {topProducts.map((product: any) => (
                     <div
                       key={product.id}
                       className="flex items-center justify-between p-4 bg-surface dark:bg-slate-800 rounded-lg"
@@ -424,45 +390,71 @@ export default function SellerDashboardPage() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Phân tích 6 tháng</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-8">
-                  <div>
-                    <p className="font-semibold mb-4">Doanh thu</p>
-                    <div className="flex items-end gap-2 h-40">
-                      {monthlyData.map((data, idx) => {
-                        const maxRevenue = Math.max(...monthlyData.map((d) => d.revenue))
-                        const height = (data.revenue / maxRevenue) * 100
-                        return (
-                          <div key={idx} className="flex-1">
-                            <div
-                              className="bg-primary rounded-t-lg transition-all hover:bg-primary-dark"
-                              style={{ height: `${height}%` }}
-                            />
-                            <p className="text-xs text-center mt-2 text-muted-foreground">{data.month}</p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Doanh thu 6 tháng</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value: any) => `${(value / 1000000).toFixed(1)}M₫`} />
+                      <Legend />
+                      <Line type="monotone" dataKey="revenue" stroke="#3b82f6" name="Doanh thu" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-                  <div>
-                    <p className="font-semibold mb-4">Đơn hàng</p>
-                    <div className="grid grid-cols-6 gap-2">
-                      {monthlyData.map((data, idx) => (
-                        <div key={idx} className="text-center">
-                          <p className="font-bold text-lg">{data.orders}</p>
-                          <p className="text-xs text-muted-foreground">{data.month}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Số lượng đơn hàng 6 tháng</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="orders" fill="#10b981" name="Đơn hàng" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {topProducts.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Sản phẩm bán chạy</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={topProducts}
+                          dataKey="sales"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          label
+                        >
+                          {topProducts.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b'][index % 3]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: any) => `${value} bán`} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

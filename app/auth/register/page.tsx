@@ -46,6 +46,20 @@ export default function RegisterPage() {
     }
 
     try {
+      // Clear old session first
+      if (loading === false) {
+        // Only logout if not already loading
+        try {
+          await fetch('/api/auth/logout', { 
+            method: 'POST',
+            credentials: 'include',
+          })
+        } catch (err) {
+          // Ignore logout errors, proceed with signup
+          console.error('Logout error during register:', err)
+        }
+      }
+
       await signup(formData.email, formData.password, formData.name, formData.phone)
       router.push('/client')
     } catch (err) {
