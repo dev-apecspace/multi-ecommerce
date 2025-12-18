@@ -218,31 +218,32 @@ export default function SellerProductsPage() {
 
   if (loading) {
     return (
-      <main className="p-6">
+      <main className="p-4 md:p-6">
         <p className="text-center">Đang tải sản phẩm...</p>
       </main>
     )
   }
 
   return (
-    <main className="p-6">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Sản phẩm của tôi</h1>
-        <div className="flex gap-2">
+    <main className="p-4 md:p-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold">Sản phẩm của tôi</h1>
+        <div className="flex gap-2 w-full md:w-auto">
           <Button 
             onClick={handleRefresh}
             disabled={refreshing}
             variant="outline"
             size="sm"
+            className="flex-1 md:flex-initial text-xs md:text-sm"
           >
-            <RotateCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            <RotateCw className={`h-4 w-4 mr-1 md:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Làm mới
           </Button>
           <Button 
             onClick={() => router.push('/seller/products/create')}
-            className="bg-orange-600 hover:bg-orange-700"
+            className="bg-orange-600 hover:bg-orange-700 flex-1 md:flex-initial text-xs md:text-sm"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-1 md:mr-2" />
             Thêm sản phẩm
           </Button>
         </div>
@@ -250,7 +251,7 @@ export default function SellerProductsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách sản phẩm ({products.length})</CardTitle>
+          <CardTitle className="text-lg md:text-xl">Danh sách sản phẩm ({products.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {products.length === 0 ? (
@@ -265,7 +266,8 @@ export default function SellerProductsPage() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="space-y-3 md:space-y-0 md:overflow-x-auto">
+              <div className="hidden md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
@@ -398,6 +400,121 @@ export default function SellerProductsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+
+              <div className="md:hidden space-y-3">
+                {products.map((product) => (
+                  <div key={product.id} className="border rounded-lg p-3 space-y-2 bg-card">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm truncate">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{getStatusBadge(product.status)}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleExpandProduct(product.id)}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded flex-shrink-0"
+                      >
+                        {expandedProductIds.has(product.id) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="space-y-1 text-xs border-t pt-2">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Giá bán:</span>
+                        <span className="font-semibold">{formatPrice(product.price)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Kho:</span>
+                        <span>{calculateTotalStock(product)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Bán:</span>
+                        <span>{product.sold}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Đánh giá:</span>
+                        <span>⭐ {(product.rating || 0).toFixed(1)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1 text-xs"
+                        onClick={() => router.push(`/seller/products/${product.id}`)}
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1 text-xs"
+                        onClick={() => router.push(`/seller/products/${product.id}/edit`)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1 text-xs"
+                        onClick={() => handleDuplicate(product.id)}
+                        disabled={duplicatingId === product.id}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1 text-destructive hover:text-destructive text-xs"
+                        onClick={() => handleDelete(product.id)}
+                        disabled={deletingId === product.id}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
+                      <div className="mt-2 pt-2 border-t space-y-2">
+                        {product.ProductVariant.map((variant) => (
+                          <div key={`variant-${variant.id}`} className="text-xs bg-gray-50 dark:bg-slate-800 p-2 rounded">
+                            <p className="font-medium">{variant.name}</p>
+                            <div className="space-y-1 mt-1">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Giá:</span>
+                                <span>{formatPrice(variant.price)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Kho:</span>
+                                <span>{variant.stock}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-1 mt-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="flex-1 text-xs h-7"
+                                onClick={() => router.push(`/seller/products/${product.id}/edit`)}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="flex-1 text-destructive hover:text-destructive text-xs h-7"
+                                onClick={() => handleDeleteVariant(product.id, variant.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           

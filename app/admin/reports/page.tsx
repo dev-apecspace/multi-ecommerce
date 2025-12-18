@@ -1,47 +1,50 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { TrendingUp, Users, ShoppingBag, Wallet } from "lucide-react"
+import { TrendingUp, Users, ShoppingBag, Wallet, LineChart, BarChart, PieChart } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAdminStatistics, useAdminReports } from "@/hooks/useSupabase"
+import { LineChart as LineChartComponent, Line, BarChart as BarChartComponent, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 export default function AdminReportsPage() {
-  const [type, setType] = useState<string | undefined>(undefined)
-  const [reportStatus, setReportStatus] = useState<string | undefined>(undefined)
-  
-  const { data: statsData, loading: statsLoading, error: statsError, fetchStatistics } = useAdminStatistics()
-  const { data: reportsData, loading: reportsLoading, error: reportsError, fetchReports } = useAdminReports(type, reportStatus)
+  const [stats, setStats] = useState<any>({
+    vendors: { total: 0, approved: 0, pending: 0, rejected: 0 },
+    users: { total: 0, active: 0 },
+    products: { total: 0 },
+    orders: { total: 0, totalRevenue: 0, averageOrderValue: 0 },
+  })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchStatistics()
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/admin/statistics')
+        if (!response.ok) throw new Error('Failed to fetch statistics')
+        const data = await response.json()
+        setStats(data)
+      } catch (error) {
+        console.error('Error fetching statistics:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
   }, [])
 
-  useEffect(() => {
-    fetchReports()
-  }, [type, reportStatus])
+  const monthlyData = [
+    { month: 'Jan', revenue: 450000000, orders: 300, users: 150 },
+    { month: 'Feb', revenue: 520000000, orders: 350, users: 180 },
+    { month: 'Mar', revenue: 480000000, orders: 320, users: 160 },
+    { month: 'Apr', revenue: 610000000, orders: 410, users: 220 },
+    { month: 'May', revenue: 987500000, orders: 580, users: 340 },
+    { month: 'Jun', revenue: 1254500000, orders: 650, users: 410 },
+  ]
 
-  const stats = statsData || {
-    totalRevenue: 2500000000,
-    totalOrders: 12450,
-    newUsers: 1240,
-    conversionRate: 3.5,
-  }
-
-  const reports = Array.isArray(reportsData) ? reportsData : []
-
-  if (statsLoading || reportsLoading) {
+  if (loading) {
     return (
       <main className="p-6">
         <p className="text-center">Đang tải báo cáo...</p>
-      </main>
-    )
-  }
-
-  if (statsError || reportsError) {
-    return (
-      <main className="p-6">
-        <p className="text-center text-red-500">Lỗi: {statsError || reportsError}</p>
       </main>
     )
   }
@@ -56,11 +59,11 @@ export default function AdminReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Doanh thu</p>
-                <p className="text-2xl font-bold text-blue-600 mt-2">{(stats.totalRevenue / 1000000000).toFixed(1)} Tỷ đ</p>
+                <p className="text-2xl font-bold text-blue-600 mt-2">{(stats.orders?.totalRevenue / 1000000000).toFixed(1)} Tỷ đ</p>
               </div>
               <Wallet className="h-8 w-8 text-blue-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">+12% so với tháng trước</p>
+            <p className="text-xs text-muted-foreground mt-2">Từ {stats.orders?.total || 0} đơn hàng</p>
           </CardContent>
         </Card>
 
@@ -69,11 +72,11 @@ export default function AdminReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Đơn hàng</p>
-                <p className="text-2xl font-bold text-green-600 mt-2">{stats.totalOrders?.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-green-600 mt-2">{stats.orders?.total?.toLocaleString()}</p>
               </div>
               <ShoppingBag className="h-8 w-8 text-green-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">+8% so với tháng trước</p>
+            <p className="text-xs text-muted-foreground mt-2">Trung bình: {(stats.orders?.averageOrderValue / 1000000).toFixed(1)}M₫</p>
           </CardContent>
         </Card>
 
@@ -81,12 +84,12 @@ export default function AdminReportsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Người dùng mới</p>
-                <p className="text-2xl font-bold text-orange-600 mt-2">{stats.newUsers?.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Người dùng</p>
+                <p className="text-2xl font-bold text-orange-600 mt-2">{stats.users?.total?.toLocaleString()}</p>
               </div>
               <Users className="h-8 w-8 text-orange-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">+5% so với tháng trước</p>
+            <p className="text-xs text-muted-foreground mt-2">Hoạt động: {stats.users?.active || 0}</p>
           </CardContent>
         </Card>
 
@@ -94,12 +97,12 @@ export default function AdminReportsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Tỷ lệ chuyển đổi</p>
-                <p className="text-2xl font-bold text-purple-600 mt-2">{stats.conversionRate}%</p>
+                <p className="text-sm text-muted-foreground">Sản phẩm</p>
+                <p className="text-2xl font-bold text-purple-600 mt-2">{stats.products?.total?.toLocaleString()}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-purple-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">+0.2% so với tháng trước</p>
+            <p className="text-xs text-muted-foreground mt-2">Tổng cộng</p>
           </CardContent>
         </Card>
       </div>
@@ -107,39 +110,92 @@ export default function AdminReportsPage() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
-          <TabsTrigger value="sales">Doanh số</TabsTrigger>
+          <TabsTrigger value="revenue">Doanh số</TabsTrigger>
           <TabsTrigger value="users">Người dùng</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Doanh thu 6 tháng</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChartComponent data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value: any) => `${(value / 1000000).toFixed(1)}M₫`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="revenue" stroke="#3b82f6" name="Doanh thu" strokeWidth={2} />
+                  </LineChartComponent>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>So sánh chỉ số chính</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChartComponent data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="orders" fill="#10b981" name="Đơn hàng" />
+                    <Bar dataKey="users" fill="#f59e0b" name="Người dùng mới" />
+                  </BarChartComponent>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="revenue" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Báo cáo tổng quan</CardTitle>
+              <CardTitle>Chi tiết doanh số</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Biểu đồ và thống kê tổng quan kinh doanh</p>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChartComponent data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value: any) => {
+                    if (typeof value === 'number') {
+                      return `${(value / 1000000).toFixed(1)}M₫`
+                    }
+                    return value
+                  }} />
+                  <Legend />
+                  <Line type="monotone" dataKey="revenue" stroke="#3b82f6" name="Doanh thu" strokeWidth={2} />
+                </LineChartComponent>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="sales">
+        <TabsContent value="users" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Báo cáo doanh số</CardTitle>
+              <CardTitle>Tăng trưởng người dùng</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Chi tiết doanh số bán hàng theo thời gian</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>Báo cáo người dùng</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Thống kê về người dùng và hành vi mua hàng</p>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChartComponent data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="users" fill="#f59e0b" name="Người dùng mới" />
+                </BarChartComponent>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </TabsContent>
