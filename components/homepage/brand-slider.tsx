@@ -30,40 +30,46 @@ export function BrandSlider() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Thương hiệu nổi bật</h2>
-      <div className="relative">
+      <div className="flex items-center gap-2 mb-6">
+        <h2 className="text-2xl font-bold">💎 Thương hiệu nổi bật</h2>
+        <div className="h-px flex-1 bg-gray-200 dark:bg-gray-800"></div>
+        <Link href="/client/brands" className="text-sm font-medium text-primary hover:underline">
+          Xem tất cả
+        </Link>
+      </div>
+      <div className="relative group">
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full shadow-md bg-white dark:bg-slate-900 border-gray-200 dark:border-gray-800 h-10 w-10"
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
 
-        <div id="brands-scroll" className="flex gap-4 overflow-x-auto scroll-smooth pb-2 [&::-webkit-scrollbar]:hidden">
+        <div id="brands-scroll" className="flex gap-4 overflow-x-auto scroll-smooth pb-4 [&::-webkit-scrollbar]:hidden -mx-1 px-1">
           {brands.map((brand) => (
             <Link
               key={brand.id}
               href={`/client/shop/${generateSlug(brand.name)}`}
-              className="flex-shrink-0 w-32 h-20 bg-surface dark:bg-slate-800 rounded-lg p-2 hover:shadow-md transition-shadow flex items-center justify-center border border-border"
+              className="flex-shrink-0 w-36 h-24 bg-white dark:bg-slate-900 rounded-xl p-4 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex items-center justify-center border border-gray-100 dark:border-gray-800"
             >
               <Image
                 src={brand.image || "/placeholder.svg"}
                 alt={brand.name}
                 width={100}
                 height={60}
-                className="object-contain max-h-16"
+                className="object-contain max-h-16 w-auto grayscale hover:grayscale-0 transition-all duration-300"
               />
             </Link>
           ))}
         </div>
 
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full shadow-md bg-white dark:bg-slate-900 border-gray-200 dark:border-gray-800 h-10 w-10"
         >
           <ChevronRight className="h-5 w-5" />
         </Button>

@@ -4,9 +4,11 @@ import { TopBanner } from "@/components/homepage/top-banner"
 import { MegaMenu } from "@/components/homepage/mega-menu"
 import { FlashSaleCarousel } from "@/components/homepage/flash-sale-carousel"
 import { PromotionalBlocks } from "@/components/homepage/promotional-blocks"
+import { CategoryShowcase } from "@/components/homepage/category-showcase"
 import { ShopeemalSlider } from "@/components/homepage/shopeemal-slider"
 import { RecommendedProducts } from "@/components/homepage/recommended-products"
 import { BrandSlider } from "@/components/homepage/brand-slider"
+import { TrustSection } from "@/components/homepage/trust-section"
 
 export default function HomePage() {
   return (
@@ -22,6 +24,11 @@ export default function HomePage() {
       {/* Promotional Blocks Section */}
       <div className="container-viewport my-12">
         <PromotionalBlocks />
+      </div>
+
+      {/* Category Showcase Section */}
+      <div className="container-viewport my-12">
+        <CategoryShowcase />
       </div>
 
       {/* Shopeemal Section */}
@@ -41,6 +48,11 @@ export default function HomePage() {
         <div className="container-viewport">
           <RecommendedProducts />
         </div>
+      </div>
+
+      {/* Trust Section */}
+      <div className="container-viewport my-8">
+        <TrustSection />
       </div>
     </main>
   )

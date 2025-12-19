@@ -57,24 +57,43 @@ const blocks = [
 export function PromotionalBlocks() {
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Khuyến mãi hôm nay</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold">🎉 Khuyến mãi hôm nay</h2>
+          <p className="text-sm text-muted-foreground mt-1">Các ưu đãi đặc biệt dành cho bạn</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {blocks.map((block) => (
           <Link
             key={block.id}
             href={block.link}
-            className="group relative h-32 md:h-40 rounded-lg overflow-hidden cursor-pointer"
+            className="group relative h-40 md:h-48 rounded-xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300"
           >
             <Image
               src={block.image || "/placeholder.svg"}
               alt={block.title}
               fill
-              className="object-cover group-hover:scale-105 transition-transform"
+              className="object-cover group-hover:scale-110 transition-transform duration-500"
             />
-            <div className={`absolute inset-0 bg-gradient-to-br ${block.color} opacity-50`} />
-            <div className="absolute inset-0 flex flex-col justify-end p-3 text-white">
-              <h3 className="font-bold text-sm md:text-base">{block.title}</h3>
-              <p className="text-xs opacity-90">{block.subtitle}</p>
+            <div className={`absolute inset-0 bg-gradient-to-br ${block.color} opacity-60 group-hover:opacity-50 transition-opacity duration-300`} />
+            
+            <div className="absolute inset-0 flex flex-col justify-between p-4 text-white">
+              <div className="flex-1 flex flex-col justify-center">
+                <h3 className="font-bold text-base md:text-lg leading-tight group-hover:translate-y-1 transition-transform duration-300">{block.title}</h3>
+                <p className="text-xs md:text-sm opacity-90 mt-1">{block.subtitle}</p>
+              </div>
+              
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">
+                <span className="text-sm font-semibold">Xem ngay</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+            
+            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur text-gray-900 px-3 py-1 rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              ⭐ Ưu đãi
             </div>
           </Link>
         ))}

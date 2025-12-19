@@ -11,6 +11,7 @@ import { VariantSelectionModal } from "@/components/product/variant-selection-mo
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
+import { useFavoritesContext } from "@/lib/favorites-context"
 import { computePrice, isCampaignActive } from "@/lib/price-utils"
 
 import { usePagination } from "@/hooks/use-pagination"
@@ -30,6 +31,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
   const { user } = useAuth()
   const { toast } = useToast()
   const { setIsLoading } = useLoading()
+  const { updateFavoritesCount } = useFavoritesContext()
   const [favorites, setFavorites] = useState<string[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,14 +96,70 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     fetchProducts()
   }, [category, subcategory, filters, sortBy, pagination.page, pagination.limit])
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = async (id: number) => {
     if (!user) {
       router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
       return
     }
-    
-    setFavorites((prev) => (prev.includes(id) ? prev.filter((fav) => fav !== id) : [...prev, id]))
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      const isFavorited = favorites.includes(id.toString())
+
+      if (isFavorited) {
+        const response = await fetch(`/api/favorites?userId=${userId}&productId=${id}`, {
+          method: 'DELETE',
+        })
+        if (response.ok) {
+          setFavorites((prev) => prev.filter((fav) => fav !== id.toString()))
+          toast({
+            title: 'Thành công',
+            description: 'Đã xóa khỏi danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      } else {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, productId: id })
+        })
+        if (response.ok) {
+          setFavorites((prev) => [...prev, id.toString()])
+          toast({
+            title: 'Thành công',
+            description: 'Đã thêm vào danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi danh sách yêu thích',
+        variant: 'destructive'
+      })
+    }
   }
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!user) return
+      
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/favorites?userId=${userId}`)
+        if (response.ok) {
+          const favs = await response.json()
+          setFavorites(favs.map((fav: any) => fav.productId.toString()))
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error)
+      }
+    }
+
+    loadFavorites()
+  }, [user])
 
   const handleAddToCartClick = (e: React.MouseEvent, product: any) => {
     e.preventDefault()
@@ -238,11 +296,13 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
             || product.image 
             || "/placeholder.svg"
 
+          const productUrl = `/client/product/${product.slug || generateSlug(product.name)}`
+
           return (
-            <Link key={product.id} href={`/client/product/${product.slug || generateSlug(product.name)}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardContent className="p-3 space-y-2">
-                  <div className="relative h-40 md:h-48 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden group">
+            <Card key={product.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
+              <CardContent className="p-3 space-y-2 flex-1 flex flex-col">
+                <div className="relative h-40 md:h-48 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden group flex-shrink-0">
+                  <Link href={productUrl} className="block w-full h-full">
                     <img
                       src={mainImage}
                       alt={product.name}
@@ -253,25 +313,29 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
                         -{discount}%
                       </div>
                     )}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        toggleFavorite(product.id)
-                      }}
-                      className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors"
-                    >
-                      {favorites.includes(product.id) ? (
-                        <HeartFilled className="h-5 w-5 text-red-500" />
-                      ) : (
-                        <Heart className="h-5 w-5 text-gray-400" />
-                      )}
-                    </button>
-                  </div>
+                  </Link>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      toggleFavorite(product.id)
+                    }}
+                    className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white transition-colors z-10"
+                  >
+                    {favorites.includes(product.id.toString()) ? (
+                      <HeartFilled className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <Heart className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
 
-                  <div className="space-y-1">
-                    <p className="text-xs md:text-sm font-medium line-clamp-2 h-8">{product.name}</p>
+                <div className="space-y-1 flex-1 flex flex-col">
+                  <Link href={productUrl} className="block">
+                    <p className="text-xs md:text-sm font-medium line-clamp-2 h-8 hover:text-primary transition-colors">{product.name}</p>
+                  </Link>
 
+                  <Link href={productUrl} className="block">
                     <p className="text-xs text-muted-foreground truncate">{vendorName}</p>
 
                     <div className="flex items-center gap-1">
@@ -282,7 +346,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
 
                     <p className="text-xs text-muted-foreground">Đã bán {(product.sold / 1000).toFixed(1)}k</p>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 mt-1">
                       <div className="flex items-baseline gap-1">
                         {hasVariants && (
                           <p className="text-xs text-muted-foreground">Từ</p>
@@ -302,18 +366,20 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
                         </p>
                       )}
                     </div>
+                  </Link>
 
+                  <div className="mt-auto pt-2">
                     <Button
                       size="sm"
-                      className="w-full h-7 text-xs mt-2"
+                      className="w-full h-7 text-xs"
                       onClick={(e) => handleAddToCartClick(e, product)}
                     >
                       Thêm vào giỏ
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                </div>
+              </CardContent>
+            </Card>
           )
         })}
       </div>

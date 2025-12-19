@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('Favorite')
-      .select('*, Product(id, name, price, rating, Vendor(name))')
+      .select('*, Product(id, name, slug, price, originalPrice, media, rating, sold, stock, status, Vendor(id, name, slug, logo, rating), Category(id, name, slug))')
       .eq('userId', userId)
       .order('createdAt', { ascending: false })
 
@@ -25,7 +25,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data)
+    const formattedData = data?.map((favorite: any) => ({
+      ...favorite,
+      product: {
+        ...favorite.Product,
+        image: favorite.Product?.media?.[0]?.url || '/placeholder.svg'
+      },
+      isFavorited: true,
+    })) || []
+
+    return NextResponse.json(formattedData)
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
@@ -34,17 +43,32 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const { userId, productId } = body
+
+    if (!userId || !productId) {
+      return NextResponse.json({ error: 'User ID and Product ID required' }, { status: 400 })
+    }
 
     const { data, error } = await supabase
       .from('Favorite')
-      .insert([body])
-      .select('*, Product(id, name, price)')
+      .insert([{ userId, productId }])
+      .select('*, Product(id, name, slug, price, originalPrice, media, rating, sold, stock, status, Vendor(id, name, slug, logo, rating), Category(id, name, slug))')
 
     if (error) {
+      if (error.message.includes('duplicate')) {
+        return NextResponse.json({ message: 'Product already in favorites' }, { status: 200 })
+      }
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data[0], { status: 201 })
+    return NextResponse.json({
+      ...data[0],
+      product: {
+        ...data[0].Product,
+        image: data[0].Product?.media?.[0]?.url || '/placeholder.svg'
+      },
+      isFavorited: true,
+    }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
@@ -63,14 +87,14 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('Favorite')
       .delete()
-      .eq('userId', userId)
-      .eq('productId', productId)
+      .eq('userId', parseInt(userId))
+      .eq('productId', parseInt(productId))
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: 'Removed from favorites' })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
