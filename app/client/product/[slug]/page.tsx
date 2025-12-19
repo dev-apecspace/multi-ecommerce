@@ -14,6 +14,7 @@ import { VariantSelectionModal } from "@/components/product/variant-selection-mo
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
+import { useFavoritesContext } from "@/lib/favorites-context"
 import { computePrice, isCampaignActive } from "@/lib/price-utils"
 
 interface ProductDetailPageProps {
@@ -27,6 +28,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { user } = useAuth()
   const { addToCart } = useCart()
   const { setIsLoading } = useLoading()
+  const { updateFavoritesCount } = useFavoritesContext()
   const resolvedParams = use(params)
   const productSlug = resolvedParams.slug
   const [quantity, setQuantity] = useState(1)
@@ -115,6 +117,26 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       fetchProduct()
     }
   }, [productSlug, fetchReviews])
+
+  useEffect(() => {
+    const checkIfFavorited = async () => {
+      if (!user || !product) return
+      
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/favorites?userId=${userId}`)
+        if (response.ok) {
+          const favorites = await response.json()
+          const isFavorited = favorites.some((fav: any) => fav.productId === product.id)
+          setIsFavorite(isFavorited)
+        }
+      } catch (error) {
+        console.error('Error checking favorite status:', error)
+      }
+    }
+
+    checkIfFavorited()
+  }, [user, product])
 
   const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : []
   const reviewCount = reviews.length > 0 ? reviews.length : Number(product?.reviews) || 0
@@ -266,6 +288,54 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       } finally {
         setIsAddingToCart(false)
       }
+    }
+  }
+
+  const handleToggleFavorite = async () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+
+      if (isFavorite) {
+        const response = await fetch(`/api/favorites?userId=${userId}&productId=${product.id}`, {
+          method: 'DELETE',
+        })
+        if (response.ok) {
+          setIsFavorite(false)
+          toast({
+            title: 'Thành công',
+            description: 'Đã xóa khỏi danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      } else {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, productId: product.id })
+        })
+        if (response.ok) {
+          setIsFavorite(true)
+          toast({
+            title: 'Thành công',
+            description: 'Đã thêm vào danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi danh sách yêu thích',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -623,7 +693,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       variant="outline"
                       size="icon"
                       className="h-12 w-12 bg-transparent"
-                      onClick={() => setIsFavorite(!isFavorite)}
+                      onClick={handleToggleFavorite}
                     >
                       <Heart className={`h-6 w-6 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
                     </Button>

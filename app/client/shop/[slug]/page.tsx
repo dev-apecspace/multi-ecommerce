@@ -3,6 +3,7 @@
 import { use, useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter, usePathname } from "next/navigation"
 import { Star, Heart, MapPin, Shield, Phone, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -12,6 +13,9 @@ import { ProductGrid } from "@/components/category/product-grid"
 import { useLoading } from "@/hooks/use-loading"
 import { usePagination } from "@/hooks/use-pagination"
 import { Pagination } from "@/components/pagination"
+import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { useFavoritesContext } from "@/lib/favorites-context"
 
 interface ShopPageProps {
   params: Promise<{ slug: string }>
@@ -19,11 +23,17 @@ interface ShopPageProps {
 
 export default function ShopPage({ params }: ShopPageProps) {
   const resolvedParams = use(params)
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user } = useAuth()
+  const { toast } = useToast()
   const { setIsLoading } = useLoading()
+  const { updateFavoritesCount } = useFavoritesContext()
   const [shop, setShop] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [favorites, setFavorites] = useState<string[]>([])
   
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
@@ -90,6 +100,25 @@ export default function ShopPage({ params }: ShopPageProps) {
   }, [resolvedParams.slug])
 
   useEffect(() => {
+    const loadFavorites = async () => {
+      if (!user) return
+      
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/favorites?userId=${userId}`)
+        if (response.ok) {
+          const favs = await response.json()
+          setFavorites(favs.map((fav: any) => fav.productId.toString()))
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error)
+      }
+    }
+
+    loadFavorites()
+  }, [user])
+
+  useEffect(() => {
     const fetchProducts = async () => {
       if (!shop?.id) return
       
@@ -106,6 +135,54 @@ export default function ShopPage({ params }: ShopPageProps) {
     fetchProducts()
   }, [shop?.id, pagination.page, pagination.limit])
 
+  const toggleFavorite = async (e: React.MouseEvent, id: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      const isFavorited = favorites.includes(id.toString())
+
+      if (isFavorited) {
+        const response = await fetch(`/api/favorites?userId=${userId}&productId=${id}`, {
+          method: 'DELETE',
+        })
+        if (response.ok) {
+          setFavorites((prev) => prev.filter((fav) => fav !== id.toString()))
+          toast({
+            title: 'Thành công',
+            description: 'Đã xóa khỏi danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      } else {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, productId: id })
+        })
+        if (response.ok) {
+          setFavorites((prev) => [...prev, id.toString()])
+          toast({
+            title: 'Thành công',
+            description: 'Đã thêm vào danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi danh sách yêu thích',
+        variant: 'destructive'
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -220,13 +297,25 @@ export default function ShopPage({ params }: ShopPageProps) {
                     <Link key={product.id} href={`/client/product/${product.slug}`}>
                       <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                         <CardContent className="p-3">
-                          <div className="relative w-full aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2">
+                          <div className="relative w-full aspect-square bg-gray-200 rounded-lg overflow-hidden mb-2 group">
                             <Image
                               src={product.media[0].url || "/placeholder.svg"}
                               alt={product.name}
                               fill
                               className="object-cover"
                             />
+                            <button
+                              onClick={(e) => toggleFavorite(e, product.id)}
+                              className="absolute top-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Heart
+                                className={`h-4 w-4 ${
+                                  favorites.includes(product.id.toString())
+                                    ? "fill-red-500 text-red-500"
+                                    : "text-gray-600"
+                                }`}
+                              />
+                            </button>
                           </div>
                           <h3 className="font-semibold text-sm line-clamp-2 mb-1">{product.name}</h3>
                           <p className="text-primary font-bold mb-2">{product.price.toLocaleString('vi-VN')} ₫</p>
@@ -373,7 +462,7 @@ export default function ShopPage({ params }: ShopPageProps) {
                     <h3 className="font-bold mb-2 capitalize">
                       {key === "shipping" ? "Vận chuyển" : key === "return" ? "Hoàn trả" : "Bảo hành"}
                     </h3>
-                    <p className="text-muted-foreground">{value}</p>
+                    <p className="text-muted-foreground">{value as string}</p>
                   </div>
                 ))}
               </CardContent>

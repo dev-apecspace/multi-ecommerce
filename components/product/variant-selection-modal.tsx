@@ -96,6 +96,8 @@ export function VariantSelectionModal({
       } else {
         if (variants.length > 0) {
           setSelectedVariant(variants[0].id)
+        } else {
+          setSelectedVariant(0)
         }
         setSelectedAttributes({})
       }

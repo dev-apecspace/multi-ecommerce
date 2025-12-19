@@ -89,7 +89,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query = query.ilike('name', `%${search}%`)
+      const formattedSearch = search.trim().split(/\s+/).join('%')
+      query = query.ilike('name', `%${formattedSearch}%`)
     }
 
     if (subcategory) {

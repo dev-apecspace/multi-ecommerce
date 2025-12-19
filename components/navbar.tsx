@@ -11,7 +11,7 @@ import { MobileMenu } from "@/components/mobile-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
-import { products } from "@/lib/mockdata"
+import { useFavoritesContext } from "@/lib/favorites-context"
 import { generateSlug } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 
@@ -38,21 +38,29 @@ export function Navbar() {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const { cartCount } = useCart()
+  const { favoritesCount } = useFavoritesContext()
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [megaMenuOpen, setMegaMenuOpen] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [showProfileDropdown, setShowProfileDropdown] = useState(false)
-  const searchRef = useRef<HTMLDivElement>(null)
+  const desktopSearchContainerRef = useRef<HTMLDivElement>(null)
+  const mobileSearchContainerRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const isDesktopSearch = desktopSearchContainerRef.current && desktopSearchContainerRef.current.contains(target)
+      const isMobileSearch = mobileSearchContainerRef.current && mobileSearchContainerRef.current.contains(target)
+      
+      if (!isDesktopSearch && !isMobileSearch) {
         setShowSearchDropdown(false)
       }
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+      
+      if (profileRef.current && !profileRef.current.contains(target)) {
         setShowProfileDropdown(false)
       }
     }
@@ -61,15 +69,29 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  const filteredProducts = searchQuery.trim()
-    ? products
-        .filter(
-          (p) =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.description.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-        .slice(0, 8)
-    : []
+  useEffect(() => {
+    setShowSearchDropdown(false)
+  }, [pathname])
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchQuery.trim()) {
+        try {
+          const res = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=8`)
+          if (res.ok) {
+            const data = await res.json()
+            setSearchResults(data.data || [])
+          }
+        } catch (error) {
+          console.error("Failed to fetch search results", error)
+        }
+      } else {
+        setSearchResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   return (
     <>
@@ -104,7 +126,7 @@ export function Navbar() {
             </Link>
 
             {/* Search Bar - 50% width on desktop */}
-            <div className="hidden md:flex flex-1 max-w-2xl" ref={searchRef}>
+            <div className="hidden md:flex flex-1 max-w-2xl" ref={desktopSearchContainerRef}>
               <div className="relative w-full">
                 <Input
                   type="text"
@@ -114,25 +136,28 @@ export function Navbar() {
                     setSearchQuery(e.target.value)
                     setShowSearchDropdown(!!e.target.value)
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      setShowSearchDropdown(false)
+                      router.push(`/client/search?q=${encodeURIComponent(searchQuery)}`)
+                    }
+                  }}
                   onFocus={() => searchQuery && setShowSearchDropdown(true)}
                   className="w-full pl-10 pr-4 h-10"
                 />
                 <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
 
-                {showSearchDropdown && filteredProducts.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                    {filteredProducts.map((product) => (
-                      <Link key={product.id} href={`/client/product/${generateSlug(product.name)}`}>
-                        <div
-                          className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer border-b border-border last:border-b-0 transition-colors"
-                          onClick={() => {
-                            setShowSearchDropdown(false)
-                            setSearchQuery("")
-                          }}
-                        >
+                {showSearchDropdown && searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-[100] max-h-96 overflow-y-auto">
+                    {searchResults.map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/client/product/${product.slug || generateSlug(product.name)}`}
+                      >
+                        <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer border-b border-border last:border-b-0 transition-colors">
                           <div className="relative w-12 h-12 flex-shrink-0">
                             <Image
-                              src={product.image || "/placeholder.svg"}
+                              src={product.media?.[0]?.url || product.image || "/placeholder.svg"}
                               alt={product.name}
                               fill
                               className="object-cover rounded"
@@ -141,7 +166,7 @@ export function Navbar() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium line-clamp-2">{product.name}</p>
                             <p className="text-sm text-orange-600 dark:text-orange-400 font-semibold">
-                              {product.price.toLocaleString("vi-VN")}₫
+                              {(product.salePrice || product.price).toLocaleString("vi-VN")}₫
                             </p>
                           </div>
                         </div>
@@ -155,9 +180,14 @@ export function Navbar() {
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-1">
               <ThemeToggle />
-              <Button variant="ghost" size="icon" asChild>
+              <Button variant="ghost" size="icon" asChild className="relative">
                 <Link href="/client/favorites">
                   <Heart className="h-5 w-5" />
+                  {favoritesCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs flex items-center justify-center rounded-full font-bold">
+                      {favoritesCount > 99 ? '99+' : favoritesCount}
+                    </span>
+                  )}
                 </Link>
               </Button>
 
@@ -233,7 +263,7 @@ export function Navbar() {
           </div>
 
           {/* Mobile Search */}
-          <div className="md:hidden mt-3" ref={searchRef}>
+          <div className="md:hidden mt-3" ref={mobileSearchContainerRef}>
             <div className="relative w-full">
               <Input
                 type="text"
@@ -243,25 +273,28 @@ export function Navbar() {
                   setSearchQuery(e.target.value)
                   setShowSearchDropdown(!!e.target.value)
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    setShowSearchDropdown(false)
+                    router.push(`/client/search?q=${encodeURIComponent(searchQuery)}`)
+                  }
+                }}
                 onFocus={() => searchQuery && setShowSearchDropdown(true)}
                 className="w-full pl-10 h-10"
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
 
-              {showSearchDropdown && filteredProducts.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                  {filteredProducts.map((product) => (
-                    <Link key={product.id} href={`/client/product/${generateSlug(product.name)}`}>
-                      <div
-                        className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer border-b border-border last:border-b-0 transition-colors"
-                        onClick={() => {
-                          setShowSearchDropdown(false)
-                          setSearchQuery("")
-                        }}
-                      >
+              {showSearchDropdown && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-[100] max-h-96 overflow-y-auto">
+                  {searchResults.map((product) => (
+                    <Link
+                      key={product.id}
+                      href={`/client/product/${product.slug || generateSlug(product.name)}`}
+                    >
+                      <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer border-b border-border last:border-b-0 transition-colors">
                         <div className="relative w-12 h-12 flex-shrink-0">
                           <Image
-                            src={product.image || "/placeholder.svg"}
+                            src={product.media?.[0]?.url || product.image || "/placeholder.svg"}
                             alt={product.name}
                             fill
                             className="object-cover rounded"
@@ -270,7 +303,7 @@ export function Navbar() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium line-clamp-2">{product.name}</p>
                           <p className="text-sm text-orange-600 dark:text-orange-400 font-semibold">
-                            {product.price.toLocaleString("vi-VN")}₫
+                            {(product.salePrice || product.price).toLocaleString("vi-VN")}₫
                           </p>
                         </div>
                       </div>
@@ -284,9 +317,9 @@ export function Navbar() {
 
         {/* Mega Menu - Desktop Only */}
         <div className="hidden md:block border-t border-border">
-          <div className="max-w-7xl mx-auto px-4 py-0">
+          <div className="max-w-7xl mx-auto px-4 py-0 relative">
             <div
-              className="relative"
+              className="w-fit"
               onMouseEnter={() => setMegaMenuOpen(true)}
               onMouseLeave={() => setMegaMenuOpen(false)}
             >
@@ -297,7 +330,7 @@ export function Navbar() {
               </button>
 
               {megaMenuOpen && (
-                <div className="absolute left-0 right-0 top-full bg-white dark:bg-slate-950 border-t border-border shadow-lg">
+                <div className="absolute left-0 right-0 top-full bg-white dark:bg-slate-950 border-t border-border shadow-lg z-50">
                   <div className="max-w-7xl mx-auto grid grid-cols-5 gap-2 p-4">
                     {categories.map((cat) => (
                       <Link

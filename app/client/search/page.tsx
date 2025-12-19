@@ -2,23 +2,31 @@
 
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { SearchIcon, X, Star } from "lucide-react"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { SearchIcon, X, Star, Heart, HeartPulse as HeartFilled } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { formatPrice } from "@/lib/utils"
 import { usePagination } from "@/hooks/use-pagination"
 import { Pagination } from "@/components/pagination"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth-context"
+import { useFavoritesContext } from "@/lib/favorites-context"
 
 function SearchContent() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const { updateFavoritesCount } = useFavoritesContext()
   const initialQuery = searchParams.get("q") || ""
   
   const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [favorites, setFavorites] = useState<string[]>([])
   
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
@@ -35,6 +43,74 @@ function SearchContent() {
       pagination.setTotal(0)
     }
   }, [searchParams, pagination.page, pagination.limit])
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!user) return
+      
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/favorites?userId=${userId}`)
+        if (response.ok) {
+          const favs = await response.json()
+          setFavorites(favs.map((fav: any) => fav.productId.toString()))
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error)
+      }
+    }
+
+    loadFavorites()
+  }, [user])
+
+  const toggleFavorite = async (e: React.MouseEvent, id: number) => {
+    e.preventDefault() // Prevent navigation
+    e.stopPropagation()
+
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      const isFavorited = favorites.includes(id.toString())
+
+      if (isFavorited) {
+        const response = await fetch(`/api/favorites?userId=${userId}&productId=${id}`, {
+          method: 'DELETE',
+        })
+        if (response.ok) {
+          setFavorites((prev) => prev.filter((fav) => fav !== id.toString()))
+          updateFavoritesCount()
+          toast({
+            title: 'Thành công',
+            description: 'Đã xóa khỏi danh sách yêu thích'
+          })
+        }
+      } else {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, productId: id })
+        })
+        if (response.ok) {
+          setFavorites((prev) => [...prev, id.toString()])
+          updateFavoritesCount()
+          toast({
+            title: 'Thành công',
+            description: 'Đã thêm vào danh sách yêu thích'
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi danh sách yêu thích',
+        variant: 'destructive'
+      })
+    }
+  }
 
   const fetchProducts = async (query: string) => {
     try {
@@ -109,7 +185,7 @@ function SearchContent() {
                 <Link key={product.id} href={`/client/product/${product.slug || product.id}`}>
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full overflow-hidden">
                     <CardContent className="p-0">
-                      <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 overflow-hidden relative">
+                      <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 overflow-hidden relative group">
                         <img
                           src={product.image || "/placeholder.svg"}
                           alt={product.name}
@@ -120,6 +196,18 @@ function SearchContent() {
                             -{Math.round(((product.price - product.salePrice) / product.price) * 100)}%
                           </div>
                         )}
+                        <button
+                          onClick={(e) => toggleFavorite(e, product.id)}
+                          className="absolute top-2 left-2 p-2 rounded-full bg-white/80 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Heart
+                            className={`h-4 w-4 ${
+                              favorites.includes(product.id.toString())
+                                ? "fill-red-500 text-red-500"
+                                : "text-gray-600"
+                            }`}
+                          />
+                        </button>
                       </div>
                       <div className="p-3 space-y-2">
                         <h3 className="text-sm font-medium line-clamp-2 h-10">{product.name}</h3>

@@ -3,18 +3,28 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Heart } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { generateSlug } from "@/lib/utils"
 import { isCampaignActive } from "@/lib/price-utils"
+import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { useFavoritesContext } from "@/lib/favorites-context"
 
 export function FlashSaleCarousel() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const { updateFavoritesCount } = useFavoritesContext()
   const [scrollPosition, setScrollPosition] = useState(0)
   const [products, setProducts] = useState<any[]>([])
   const [campaign, setCampaign] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [timeRemaining, setTimeRemaining] = useState<string>("")
+  const [favorites, setFavorites] = useState<string[]>([])
 
   useEffect(() => {
     const fetchFlashSaleData = async () => {
@@ -64,6 +74,25 @@ export function FlashSaleCarousel() {
 
     fetchFlashSaleData()
   }, [])
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (!user) return
+      
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/favorites?userId=${userId}`)
+        if (response.ok) {
+          const favs = await response.json()
+          setFavorites(favs.map((fav: any) => fav.productId.toString()))
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error)
+      }
+    }
+
+    loadFavorites()
+  }, [user])
 
   useEffect(() => {
     if (!campaign?.flashSaleStartTime || !campaign?.flashSaleEndTime) return
@@ -126,6 +155,55 @@ export function FlashSaleCarousel() {
     const minutes = String(now.getMinutes()).padStart(2, '0')
     const currentTime = `${hours}:${minutes}`
     return currentTime >= campaign.flashSaleStartTime && currentTime <= campaign.flashSaleEndTime
+  }
+
+  const toggleFavorite = async (e: React.MouseEvent, id: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      const isFavorited = favorites.includes(id.toString())
+
+      if (isFavorited) {
+        const response = await fetch(`/api/favorites?userId=${userId}&productId=${id}`, {
+          method: 'DELETE',
+        })
+        if (response.ok) {
+          setFavorites((prev) => prev.filter((fav) => fav !== id.toString()))
+          toast({
+            title: 'Thành công',
+            description: 'Đã xóa khỏi danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      } else {
+        const response = await fetch('/api/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, productId: id })
+        })
+        if (response.ok) {
+          setFavorites((prev) => [...prev, id.toString()])
+          toast({
+            title: 'Thành công',
+            description: 'Đã thêm vào danh sách yêu thích'
+          })
+          updateFavoritesCount()
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi danh sách yêu thích',
+        variant: 'destructive'
+      })
+    }
   }
 
   if (loading) {
@@ -232,7 +310,7 @@ export function FlashSaleCarousel() {
                 <Card className={`transition-all cursor-pointer h-full overflow-hidden ${
                   isActive ? 'hover:shadow-xl hover:scale-105 duration-300' : 'opacity-50'
                 }`}>
-                  <CardContent className="p-0 relative">
+                  <CardContent className="p-0 relative group">
                     <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
                       <Image
                         src={product.image || "/placeholder.svg"}
@@ -248,6 +326,18 @@ export function FlashSaleCarousel() {
                       <div className="absolute top-3 left-3 bg-yellow-400 text-yellow-900 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
                         <span>⚡</span> Sale
                       </div>
+                      <button
+                        onClick={(e) => toggleFavorite(e, product.id)}
+                        className="absolute bottom-2 right-2 p-2 rounded-full bg-white/80 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${
+                            favorites.includes(product.id.toString())
+                              ? "fill-red-500 text-red-500"
+                              : "text-gray-600"
+                          }`}
+                        />
+                      </button>
                       {!isActive && (
                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                           <span className="text-white font-bold text-center text-sm">Sắp diễn ra</span>
