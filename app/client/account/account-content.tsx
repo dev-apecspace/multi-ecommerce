@@ -53,6 +53,9 @@ export default function AccountContent() {
   
   const [favorites, setFavorites] = useState<any[]>([])
   const [loadingFavorites, setLoadingFavorites] = useState(false)
+
+  const [followedShops, setFollowedShops] = useState<any[]>([])
+  const [loadingFollowedShops, setLoadingFollowedShops] = useState(false)
   
   // Profile Edit State
   const [editProfileOpen, setEditProfileOpen] = useState(false)
@@ -86,6 +89,7 @@ export default function AccountContent() {
       fetchOrders()
       fetchReturns()
       fetchFavorites()
+      fetchFollowedShops()
     }
   }, [userId, isLoggedIn])
 
@@ -140,6 +144,19 @@ export default function AccountContent() {
     }
   }
 
+  const fetchFollowedShops = async () => {
+    try {
+      setLoadingFollowedShops(true)
+      const response = await fetch(`/api/shop-follows?userId=${userId}`)
+      const data = await response.json()
+      setFollowedShops(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error fetching followed shops:", error)
+    } finally {
+      setLoadingFollowedShops(false)
+    }
+  }
+
   const handleRemoveFavorite = async (productId: number) => {
     try {
       const response = await fetch(`/api/favorites?userId=${userId}&productId=${productId}`, {
@@ -151,6 +168,20 @@ export default function AccountContent() {
       }
     } catch (error) {
       toast({ title: "Lỗi", description: "Không thể xóa yêu thích", variant: "destructive" })
+    }
+  }
+
+  const handleUnfollowShop = async (vendorId: number) => {
+    try {
+      const response = await fetch(`/api/shop-follows?userId=${userId}&vendorId=${vendorId}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        toast({ title: "Thành công", description: "Đã hủy theo dõi shop" })
+        fetchFollowedShops()
+      }
+    } catch (error) {
+      toast({ title: "Lỗi", description: "Không thể hủy theo dõi", variant: "destructive" })
     }
   }
 
@@ -361,6 +392,7 @@ export default function AccountContent() {
             <TabsTrigger value="exchanges">Đổi hàng</TabsTrigger>
             <TabsTrigger value="addresses">Địa chỉ</TabsTrigger>
             <TabsTrigger value="favorites">Yêu thích</TabsTrigger>
+            <TabsTrigger value="following">Đang theo dõi</TabsTrigger>
             <TabsTrigger value="settings">Cài đặt</TabsTrigger>
           </TabsList>
 
@@ -608,6 +640,63 @@ export default function AccountContent() {
                           className="text-red-500 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="following" className="mt-4 space-y-4">
+            {loadingFollowedShops ? (
+              <Card><CardContent className="p-6 text-center">Đang tải danh sách theo dõi...</CardContent></Card>
+            ) : followedShops.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center py-12">
+                    <Heart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Bạn chưa theo dõi shop nào</p>
+                    <Link href="/client/shop">
+                      <Button className="mt-4">Khám phá cửa hàng</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {followedShops.map((item) => (
+                  <Card key={item.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full overflow-hidden flex-shrink-0 border">
+                          {item.Vendor?.logo ? (
+                            <img src={item.Vendor.logo} alt={item.Vendor.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-bold text-xl">
+                              {item.Vendor?.name?.charAt(0) || 'S'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/client/shop/${item.Vendor?.slug || item.Vendor?.id}`} className="hover:underline">
+                            <h3 className="font-bold text-lg truncate">{item.Vendor?.name}</h3>
+                          </Link>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Award className="h-3 w-3" /> {item.Vendor?.rating || 0}
+                            </span>
+                            <span>•</span>
+                            <span>{item.Vendor?.followers || 0} người theo dõi</span>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleUnfollowShop(item.vendorId)}
+                        >
+                          Bỏ theo dõi
                         </Button>
                       </div>
                     </CardContent>

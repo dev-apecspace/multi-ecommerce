@@ -13,11 +13,16 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const offset = (page - 1) * limit
+    const slug = searchParams.get('slug')
 
     let query = supabase.from('Category').select('*', { count: 'exact' })
 
     if (withSubcategories) {
       query = supabase.from('Category').select('*, SubCategory(*)', { count: 'exact' })
+    }
+
+    if (slug) {
+      query = query.eq('slug', slug)
     }
 
     const { data, error, count } = await query.order('name').range(offset, offset + limit - 1)

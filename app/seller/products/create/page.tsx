@@ -97,8 +97,8 @@ export default function SellerCreateProductPage() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      const data = await response.json()
-      setCategories(Array.isArray(data) ? data : [])
+      const result = await response.json()
+      setCategories(Array.isArray(result.data) ? result.data : [])
     } catch (error) {
       toast({
         title: "Lỗi",

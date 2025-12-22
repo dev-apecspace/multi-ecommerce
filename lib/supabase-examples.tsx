@@ -115,7 +115,7 @@ export function CartExample({ userId }: { userId: number }) {
 }
 
 export function CategoriesExample() {
-  const { data: categories, loading, error, fetchData } = useCategories(true)
+  const { data: categoriesData, loading, error, fetchData } = useCategories(true)
 
   useEffect(() => {
     fetchData()
@@ -128,7 +128,7 @@ export function CategoriesExample() {
     <div>
       <h2 className="text-2xl font-bold mb-4">Categories</h2>
       <div className="grid grid-cols-4 gap-4">
-        {categories?.map(category => (
+        {categoriesData?.data?.map((category: any) => (
           <div key={category.id} className="border p-4 rounded cursor-pointer hover:shadow-lg">
             <div className="text-4xl mb-2">{category.icon}</div>
             <h3 className="font-bold">{category.name}</h3>

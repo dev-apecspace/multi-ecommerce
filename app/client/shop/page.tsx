@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter, usePathname } from "next/navigation"
 import { Star, Shield, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -11,9 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { generateSlug } from "@/lib/utils"
 import { usePagination } from "@/hooks/use-pagination"
 import { Pagination } from "@/components/pagination"
+import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ShopsPage() {
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const router = useRouter()
+  const pathname = usePathname()
   const [favorites, setFavorites] = useState<number[]>([])
+  const [followedShops, setFollowedShops] = useState<number[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("followers")
   const [shops, setShops] = useState<any[]>([])
@@ -29,6 +37,24 @@ export default function ShopsPage() {
     }, 500)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  useEffect(() => {
+    const fetchFollowedShops = async () => {
+      if (!user) return
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/shop-follows?userId=${userId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setFollowedShops(data.map((item: any) => item.vendorId))
+        }
+      } catch (error) {
+        console.error('Failed to fetch followed shops:', error)
+      }
+    }
+
+    fetchFollowedShops()
+  }, [user])
 
   useEffect(() => {
     const fetchShops = async () => {
@@ -52,6 +78,65 @@ export default function ShopsPage() {
 
   const toggleFavorite = (shopId: number) => {
     setFavorites((prev) => (prev.includes(shopId) ? prev.filter((id) => id !== shopId) : [...prev, shopId]))
+  }
+
+  const handleFollow = async (e: React.MouseEvent, shopId: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      const isFollowing = followedShops.includes(shopId)
+
+      if (isFollowing) {
+        const response = await fetch(`/api/shop-follows?userId=${userId}&vendorId=${shopId}`, {
+          method: 'DELETE',
+        })
+        
+        if (response.ok) {
+          setFollowedShops(prev => prev.filter(id => id !== shopId))
+          setShops(prev => prev.map(shop => 
+            shop.id === shopId 
+              ? { ...shop, followers: Math.max(0, shop.followers - 1) }
+              : shop
+          ))
+          toast({
+            title: 'Thành công',
+            description: 'Đã hủy theo dõi cửa hàng'
+          })
+        }
+      } else {
+        const response = await fetch('/api/shop-follows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, vendorId: shopId })
+        })
+
+        if (response.ok) {
+          setFollowedShops(prev => [...prev, shopId])
+          setShops(prev => prev.map(shop => 
+            shop.id === shopId 
+              ? { ...shop, followers: shop.followers + 1 }
+              : shop
+          ))
+          toast({
+            title: 'Thành công',
+            description: 'Đã theo dõi cửa hàng'
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi trạng thái theo dõi',
+        variant: 'destructive'
+      })
+    }
   }
 
   const handleSortChange = (value: string) => {
@@ -158,10 +243,15 @@ export default function ShopsPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2 border-t border-border">
-                      <Button size="sm" variant="outline" className="flex-1">
-                        Theo dõi
+                      <Button 
+                        size="sm" 
+                        variant={followedShops.includes(shop.id) ? "outline" : "default"} 
+                        className="flex-1"
+                        onClick={(e) => handleFollow(e, shop.id)}
+                      >
+                        {followedShops.includes(shop.id) ? "Đang theo dõi" : "Theo dõi"}
                       </Button>
-                      <Button size="sm" className="flex-1">
+                      <Button size="sm" variant="outline" className="flex-1">
                         Ghé shop
                       </Button>
                     </div>

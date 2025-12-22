@@ -4,11 +4,13 @@ import { categories } from "@/lib/mockdata"
 
 interface CategoryHeaderProps {
   slug: string
+  name?: string
 }
 
-export function CategoryHeader({ slug }: CategoryHeaderProps) {
+export function CategoryHeader({ slug, name: propName }: CategoryHeaderProps) {
   const category = categories.find((c) => c.slug === slug)
-  const name = category?.name || slug
+  let name = propName || category?.name || slug
+  if (name === "all") name = "Tất cả sản phẩm"
 
   return (
     <div className="bg-white dark:bg-slate-900 border-b border-border">

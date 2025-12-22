@@ -5,9 +5,10 @@ interface PaginationProps {
   currentPage: number
   totalPages: number
   onPageChange: (page: number) => void
-  limit: number
-  onLimitChange: (limit: number) => void
-  total: number
+  limit?: number
+  onLimitChange?: (limit: number) => void
+  total?: number
+  variant?: 'default' | 'minimal'
 }
 
 export function Pagination({
@@ -16,10 +17,11 @@ export function Pagination({
   onPageChange,
   limit,
   onLimitChange,
-  total
+  total,
+  variant = 'default'
 }: PaginationProps) {
-  const startItem = (currentPage - 1) * limit + 1
-  const endItem = Math.min(currentPage * limit, total)
+  const startItem = limit ? (currentPage - 1) * limit + 1 : 0
+  const endItem = limit && total ? Math.min(currentPage * limit, total) : 0
 
   const getPageNumbers = () => {
     const pages: (number | string)[] = []
@@ -50,6 +52,57 @@ export function Pagination({
     return pages
   }
 
+  if (variant === 'minimal') {
+    return (
+      <div className="flex items-center justify-center gap-2 py-8">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            currentPage === 1
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </button>
+
+        <div className="flex items-center gap-1">
+          {getPageNumbers().map((page, i) => (
+            <button
+              key={i}
+              onClick={() => typeof page === 'number' && onPageChange(page)}
+              disabled={page === '...'}
+              className={`min-w-[32px] h-8 flex items-center justify-center rounded-md text-sm font-medium transition-all ${
+                page === currentPage
+                  ? 'bg-white text-primary shadow-sm border border-gray-200'
+                  : page === '...'
+                  ? 'cursor-default text-gray-400'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            currentPage === totalPages
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4 py-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -57,23 +110,25 @@ export function Pagination({
           Hiển thị kết quả từ <span className="font-medium">{startItem}</span> - <span className="font-medium">{endItem}</span> trên tổng <span className="font-medium">{total}</span>
         </span>
         
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Hiển thị</span>
-          <Select value={String(limit)} onValueChange={(val) => onLimitChange(Number(val))}>
-            <SelectTrigger className="w-[70px] border border-gray-300 rounded-md">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="5">5</SelectItem>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="20">20</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-              <SelectItem value="200">200</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-sm text-gray-600">kết quả</span>
-        </div>
+        {limit && onLimitChange && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Hiển thị</span>
+            <Select value={String(limit)} onValueChange={(val) => onLimitChange(Number(val))}>
+              <SelectTrigger className="w-[70px] border border-gray-300 rounded-md">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="200">200</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-gray-600">kết quả</span>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-center gap-2">

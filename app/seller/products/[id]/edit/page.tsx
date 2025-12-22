@@ -109,8 +109,8 @@ export default function EditProductPage() {
   const fetchCategories = async () => {
     try {
       const response = await fetch('/api/categories?withSubcategories=true')
-      const data = await response.json()
-      setCategories(data)
+      const result = await response.json()
+      setCategories(result.data || [])
     } catch (error) {
       toast({
         title: "Lỗi",
