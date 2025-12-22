@@ -38,8 +38,8 @@ export default function CategoriesPage() {
       const response = await fetch('/api/categories?withSubcategories=true')
       const result = await response.json()
 
-      if (Array.isArray(result)) {
-        setCategories(result)
+      if (result.data && Array.isArray(result.data)) {
+        setCategories(result.data)
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error)

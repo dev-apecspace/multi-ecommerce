@@ -34,6 +34,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
   const [isFavorite, setIsFavorite] = useState(false)
+  const [isFollowingShop, setIsFollowingShop] = useState(false)
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [variantModalOpen, setVariantModalOpen] = useState(false)
@@ -137,6 +138,25 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
     checkIfFavorited()
   }, [user, product])
+
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!user || !product?.vendorId) return
+
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/shop-follows?userId=${userId}&vendorId=${product.vendorId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setIsFollowingShop(data.isFollowing)
+        }
+      } catch (error) {
+        console.error('Error checking follow status:', error)
+      }
+    }
+
+    checkFollowStatus()
+  }, [user, product?.vendorId])
 
   const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : []
   const reviewCount = reviews.length > 0 ? reviews.length : Number(product?.reviews) || 0
@@ -336,6 +356,67 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleFollowShop = async () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    if (!product?.vendorId) return
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      
+      if (isFollowingShop) {
+        const response = await fetch(`/api/shop-follows?userId=${userId}&vendorId=${product.vendorId}`, {
+          method: 'DELETE',
+        })
+        
+        if (response.ok) {
+          setIsFollowingShop(false)
+          setProduct((prev: any) => ({
+            ...prev,
+            seller: {
+              ...prev.seller,
+              followers: Math.max(0, prev.seller.followers - 1)
+            }
+          }))
+          toast({
+            title: 'Thành công',
+            description: 'Đã hủy theo dõi cửa hàng'
+          })
+        }
+      } else {
+        const response = await fetch('/api/shop-follows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, vendorId: product.vendorId })
+        })
+
+        if (response.ok) {
+          setIsFollowingShop(true)
+          setProduct((prev: any) => ({
+            ...prev,
+            seller: {
+              ...prev.seller,
+              followers: prev.seller.followers + 1
+            }
+          }))
+          toast({
+            title: 'Thành công',
+            description: 'Đã theo dõi cửa hàng'
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi trạng thái theo dõi',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -739,7 +820,12 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       </p>
                     </div>
                   </div>
-                  <Button>Theo dõi Shop</Button>
+                  <Button 
+                    onClick={handleFollowShop} 
+                    variant={isFollowingShop ? "outline" : "default"}
+                  >
+                    {isFollowingShop ? "Đang theo dõi" : "Theo dõi Shop"}
+                  </Button>
                 </div>
                 <div className="flex gap-3 pt-4 border-t border-border">
                   <Button variant="outline" className="flex-1 bg-transparent" size="sm" onClick={handleChatWithSeller}>

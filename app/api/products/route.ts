@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const showPending = searchParams.get('showPending') === 'true'
     const isFlashSale = searchParams.get('isFlashSale') === 'true'
     const subcategory = searchParams.get('subcategory')
+    const includeSubcategories = searchParams.get('includeSubcategories') === 'true'
     const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : null
     const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : null
     const minRating = searchParams.get('rating') ? parseFloat(searchParams.get('rating')!) : null
@@ -77,7 +78,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (categoryId) {
-      query = query.eq('categoryId', categoryId)
+      if (includeSubcategories) {
+        const { data: subcategories } = await supabase
+          .from('SubCategory')
+          .select('id')
+          .eq('categoryId', categoryId)
+        
+        const subcategoryIds = subcategories?.map((sc: any) => sc.id) || []
+        
+        if (subcategoryIds.length > 0) {
+          query = query.in('subcategoryId', subcategoryIds)
+        } else {
+          query = query.eq('categoryId', categoryId)
+        }
+      } else {
+        query = query.eq('categoryId', categoryId)
+      }
     }
 
     if (vendorId) {

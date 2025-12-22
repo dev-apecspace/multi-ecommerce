@@ -34,8 +34,28 @@ export default function ShopPage({ params }: ShopPageProps) {
   const [reviews, setReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [favorites, setFavorites] = useState<string[]>([])
+  const [isFollowing, setIsFollowing] = useState(false)
   
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
+
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!user || !shop?.id) return
+
+      try {
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+        const response = await fetch(`/api/shop-follows?userId=${userId}&vendorId=${shop.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setIsFollowing(data.isFollowing)
+        }
+      } catch (error) {
+        console.error('Error checking follow status:', error)
+      }
+    }
+
+    checkFollowStatus()
+  }, [user, shop?.id])
 
   useEffect(() => {
     const fetchShopData = async () => {
@@ -184,6 +204,61 @@ export default function ShopPage({ params }: ShopPageProps) {
     }
   }
 
+  const handleFollow = async () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+
+    if (!shop?.id) return
+
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
+      
+      if (isFollowing) {
+        const response = await fetch(`/api/shop-follows?userId=${userId}&vendorId=${shop.id}`, {
+          method: 'DELETE',
+        })
+        
+        if (response.ok) {
+          setIsFollowing(false)
+          setShop((prev: any) => ({
+            ...prev,
+            followers: Math.max(0, prev.followers - 1)
+          }))
+          toast({
+            title: 'Thành công',
+            description: 'Đã hủy theo dõi cửa hàng'
+          })
+        }
+      } else {
+        const response = await fetch('/api/shop-follows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, vendorId: shop.id })
+        })
+
+        if (response.ok) {
+          setIsFollowing(true)
+          setShop((prev: any) => ({
+            ...prev,
+            followers: prev.followers + 1
+          }))
+          toast({
+            title: 'Thành công',
+            description: 'Đã theo dõi cửa hàng'
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Lỗi',
+        description: 'Không thể thay đổi trạng thái theo dõi',
+        variant: 'destructive'
+      })
+    }
+  }
+
   if (loading) {
     return (
       <main className="min-h-screen bg-surface dark:bg-slate-950 flex items-center justify-center">
@@ -266,7 +341,12 @@ export default function ShopPage({ params }: ShopPageProps) {
                 </div>
 
                 <div className="flex gap-3">
-                  <Button>Theo dõi</Button>
+                  <Button 
+                    onClick={handleFollow} 
+                    variant={isFollowing ? "outline" : "default"}
+                  >
+                    {isFollowing ? "Đang theo dõi" : "Theo dõi"}
+                  </Button>
                   <Button variant="outline">Trò chuyện</Button>
                   <Button variant="outline" size="icon">
                     <Heart className="h-5 w-5" />

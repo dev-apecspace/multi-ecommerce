@@ -19,13 +19,14 @@ import { Pagination } from "@/components/pagination"
 
 interface ProductGridProps {
   category?: string
+  categoryId?: number
   subcategory?: string
   filters?: any
   sortBy?: string
   onSortChange?: (sort: string) => void
 }
 
-export function ProductGrid({ category = "all", subcategory, filters, sortBy = "relevant", onSortChange }: ProductGridProps) {
+export function ProductGrid({ category = "all", categoryId, subcategory, filters, sortBy = "relevant", onSortChange }: ProductGridProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { user } = useAuth()
@@ -50,20 +51,28 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
     const fetchProducts = async () => {
       try {
         setIsLoading(true)
-        if (!category || category === "all") {
-          setProducts([])
-          setLoading(false)
-          return
-        }
+        let targetCategoryId = categoryId
+        let hasSubcategories = false
 
-        const categoriesResponse = await fetch('/api/categories?withSubcategories=true')
-        const allCategories = await categoriesResponse.json()
-        const categoryObj = allCategories.find((c: any) => c.slug === category)
+        if (!targetCategoryId && category && category !== "all") {
+          const categoriesResponse = await fetch(`/api/categories?slug=${category}&withSubcategories=true`)
+          const result = await categoriesResponse.json()
+          const categoryObj = result.data && result.data.length > 0 ? result.data[0] : null
+
+          if (!categoryObj) {
+            setProducts([])
+            setLoading(false)
+            return
+          }
+          targetCategoryId = categoryObj.id
+          hasSubcategories = categoryObj.SubCategory && categoryObj.SubCategory.length > 0
+        }
 
         let url = `/api/products?limit=${pagination.limit}&offset=${pagination.offset}`
         
-        if (categoryObj?.id) {
-          url += `&categoryId=${categoryObj.id}`
+        if (targetCategoryId) {
+          url += `&categoryId=${targetCategoryId}`
+          url += `&includeSubcategories=${hasSubcategories ? 'true' : 'false'}`
         }
 
         if (subcategory) {
@@ -402,6 +411,7 @@ export function ProductGrid({ category = "all", subcategory, filters, sortBy = "
             limit={pagination.limit}
             onLimitChange={pagination.setPageLimit}
             total={pagination.total}
+            variant="minimal"
           />
         </div>
       )}
