@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Check, ExternalLink, MapPin, Tag, X } from "lucide-react"
@@ -49,7 +49,7 @@ interface Address {
   isDefault: boolean
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -1124,5 +1124,13 @@ export default function CheckoutPage() {
         </Dialog>
       </div>
     </main>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<main className="container-viewport py-8"><p className="text-muted-foreground">Đang tải thanh toán...</p></main>}>
+      <CheckoutContent />
+    </Suspense>
   )
 }

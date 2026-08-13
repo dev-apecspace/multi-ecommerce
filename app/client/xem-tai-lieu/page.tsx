@@ -1,9 +1,10 @@
 "use client"
 
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { FileWarning } from "lucide-react"
 
-export default function DocumentViewerPage() {
+function DocumentViewerContent() {
   const searchParams = useSearchParams()
   const url = searchParams.get("url")
   const name = searchParams.get("name") || "Tài liệu"
@@ -19,5 +20,13 @@ export default function DocumentViewerPage() {
       </header>
       <iframe title={`Xem ${name}`} src={url} className="min-h-0 flex-1 border-0" />
     </main>
+  )
+}
+
+export default function DocumentViewerPage() {
+  return (
+    <Suspense fallback={<main className="grid min-h-screen place-items-center p-6 text-muted-foreground">Đang tải tài liệu...</main>}>
+      <DocumentViewerContent />
+    </Suspense>
   )
 }

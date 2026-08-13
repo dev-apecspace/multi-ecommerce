@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -56,7 +56,7 @@ interface VendorDocument {
   uploadedAt: string
 }
 
-export default function AdminVendorsPage() {
+function AdminVendorsContent() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<string>("all")
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
@@ -456,5 +456,13 @@ export default function AdminVendorsPage() {
         </>
       )}
     </main>
+  )
+}
+
+export default function AdminVendorsPage() {
+  return (
+    <Suspense fallback={<main className="p-6 text-muted-foreground">Đang tải nhà bán hàng...</main>}>
+      <AdminVendorsContent />
+    </Suspense>
   )
 }
