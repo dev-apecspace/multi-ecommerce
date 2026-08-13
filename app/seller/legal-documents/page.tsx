@@ -1,0 +1,4 @@
+import { LegalDocumentLink } from '@/components/legal-document-link'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+const documents = [['privacy-policy', 'Chính sách bảo mật'], ['terms-of-service', 'Điều khoản dịch vụ'], ['operating-regulations', 'Điều kiện hoạt động'], ['dispute-resolution', 'Cơ chế giải quyết tranh chấp']]
+export default function SellerLegalDocumentsPage() { return <main className="container-viewport py-8"><h1 className="text-3xl font-bold">Tài liệu chính sách</h1><p className="mt-2 text-muted-foreground">Các chính sách đang áp dụng trên sàn.</p><div className="mt-6 grid gap-4 lg:grid-cols-2">{documents.map(([code, title]) => <Card key={code}><CardHeader><CardTitle className="text-lg">{title}</CardTitle><CardDescription>Tài liệu do quản trị viên công bố</CardDescription></CardHeader><CardContent><LegalDocumentLink code={code} /></CardContent></Card>)}</div></main> }

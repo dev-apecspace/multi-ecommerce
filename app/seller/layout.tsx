@@ -5,6 +5,8 @@ import { SellerSidebar } from "@/components/seller-sidebar"
 import { SellerTopBar } from "@/components/seller-topbar"
 import { useEffect, useRef } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { Footer } from "@/components/footer"
+import { ExperimentalModeModal } from "@/components/experimental-mode-modal"
 
 export default function SellerLayout({
   children,
@@ -28,6 +30,8 @@ export default function SellerLayout({
         <SellerSidebar />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      <Footer />
+      <ExperimentalModeModal />
     </div>
   )
 }

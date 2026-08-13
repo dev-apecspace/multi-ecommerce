@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth-context"
+import { toast } from "@/hooks/use-toast"
 
 interface AuthModalProps {
   open: boolean
@@ -38,11 +39,11 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
 
   const handleRegister = async () => {
     if (password !== confirmPassword) {
-      alert("Mật khẩu không khớp!")
+      toast({ variant: "destructive", title: "Mật khẩu không khớp" })
       return
     }
     if (password.length < 8) {
-      alert("Mật khẩu phải có ít nhất 8 ký tự!")
+      toast({ variant: "destructive", title: "Mật khẩu cần ít nhất 8 ký tự" })
       return
     }
     try {
@@ -218,11 +219,11 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
                 <input type="checkbox" className="mt-1" required disabled={loading} />
                 <span className="text-xs text-muted-foreground">
                   Tôi đồng ý với{" "}
-                  <a href="/client/dieu-khoan-dich-vu" className="text-primary hover:underline">
+                  <a href="/client/dieu-khoan-dich-vu" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     Điều khoản dịch vụ
                   </a>{" "}
                   và{" "}
-                  <a href="/client/chinh-sach-bao-mat" className="text-primary hover:underline">
+                  <a href="/client/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     Chính sách bảo mật
                   </a>
                 </span>

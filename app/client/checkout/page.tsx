@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Check, MapPin, Tag, X } from "lucide-react"
+import { Check, ExternalLink, MapPin, Tag, X } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +16,7 @@ import { useCart } from "@/lib/cart-context"
 import { useLoading } from "@/hooks/use-loading"
 import { CheckoutAddressDialog } from "@/components/client/checkout-address-dialog"
 import { computePrice } from "@/lib/price-utils"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface CheckoutItem {
   id: number
@@ -50,6 +51,7 @@ interface Address {
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const { user } = useAuth()
   const { refetchCart } = useCart()
@@ -68,8 +70,8 @@ export default function CheckoutPage() {
     ward: "",
     district: "",
     city: "",
-    shippingMethod: "express",
-    paymentMethod: "cod",
+    shippingMethod: "",
+    paymentMethod: "",
   })
   const [isEditingManually, setIsEditingManually] = useState(false)
   const [vendorBankingInfo, setVendorBankingInfo] = useState<Record<number, {
@@ -89,6 +91,70 @@ export default function CheckoutPage() {
   const [voucherLoading, setVoucherLoading] = useState<Record<number, boolean>>({})
   const [publicVouchers, setPublicVouchers] = useState<Record<number, any[]>>({})
   const [showVoucherList, setShowVoucherList] = useState<Record<number, boolean>>({})
+  const [walletAgreementConfirmed, setWalletAgreementConfirmed] = useState(false)
+  const [siteTermsConfirmed, setSiteTermsConfirmed] = useState(false)
+  const [consentDialog, setConsentDialog] = useState<"wallet" | "terms" | null>(null)
+  const [savingConsent, setSavingConsent] = useState<"wallet" | "terms" | null>(null)
+  const checkoutSteps = ["shipping", "payment", "review"] as const
+
+  const goToStep = (nextStep: "shipping" | "payment" | "review" | "success") => {
+    setStep(nextStep)
+    if (nextStep !== "success") router.replace(`/client/checkout?step=${nextStep}`, { scroll: false })
+  }
+
+  useEffect(() => {
+    const requestedStep = searchParams.get("step")
+    if (requestedStep && checkoutSteps.includes(requestedStep as (typeof checkoutSteps)[number])) {
+      setStep(requestedStep as "shipping" | "payment" | "review")
+    }
+  }, [searchParams])
+
+  const checkWalletAgreement = async () => {
+    try {
+      const response = await fetch('/api/policy-acceptances?policyCode=intermediary-payment-agreement', { credentials: 'include' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
+      setWalletAgreementConfirmed(result.accepted === true)
+      if (result.accepted !== true) setConsentDialog('wallet')
+    } catch (error) {
+      setWalletAgreementConfirmed(false)
+      setConsentDialog('wallet')
+      toast({ title: 'Không thể kiểm tra xác nhận', description: error instanceof Error ? error.message : 'Vui lòng xác nhận hợp đồng trước khi tiếp tục.', variant: 'destructive' })
+    }
+  }
+
+  const checkSiteTermsAcceptance = async () => {
+    try {
+      const response = await fetch('/api/policy-acceptances?policyCode=website-operating-conditions', { credentials: 'include' })
+      const result = await response.json()
+      if (response.ok) setSiteTermsConfirmed(result.accepted === true)
+    } catch {
+      setSiteTermsConfirmed(false)
+    }
+  }
+
+  const savePolicyAcceptance = async (type: "wallet" | "terms") => {
+    const policyCodes = type === "wallet" ? ["intermediary-payment-agreement"] : ["website-operating-conditions"]
+    try {
+      setSavingConsent(type)
+      await Promise.all(policyCodes.map(async (policyCode) => {
+        const response = await fetch("/api/policy-acceptances", {
+          method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ policyCode }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || "Không thể lưu xác nhận chính sách.")
+      }))
+      if (type === "wallet") setWalletAgreementConfirmed(true)
+      else setSiteTermsConfirmed(true)
+      setConsentDialog(null)
+      return true
+    } catch (error) {
+      toast({ title: "Chưa thể xác nhận", description: error instanceof Error ? error.message : "Vui lòng thử lại trước khi tiếp tục thanh toán.", variant: "destructive" })
+      return false
+    } finally {
+      setSavingConsent(null)
+    }
+  }
 
   useEffect(() => {
     if (user?.id) {
@@ -374,18 +440,69 @@ export default function CheckoutPage() {
   }
 
   const handleSubmit = async () => {
-    if (step === "shipping") {
-      if (!formData.fullName || !formData.phone || !formData.street) {
-        toast({
-          title: "Lỗi",
-          description: "Vui lòng điền đầy đủ thông tin giao hàng",
-          variant: "destructive",
-        })
+    if (cartItems.length === 0) {
+      toast({ title: "Giỏ hàng trống", description: "Vui lòng thêm sản phẩm vào giỏ hàng trước khi thanh toán.", variant: "destructive" })
+      return
+    }
+
+    if (step === "payment" && formData.paymentMethod === "wallet" && !walletAgreementConfirmed) {
+      setConsentDialog("wallet")
+      return
+    }
+
+    if (step === "review") {
+      if (!formData.fullName.trim()) {
+        toast({ title: "Chưa nhập người nhận", description: "Vui lòng chọn hoặc nhập họ tên người nhận.", variant: "destructive" })
+        goToStep("shipping")
         return
       }
-      setStep("payment")
+      if (!formData.phone.trim()) {
+        toast({ title: "Chưa nhập số điện thoại", description: "Vui lòng nhập số điện thoại người nhận.", variant: "destructive" })
+        goToStep("shipping")
+        return
+      }
+      if (!formData.street.trim() || !formData.ward.trim() || !formData.district.trim() || !formData.city.trim()) {
+        toast({ title: "Chưa nhập đủ địa chỉ", description: "Vui lòng chọn hoặc nhập đầy đủ địa chỉ giao hàng.", variant: "destructive" })
+        goToStep("shipping")
+        return
+      }
+      if (!["express", "standard"].includes(formData.shippingMethod)) {
+        toast({ title: "Chưa chọn hình thức giao hàng", description: "Vui lòng chọn giao nhanh hoặc giao tiêu chuẩn.", variant: "destructive" })
+        goToStep("shipping")
+        return
+      }
+      if (!["cod", "bank", "wallet"].includes(formData.paymentMethod)) {
+        toast({ title: "Chưa chọn phương thức thanh toán", description: "Vui lòng chọn COD, chuyển khoản ngân hàng hoặc ví điện tử.", variant: "destructive" })
+        goToStep("payment")
+        return
+      }
+      if (formData.paymentMethod === "wallet" && !walletAgreementConfirmed) {
+        setConsentDialog("wallet")
+        return
+      }
+      if (!siteTermsConfirmed) {
+        const saved = await savePolicyAcceptance("terms")
+        if (!saved) return
+      }
+    }
+
+    if (step === "shipping") {
+      if (!formData.fullName.trim()) { toast({ title: "Chưa nhập người nhận", description: "Vui lòng chọn hoặc nhập họ tên người nhận.", variant: "destructive" }); return }
+      if (!formData.phone.trim()) { toast({ title: "Chưa nhập số điện thoại", description: "Vui lòng nhập số điện thoại người nhận.", variant: "destructive" }); return }
+      if (!formData.street.trim()) { toast({ title: "Chưa nhập địa chỉ", description: "Vui lòng nhập số nhà, tên đường giao hàng.", variant: "destructive" }); return }
+      if (!formData.ward.trim()) { toast({ title: "Chưa chọn phường/xã", description: "Vui lòng chọn hoặc nhập phường/xã.", variant: "destructive" }); return }
+      if (!formData.district.trim()) { toast({ title: "Chưa chọn quận/huyện", description: "Vui lòng chọn hoặc nhập quận/huyện.", variant: "destructive" }); return }
+      if (!formData.city.trim()) { toast({ title: "Chưa chọn tỉnh/thành phố", description: "Vui lòng chọn hoặc nhập tỉnh/thành phố.", variant: "destructive" }); return }
+      if (!["express", "standard"].includes(formData.shippingMethod)) { toast({ title: "Chưa chọn hình thức giao hàng", description: "Vui lòng chọn giao nhanh hoặc giao tiêu chuẩn.", variant: "destructive" }); return }
+      goToStep("payment")
     } else if (step === "payment") {
-      setStep("review")
+      if (!["cod", "bank", "wallet"].includes(formData.paymentMethod)) {
+        toast({ title: "Chưa chọn phương thức thanh toán", description: "Vui lòng chọn COD, chuyển khoản ngân hàng hoặc ví điện tử.", variant: "destructive" })
+        return
+      }
+      setSiteTermsConfirmed(false)
+      void checkSiteTermsAcceptance()
+      goToStep("review")
     } else if (step === "review") {
       if (!userId) {
         toast({ title: 'Lỗi', description: 'Vui lòng đăng nhập', variant: 'destructive' })
@@ -434,15 +551,16 @@ export default function CheckoutPage() {
         })
 
         if (!response.ok) {
-          throw new Error('Failed to create order')
+          const result = await response.json().catch(() => null)
+          throw new Error(result?.error || 'Không thể tạo đơn hàng.')
         }
 
         sessionStorage.removeItem('checkoutItems')
         await refetchCart()
         toast({ title: 'Thành công', description: 'Đơn hàng của bạn đã được đặt' })
-        setStep("success")
+        goToStep("success")
       } catch (error) {
-        toast({ title: 'Lỗi', description: 'Không thể tạo đơn hàng', variant: 'destructive' })
+        toast({ title: 'Không thể đặt hàng', description: error instanceof Error ? error.message : 'Vui lòng thử lại sau.', variant: 'destructive' })
       } finally {
         setLoading(false)
         setIsLoading(false)
@@ -498,27 +616,47 @@ export default function CheckoutPage() {
   return (
     <main className="min-h-screen bg-surface dark:bg-slate-950">
       <div className="container-viewport py-6">
-        <h1 className="text-3xl font-bold mb-8">Thanh toán</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Thanh toán</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => {
+              if (step === "review") goToStep("payment")
+              else if (step === "payment") goToStep("shipping")
+              else router.back()
+            }}
+          >
+            {step === "shipping" ? "Quay lại giỏ hàng" : "Quay lại"}
+          </Button>
+        </div>
 
         <div className="space-y-6">
-            <div className="flex gap-4 mb-8">
-              {["shipping", "payment", "review"].map((s, idx) => (
-                <div
+            <nav aria-label="Các bước thanh toán" className="mb-8 flex gap-2 overflow-x-auto pb-1 sm:gap-4">
+              {checkoutSteps.map((s, idx) => {
+                const isCurrent = step === s
+                const isCompleted = checkoutSteps.indexOf(step as (typeof checkoutSteps)[number]) > idx
+                const isAccessible = idx < checkoutSteps.indexOf(step as (typeof checkoutSteps)[number])
+                return <button
                   key={s}
-                  className={`flex-1 flex items-center gap-2 p-3 rounded-lg border transition-all ${
-                    step === s
+                  type="button"
+                  disabled={!isAccessible}
+                  onClick={() => isAccessible && goToStep(s)}
+                  className={`min-w-40 flex-1 rounded-lg border p-3 text-left transition-all disabled:cursor-default ${
+                    isCurrent
                       ? "bg-primary/10 border-primary"
-                      : ["shipping", "payment", "review"].indexOf(step) > idx
+                      : isCompleted
                         ? "bg-green-50 dark:bg-green-950 border-green-300"
                         : "border-border"
-                  }`}
+                  } ${isAccessible ? "cursor-pointer hover:border-primary" : ""}`}
                 >
                   <div className="text-sm font-medium">
                     {idx + 1}. {s === "shipping" ? "Giao hàng" : s === "payment" ? "Thanh toán" : "Kiểm tra"}
                   </div>
-                </div>
-              ))}
-            </div>
+                </button>
+              })}
+            </nav>
 
             <Card>
               <CardHeader>
@@ -594,7 +732,13 @@ export default function CheckoutPage() {
                     </div>
                     <RadioGroup
                       value={formData.paymentMethod}
-                      onValueChange={(val) => setFormData({ ...formData, paymentMethod: val })}
+                      onValueChange={(val) => {
+                        setFormData({ ...formData, paymentMethod: val })
+                        setWalletAgreementConfirmed(false)
+                        if (val === "wallet") {
+                          void checkWalletAgreement()
+                        }
+                      }}
                     >
                       <div className="flex items-center space-x-2 p-3 border rounded-lg">
                         <RadioGroupItem value="cod" id="cod" />
@@ -914,16 +1058,21 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            <div className="flex gap-3">
-              {step !== "shipping" && (
-                <Button variant="outline" onClick={() => setStep(step === "payment" ? "shipping" : "payment")} disabled={loading}>
-                  Quay lại
-                </Button>
-              )}
-              <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
-                {loading ? "Đang xử lý..." : step === "review" ? "Đặt hàng" : "Tiếp tục"}
-              </Button>
-            </div>
+            {step === "review" ? (
+              <div className="space-y-2">
+                  <p className="text-sm font-semibold leading-6 text-foreground">
+                    Bằng cách nhấn nút Đặt hàng, bạn đồng ý với các{' '}
+                    <Link href="/client/dieu-kien-hoat-dong" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">Điều kiện hoạt động</Link> của website.
+                  </p>
+                  <Button className="h-10 w-full" onClick={handleSubmit} disabled={loading}>
+                    {loading ? "Đang xử lý..." : "Đặt hàng"}
+                  </Button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <Button className="flex-1" onClick={handleSubmit} disabled={loading}>Tiếp tục</Button>
+              </div>
+            )}
         </div>
 
         <CheckoutAddressDialog
@@ -933,6 +1082,46 @@ export default function CheckoutPage() {
           selectedAddressId={selectedAddressId}
           onSelectAddress={handleSelectAddress}
         />
+        <Dialog open={consentDialog === "wallet"} onOpenChange={(open) => !open && !savingConsent && setConsentDialog(null)}>
+          <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg" showCloseButton={!loading && !savingConsent}>
+            <DialogHeader>
+              <DialogTitle>Xác nhận thanh toán qua ví điện tử</DialogTitle>
+              <DialogDescription>Vui lòng xem hợp đồng trước khi tiếp tục thanh toán.</DialogDescription>
+            </DialogHeader>
+            <div className="rounded-md border bg-muted/30 p-4 text-sm leading-6">
+              <p className="text-muted-foreground">Nhấn vào liên kết dưới đây để xem Hợp đồng trung gian thanh toán.</p>
+              <Link
+                href="/client/hop-dong-trung-gian-thanh-toan"
+                className="mt-3 inline-flex items-center gap-1 font-medium text-primary underline underline-offset-4"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Xem Hợp đồng trung gian thanh toán
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" disabled={!!savingConsent} onClick={() => setConsentDialog(null)}>Hủy</Button>
+              <Button disabled={!!savingConsent} onClick={() => savePolicyAcceptance("wallet")}>{savingConsent === "wallet" ? "Đang lưu..." : "Tôi đã đọc và xác nhận"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={consentDialog === "terms"} onOpenChange={(open) => !open && !savingConsent && setConsentDialog(null)}>
+          <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg" showCloseButton={!loading && !savingConsent}>
+            <DialogHeader>
+              <DialogTitle>Xác nhận điều kiện hoạt động</DialogTitle>
+              <DialogDescription>Đơn hàng chỉ được tạo sau khi bạn xác nhận đã đọc các điều kiện dưới đây.</DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[48vh] space-y-3 overflow-y-auto rounded-md border bg-muted/30 p-4 text-sm leading-6">
+              <p>Bạn xác nhận đã đọc và đồng ý với các điều kiện hoạt động của website áp dụng cho đơn hàng này.</p>
+              <p>Vui lòng tham khảo <Link href="/client/dieu-kien-hoat-dong" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">Điều kiện hoạt động</Link> để xem nội dung đầy đủ.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" disabled={!!savingConsent} onClick={() => setConsentDialog(null)}>Hủy</Button>
+              <Button disabled={!!savingConsent} onClick={() => savePolicyAcceptance("terms")}>{savingConsent === "terms" ? "Đang lưu..." : "Tôi đã đọc và đồng ý"}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   )

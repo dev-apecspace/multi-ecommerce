@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import bcryptjs from 'bcryptjs'
+import { generateToken } from '@/lib/jwt'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,6 +78,22 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     )
+
+    const token = await generateToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone || undefined,
+      role: user.role,
+      status: user.status,
+    })
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+      path: '/',
+    })
 
     response.cookies.set('auth_token', JSON.stringify(userData), {
       httpOnly: true,

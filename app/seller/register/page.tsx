@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useLoading } from "@/hooks/use-loading"
+import { toast } from "@/hooks/use-toast"
 
 export default function SellerRegisterPage() {
   const { setIsLoading } = useLoading()
@@ -32,7 +33,10 @@ export default function SellerRegisterPage() {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000))
-      alert("Đăng ký cửa hàng thành công! Chúng tôi sẽ kiểm duyệt trong vòng 24-48 giờ.")
+      toast({
+        title: "Đăng ký cửa hàng thành công",
+        description: "Chúng tôi sẽ kiểm duyệt trong vòng 24–48 giờ.",
+      })
     } finally {
       setIsLoading(false)
     }

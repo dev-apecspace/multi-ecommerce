@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { Check, X, Clock, Eye, ChevronDown, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Clock, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -47,8 +47,6 @@ export default function AdminProductsPage() {
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 })
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('pending')
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [expandedProductIds, setExpandedProductIds] = useState<Set<number>>(new Set())
   const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
@@ -100,80 +98,28 @@ export default function AdminProductsPage() {
     fetchStats()
   }, [])
 
-  const handleApprove = async (product: Product) => {
-    try {
-      const response = await fetch('/api/admin/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: product.id,
-          status: 'approved',
-        }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Thành công",
-          description: `Đã phê duyệt sản phẩm: ${product.name}`,
-        })
-        setProducts(prev => prev.filter(p => p.id !== product.id))
-        fetchStats()
-      }
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: "Không thể phê duyệt sản phẩm",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleReject = async (product: Product) => {
-    try {
-      const response = await fetch('/api/admin/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: product.id,
-          status: 'rejected',
-        }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: "Thành công",
-          description: `Đã từ chối sản phẩm: ${product.name}`,
-        })
-        setProducts(prev => prev.filter(p => p.id !== product.id))
-        fetchStats()
-      }
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: "Không thể từ chối sản phẩm",
-        variant: "destructive",
-      })
-    }
-  }
-
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; color: string }> = {
-      pending: { label: 'Chờ duyệt', color: 'bg-yellow-100 text-yellow-800' },
-      approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-800' },
-      rejected: { label: 'Từ chối', color: 'bg-red-100 text-red-800' },
+      pending: {
+        label: 'Chờ duyệt',
+        color: 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-200',
+      },
+      approved: {
+        label: 'Đã duyệt',
+        color: 'border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/50 dark:bg-emerald-500/15 dark:text-emerald-200',
+      },
+      rejected: {
+        label: 'Từ chối',
+        color: 'border-rose-300 bg-rose-100 text-rose-900 dark:border-rose-500/50 dark:bg-rose-500/15 dark:text-rose-200',
+      },
     }
     const style = statusMap[status] || statusMap.pending
-    return <span className={`${style.color} px-2 py-1 rounded text-xs`}>{style.label}</span>
-  }
-
-  const toggleExpandProduct = (productId: number) => {
-    const newExpanded = new Set(expandedProductIds)
-    if (newExpanded.has(productId)) {
-      newExpanded.delete(productId)
-    } else {
-      newExpanded.add(productId)
-    }
-    setExpandedProductIds(newExpanded)
+    return (
+      <span className={`${style.color} inline-flex min-h-7 items-center gap-1.5 border-2 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.1em] shadow-[2px_2px_0_rgba(15,23,42,0.12)] dark:shadow-[2px_2px_0_rgba(255,255,255,0.08)]`}>
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+        {style.label}
+      </span>
+    )
   }
 
   const getDisplayPrice = (product: Product) => {
@@ -186,6 +132,96 @@ export default function AdminProductsPage() {
     }
     
     return formatPrice(product.price * (1 + product.taxRate / 100))
+  }
+
+  const renderProductCards = (emptyMessage: string) => {
+    if (loading) {
+      return <p className="py-8 text-center text-muted-foreground">Đang tải...</p>
+    }
+
+    if (products.length === 0) {
+      return (
+        <div className="py-8 text-center">
+          <Clock className="mx-auto mb-2 h-12 w-12 text-muted-foreground opacity-50" />
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      )
+    }
+
+    return (
+      <>
+        <div className="space-y-3 md:space-y-4">
+          {products.map((product) => (
+            <div key={product.id}>
+              <article className="border border-border p-3 transition-colors hover:bg-muted/50 md:p-4">
+                <div className="flex items-start gap-3 md:gap-4">
+                  <div className="min-w-0 flex-1 space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                    <div className="min-w-0">
+                      <h3 className="mb-1 truncate text-sm font-semibold md:text-lg">{product.name}</h3>
+                      <p className="truncate text-xs text-muted-foreground md:text-sm">Shop: {product.Vendor?.name || 'N/A'}</p>
+                      <p className="truncate text-xs text-muted-foreground md:text-sm">Danh mục: {product.Category?.name || 'N/A'}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-600 dark:text-slate-300 md:text-sm">
+                        {product.ProductVariant?.length ?? 0} biến thể
+                      </p>
+                      <p className="text-xs text-muted-foreground md:text-sm">
+                        Ngày: {new Date(product.createdAt).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+
+                    <section
+                      aria-label={`Thông tin duyệt và giá của ${product.name}`}
+                      className="min-w-0 border border-slate-200 bg-slate-50/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/50"
+                    >
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-2.5 dark:border-slate-800">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+                          Trạng thái duyệt
+                        </p>
+                        {getStatusBadge(product.status)}
+                      </div>
+
+                      <div className="py-3">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Giá bán {product.taxApplied && !product.taxIncluded && '(sau thuế)'}
+                        </p>
+                        <p className="mt-0.5 text-2xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                          {getDisplayPrice(product)}
+                        </p>
+                        {product.taxApplied && product.taxRate && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                            <span>VAT {product.taxRate}%</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{product.taxIncluded ? 'Đã bao gồm thuế' : 'Chưa bao gồm thuế'}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => router.push(`/admin/products/${product.id}`)}
+                        size="sm"
+                        variant="outline"
+                        className="h-9 w-full border-slate-300 bg-background text-xs font-semibold hover:border-slate-400 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 md:text-sm"
+                      >
+                        <Eye className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                        Xem chi tiết
+                      </Button>
+                    </section>
+                  </div>
+                </div>
+              </article>
+            </div>
+          ))}
+        </div>
+
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.goToPage}
+          limit={pagination.limit}
+          onLimitChange={pagination.setPageLimit}
+          total={pagination.total}
+        />
+      </>
+    )
   }
 
   return (
@@ -235,282 +271,15 @@ export default function AdminProductsPage() {
             </TabsList>
 
             <TabsContent value="pending" className="mt-6">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Đang tải...</p>
-              ) : products.length === 0 ? (
-                <div className="text-center py-8">
-                  <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-2 opacity-50" />
-                  <p className="text-muted-foreground">Không có sản phẩm nào chờ duyệt</p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-3 md:space-y-4">
-                    {products.map((product) => (
-                      <div key={product.id}>
-                        <div className="border rounded-lg p-3 md:p-4 hover:bg-muted">
-                          <div className="flex items-start gap-3 md:gap-4">
-                            <button
-                              onClick={() => toggleExpandProduct(product.id)}
-                              className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded mt-1 flex-shrink-0"
-                            >
-                              {expandedProductIds.has(product.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                            <div className="flex-1 min-w-0 space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
-                              <div className="min-w-0">
-                                <h3 className="font-semibold text-sm md:text-lg mb-1 truncate">{product.name}</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground truncate">Shop: {product.Vendor?.name || 'N/A'}</p>
-                                <p className="text-xs md:text-sm text-muted-foreground truncate">Danh mục: {product.Category?.name || 'N/A'}</p>
-                                <p className="text-xs md:text-sm text-muted-foreground">
-                                  Ngày: {new Date(product.createdAt).toLocaleDateString('vi-VN')}
-                                </p>
-                              </div>
-                              <div className="space-y-2">
-                                <div>
-                                  <p className="text-xs md:text-sm text-muted-foreground">Giá bán {product.taxApplied && '(sau thuế)'}</p>
-                                  <p className="text-xl md:text-2xl font-bold text-blue-600">
-                                    {getDisplayPrice(product)}
-                                  </p>
-                                  {product.taxApplied && product.taxRate && (
-                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                      Thuế: {product.taxRate}%
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex flex-col md:flex-row gap-2">
-                                  <Button
-                                    onClick={() => router.push(`/admin/products/${product.id}`)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="flex-1 text-xs md:text-sm"
-                                  >
-                                    <Eye className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-                                    Xem
-                                  </Button>
-                                  <Button
-                                    onClick={() => handleApprove(product)}
-                                    className="flex-1 bg-green-600 hover:bg-green-700 text-xs md:text-sm"
-                                    size="sm"
-                                  >
-                                    <Check className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-                                    Phê duyệt
-                                  </Button>
-                                  <Button
-                                    onClick={() => handleReject(product)}
-                                    variant="outline"
-                                    className="flex-1 text-red-600 hover:text-red-700 text-xs md:text-sm"
-                                    size="sm"
-                                  >
-                                    <X className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-                                    Từ chối
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
-                          <div className="border-l-2 border-b border-r rounded-b-lg p-4 bg-gray-50 dark:bg-slate-800/50 space-y-2">
-                            {product.ProductVariant.map((variant) => (
-                              <div key={`variant-${variant.id}`} className="pl-4">
-                                <p className="text-sm font-medium">{variant.name}</p>
-                                <p className="text-sm text-muted-foreground">Giá: {formatPrice(variant.price)}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {products.length > 0 && (
-                    <Pagination
-                      currentPage={pagination.page}
-                      totalPages={pagination.totalPages}
-                      onPageChange={pagination.goToPage}
-                      limit={pagination.limit}
-                      onLimitChange={pagination.setPageLimit}
-                      total={pagination.total}
-                    />
-                  )}
-                </>
-              )}
+              {renderProductCards('Không có sản phẩm nào chờ duyệt')}
             </TabsContent>
 
             <TabsContent value="approved" className="mt-6">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Đang tải...</p>
-              ) : products.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Không có sản phẩm nào được duyệt</p>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-3 px-2 w-8"></th>
-                          <th className="text-left py-3 px-4">Sản phẩm</th>
-                          <th className="text-left py-3 px-4">Shop</th>
-                          <th className="text-left py-3 px-4">Giá</th>
-                          <th className="text-left py-3 px-4">Trạng thái</th>
-                          <th className="text-left py-3 px-4">Hành động</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((product) => (
-                          <React.Fragment key={product.id}>
-                            <tr className="border-b border-border hover:bg-muted">
-                              <td className="py-3 px-2">
-                                <button
-                                  onClick={() => toggleExpandProduct(product.id)}
-                                  className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded"
-                                >
-                                  {expandedProductIds.has(product.id) ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </button>
-                              </td>
-                              <td className="py-3 px-4">{product.name}</td>
-                              <td className="py-3 px-4">{product.Vendor?.name || 'N/A'}</td>
-                              <td className="py-3 px-4 font-semibold">
-                                {getDisplayPrice(product)}
-                                {product.taxApplied && product.taxRate && (
-                                  <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">({product.taxRate}%)</span>
-                                )}
-                              </td>
-                              <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
-                              <td className="py-3 px-4">
-                                <Button
-                                  onClick={() => router.push(`/admin/products/${product.id}`)}
-                                  size="sm"
-                                  variant="ghost"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </td>
-                            </tr>
-                            {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
-                              <>
-                                {product.ProductVariant.map((variant) => (
-                                  <tr key={`variant-${variant.id}`} className="border-b border-border bg-gray-50 dark:bg-slate-800/50">
-                                    <td colSpan={2} className="py-3 px-4 pl-12">
-                                      <div className="text-sm font-medium">{variant.name}</div>
-                                    </td>
-                                    <td className="py-3 px-4"></td>
-                                    <td className="py-3 px-4">{formatPrice(variant.price)}</td>
-                                    <td colSpan={2}></td>
-                                  </tr>
-                                ))}
-                              </>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {products.length > 0 && (
-                    <Pagination
-                      currentPage={pagination.page}
-                      totalPages={pagination.totalPages}
-                      onPageChange={pagination.goToPage}
-                      limit={pagination.limit}
-                      onLimitChange={pagination.setPageLimit}
-                      total={pagination.total}
-                    />
-                  )}
-                </>
-              )}
+              {renderProductCards('Không có sản phẩm nào được duyệt')}
             </TabsContent>
 
             <TabsContent value="rejected" className="mt-6">
-              {loading ? (
-                <p className="text-center text-muted-foreground py-8">Đang tải...</p>
-              ) : products.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Không có sản phẩm nào bị từ chối</p>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-3 px-2 w-8"></th>
-                          <th className="text-left py-3 px-4">Sản phẩm</th>
-                          <th className="text-left py-3 px-4">Shop</th>
-                          <th className="text-left py-3 px-4">Giá</th>
-                          <th className="text-left py-3 px-4">Trạng thái</th>
-                          <th className="text-left py-3 px-4">Hành động</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map((product) => (
-                          <React.Fragment key={product.id}>
-                            <tr className="border-b border-border hover:bg-muted">
-                              <td className="py-3 px-2">
-                                <button
-                                  onClick={() => toggleExpandProduct(product.id)}
-                                  className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded"
-                                >
-                                  {expandedProductIds.has(product.id) ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </button>
-                              </td>
-                              <td className="py-3 px-4">{product.name}</td>
-                              <td className="py-3 px-4">{product.Vendor?.name || 'N/A'}</td>
-                              <td className="py-3 px-4 font-semibold">
-                                {getDisplayPrice(product)}
-                                {product.taxApplied && product.taxRate && (
-                                  <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">({product.taxRate}%)</span>
-                                )}
-                              </td>
-                              <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
-                              <td className="py-3 px-4">
-                                <Button
-                                  onClick={() => router.push(`/admin/products/${product.id}`)}
-                                  size="sm"
-                                  variant="ghost"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </td>
-                            </tr>
-                            {expandedProductIds.has(product.id) && product.ProductVariant && product.ProductVariant.length > 0 && (
-                              <>
-                                {product.ProductVariant.map((variant) => (
-                                  <tr key={`variant-${variant.id}`} className="border-b border-border bg-gray-50 dark:bg-slate-800/50">
-                                    <td colSpan={2} className="py-3 px-4 pl-12">
-                                      <div className="text-sm font-medium">{variant.name}</div>
-                                    </td>
-                                    <td className="py-3 px-4"></td>
-                                    <td className="py-3 px-4">{formatPrice(variant.price)}</td>
-                                    <td colSpan={2}></td>
-                                  </tr>
-                                ))}
-                              </>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {products.length > 0 && (
-                    <Pagination
-                      currentPage={pagination.page}
-                      totalPages={pagination.totalPages}
-                      onPageChange={pagination.goToPage}
-                      limit={pagination.limit}
-                      onLimitChange={pagination.setPageLimit}
-                      total={pagination.total}
-                    />
-                  )}
-                </>
-              )}
+              {renderProductCards('Không có sản phẩm nào bị từ chối')}
             </TabsContent>
           </Tabs>
         </CardContent>

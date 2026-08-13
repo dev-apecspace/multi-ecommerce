@@ -51,6 +51,7 @@ const sellerLinks = [
   // { href: "/seller/wallet", label: "Ví tiền & Doanh thu", icon: Wallet, restricted: true },
   // { href: "/seller/withdraw", label: "Yêu cầu rút tiền", icon: Download, restricted: true },
   { href: "/seller/documents", label: "Tài liệu shop", icon: FileText, restricted: false },
+  { href: "/seller/legal-documents", label: "Tài liệu chính sách", icon: FileText, restricted: false },
   { href: "/seller/settings", label: "Hồ sơ & Cài đặt shop", icon: Settings, restricted: false },
 ]
 

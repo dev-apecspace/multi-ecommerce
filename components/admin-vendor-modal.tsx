@@ -42,6 +42,7 @@ interface Vendor {
   rating: number
   products: number
   followers: number
+  description?: string | null
   Shop?: {
     id?: number
     name?: string
@@ -540,6 +541,11 @@ export default function AdminVendorModal({
                   <p className="mt-2 text-sm text-muted-foreground">
                     {vendor.Shop.ShopDetail?.address || '-'}
                   </p>
+                </div>
+
+                <div>
+                  <Label>Mô tả shop</Label>
+                  <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{vendor.description || '-'}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

@@ -7,7 +7,8 @@ import { CartProvider } from '@/lib/cart-context'
 import { FavoritesProvider } from '@/lib/favorites-context'
 import { LoadingProvider } from '@/lib/loading-context'
 import { GlobalLoading } from '@/components/global-loading'
-import { Toaster } from '@/components/ui/toaster'
+import { GlobalErrorToasts } from '@/components/global-error-toasts'
+import { Toaster } from '@/components/ui/sonner'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -18,11 +19,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <LoadingProvider>
               {children}
               <GlobalLoading />
+              <GlobalErrorToasts />
             </LoadingProvider>
           </FavoritesProvider>
         </CartProvider>
       </AuthProvider>
-      <Toaster />
+      <Toaster position="top-right" richColors closeButton />
     </NextThemesProvider>
   )
 }

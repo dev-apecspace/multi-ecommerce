@@ -1,12 +1,13 @@
 "use client"
 
-import { Save, Plus, Trash2, X } from "lucide-react"
+import { AlertCircle, Save, Plus, Trash2, X } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
@@ -70,6 +71,7 @@ export default function SellerCreateProductPage() {
   const [productImages, setProductImages] = useState<ProductImage[]>([])
   const [attributeInputBlocks, setAttributeInputBlocks] = useState<AttributeInputBlock[]>([])
   const [editingAttributeIndex, setEditingAttributeIndex] = useState<number | null>(null)
+  const [attributeError, setAttributeError] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     categoryId: "",
@@ -82,6 +84,7 @@ export default function SellerCreateProductPage() {
     specifications: "",
     shippingInfo: "",
     warranty: "",
+    taxIncluded: false,
 
   })
 
@@ -149,6 +152,7 @@ export default function SellerCreateProductPage() {
   }
 
   const addAttributeInputBlock = () => {
+    setAttributeError(false)
     const newId = `block-${Date.now()}-${Math.random()}`
     setAttributeInputBlocks([...attributeInputBlocks, { id: newId, name: "", values: [] }])
   }
@@ -231,6 +235,7 @@ export default function SellerCreateProductPage() {
     }
 
     setAttributes(updated)
+    setAttributeError(false)
     const newVariants = generateVariantCombinations(updated)
     setVariants(newVariants)
 
@@ -298,7 +303,9 @@ export default function SellerCreateProductPage() {
       return
     }
 
-    if (!formData.name || !formData.categoryId || !formData.subcategoryId || !formData.price || !formData.image) {
+    const hasValidAttribute = attributes.some((attribute) => attribute.name.trim() && attribute.values.some((value) => value.trim()))
+    setAttributeError(!hasValidAttribute)
+    if (!formData.name || !formData.description.trim() || !formData.specifications.trim() || !formData.warranty.trim() || !formData.shippingInfo.trim() || !hasValidAttribute || !formData.categoryId || !formData.subcategoryId || !formData.price || !formData.image) {
       toast({
         title: "Lỗi",
         description: "Vui lòng điền đầy đủ thông tin bắt buộc (bao gồm hình ảnh)",
@@ -323,7 +330,7 @@ export default function SellerCreateProductPage() {
           attributes: attributes,
           variants: filteredVariants,
           taxApplied: true,
-          taxIncluded: true,
+          taxIncluded: formData.taxIncluded,
           taxRate: 10,
           images: productImages.map(img => ({
             image: img.url,
@@ -432,7 +439,19 @@ export default function SellerCreateProductPage() {
                   placeholder="Mô tả chi tiết về sản phẩm"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  required
                 ></textarea>
+              </div>
+              <div>
+                <Label>Thông số kỹ thuật *</Label>
+                <textarea
+                  className="w-full p-2 border rounded text-sm mt-2"
+                  rows={4}
+                  placeholder="Ví dụ: chất liệu, kích thước, công suất, xuất xứ..."
+                  value={formData.specifications}
+                  onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
+                  required
+                />
               </div>
             </CardContent>
           </Card>
@@ -463,6 +482,21 @@ export default function SellerCreateProductPage() {
                   />
                 </div>
               </div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+                <Checkbox
+                  checked={formData.taxIncluded}
+                  onCheckedChange={(checked) => setFormData({ ...formData, taxIncluded: checked === true })}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block font-medium">Giá sản phẩm đã bao gồm thuế VAT (10%)</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {formData.taxIncluded
+                      ? "Giá đã nhập là giá cuối cùng khách hàng thanh toán."
+                      : "Hệ thống sẽ tự cộng VAT 10% vào giá sản phẩm khi hiển thị và thanh toán."}
+                  </span>
+                </span>
+              </label>
             </CardContent>
           </Card>
 
@@ -507,6 +541,7 @@ export default function SellerCreateProductPage() {
                   placeholder="vd: 12 tháng"
                   value={formData.warranty}
                   onChange={(e) => setFormData({ ...formData, warranty: e.target.value })}
+                  required
                 />
               </div>
               <div>
@@ -517,6 +552,7 @@ export default function SellerCreateProductPage() {
                   placeholder="Thông tin về vận chuyển"
                   value={formData.shippingInfo}
                   onChange={(e) => setFormData({ ...formData, shippingInfo: e.target.value })}
+                  required
                 ></textarea>
               </div>
             </CardContent>
@@ -524,10 +560,16 @@ export default function SellerCreateProductPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Thuộc tính sản phẩm (Tùy chọn)</CardTitle>
-              <p className="text-sm text-gray-500 mt-2">Thêm thuộc tính (như Size, Màu sắc) để tạo phân loại sản phẩm tự động</p>
+              <CardTitle>Thuộc tính sản phẩm <span className="text-destructive">*</span></CardTitle>
+              <p className="text-sm text-gray-500 mt-2">Bắt buộc cung cấp ít nhất một thuộc tính và giá trị (ví dụ: Size - M, L) để gửi sản phẩm duyệt và tạo phân loại.</p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4" aria-describedby={attributeError ? "product-attributes-error" : undefined}>
+              {attributeError && (
+                <div id="product-attributes-error" role="alert" className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>Vui lòng thêm ít nhất một thuộc tính sản phẩm kèm giá trị trước khi gửi duyệt.</span>
+                </div>
+              )}
               {attributes.length > 0 && (
                 <div className="border rounded p-3 bg-blue-50 space-y-3">
                   {attributes.map((attr, attrIndex) => (
@@ -616,7 +658,7 @@ export default function SellerCreateProductPage() {
                   <div className="grid grid-cols-2 gap-4 items-start">
                     {/* Left side - Attribute Name */}
                     <div>
-                      <div className="text-sm font-semibold text-gray-700 mb-2">Tên thuộc tính</div>
+                      <div className="text-sm font-semibold text-gray-700 mb-2">Tên thuộc tính <span className="text-destructive">*</span></div>
                       <Input
                         placeholder="Kích thước"
                         value={block.name}
@@ -628,7 +670,7 @@ export default function SellerCreateProductPage() {
 
                     {/* Right side - Attribute Values */}
                     <div>
-                      <div className="text-sm font-semibold text-gray-700 mb-2">Giá trị</div>
+                      <div className="text-sm font-semibold text-gray-700 mb-2">Giá trị <span className="text-destructive">*</span></div>
                       <div className="border rounded p-3 bg-blue-50 flex flex-wrap gap-2 items-center min-h-10">
                         {block.values.map((value, idx) => (
                           <div key={idx} className="bg-blue-100 text-blue-800 text-sm py-1 px-2 rounded inline-flex items-center gap-1.5">
@@ -645,7 +687,7 @@ export default function SellerCreateProductPage() {
                         <Input
                           ref={attributeInputRef}
                           type="text"
-                          placeholder="Để kỳ tự và ấn Enter để thêm thuộc tính"
+                          placeholder="Nhập giá trị và ấn Enter để thêm"
                           onKeyDown={(e) => handleAttributeValueKeyDown(e, block.id, e.currentTarget.value)}
                           className="border-0 text-sm h-8 px-0 focus:outline-none flex-1 min-w-32 bg-transparent"
                           onBlur={(e) => {

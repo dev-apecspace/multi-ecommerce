@@ -49,6 +49,7 @@ interface Product {
   shippingInfo?: string
   specifications?: string
   taxApplied?: boolean
+  taxIncluded?: boolean
   taxRate?: number
   createdAt: string
   updatedAt: string
@@ -382,7 +383,7 @@ export default function ProductDetailPage() {
                   <p className="text-sm text-muted-foreground">Tỷ lệ thuế</p>
                   <p className="text-sm font-semibold">{product.taxRate}%</p>
                   <p className="text-sm text-muted-foreground mt-2">Giá sau thuế</p>
-                  <p className="text-lg font-bold text-green-600">{formatPrice(product.price * (1 + product.taxRate / 100))}</p>
+                  <p className="text-lg font-bold text-green-600">{formatPrice(product.taxIncluded ? product.price : product.price * (1 + product.taxRate / 100))}</p>
                 </div>
               )}
             </CardContent>

@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { toast } from "@/hooks/use-toast"
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("pending")
@@ -351,12 +352,12 @@ export default function AdminPage() {
                       <Button
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"
-                        onClick={() => alert("Đã phê duyệt: " + (vendor.shopName || vendor.name))}
+                        onClick={() => toast({ title: "Đã phê duyệt", description: vendor.shopName || vendor.name })}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                         Phê duyệt
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => alert("Đã từ chối: " + (vendor.shopName || vendor.name))}>
+                      <Button size="sm" variant="destructive" onClick={() => toast({ variant: "destructive", title: "Đã từ chối", description: vendor.shopName || vendor.name })}>
                         <XCircle className="h-4 w-4 mr-2" />
                         Từ chối
                       </Button>

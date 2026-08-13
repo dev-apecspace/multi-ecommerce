@@ -401,7 +401,15 @@ export default function OrderDetailPage({ params }: PageProps) {
             <CardContent className="space-y-4">
               <div className="text-sm text-muted-foreground">
                 <p>Ngày đặt hàng: {new Date(order.date).toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                <p>Phương thức thanh toán: {order.paymentMethod === 'cod' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản'}</p>
+                <p>
+                  Phương thức thanh toán: {order.paymentMethod === 'cod'
+                    ? 'Thanh toán khi nhận hàng'
+                    : order.paymentMethod === 'bank'
+                      ? 'Chuyển khoản ngân hàng'
+                      : order.paymentMethod === 'wallet'
+                        ? 'Ví điện tử'
+                        : order.paymentMethod}
+                </p>
               </div>
               {order.status === 'delivered' && (
                 <>

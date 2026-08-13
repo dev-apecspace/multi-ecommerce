@@ -1,6 +1,7 @@
 import type React from "react"
 import { AdminSidebar } from "@/components/admin-sidebar"
 import { AdminTopBar } from "@/components/admin-topbar"
+import { ExperimentalModeModal } from "@/components/experimental-mode-modal"
 
 export default function AdminLayout({
   children,
@@ -14,6 +15,7 @@ export default function AdminLayout({
         <AdminSidebar />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      <ExperimentalModeModal />
     </div>
   )
 }

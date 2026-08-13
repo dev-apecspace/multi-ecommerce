@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useProducts, useCart, useFavorites, useCategories, useVendors, useOrders, useReviews } from '@/hooks/useSupabase'
+import { toast } from '@/hooks/use-toast'
 
 export function ProductListExample() {
   const { data: products, loading, error, fetchData } = useProducts(10, 0)
@@ -240,7 +241,11 @@ export function ReviewsExample({ productId }: { productId: number }) {
 
   const handleSubmitReview = async () => {
     if (!newReview.customerName || !newReview.comment) {
-      alert('Please fill in all fields')
+      toast({
+        variant: 'destructive',
+        title: 'Thiếu thông tin đánh giá',
+        description: 'Vui lòng điền đầy đủ các trường bắt buộc.',
+      })
       return
     }
 

@@ -62,6 +62,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const requiredFields = [
+      ['name', 'Tên sản phẩm'], ['description', 'Mô tả sản phẩm'], ['specifications', 'Thông số kỹ thuật'],
+      ['warranty', 'Thông tin bảo hành'], ['shippingInfo', 'Thông tin vận chuyển'],
+    ] as const
+    const missingFields = requiredFields.filter(([key]) => typeof body[key] !== 'string' || !body[key].trim()).map(([, label]) => label)
+    const validAttributes = Array.isArray(body.attributes) && body.attributes.some((attribute: any) =>
+      typeof attribute?.name === 'string' && attribute.name.trim() && Array.isArray(attribute.values) && attribute.values.some((value: unknown) => typeof value === 'string' && value.trim())
+    )
+    if (missingFields.length || !validAttributes) {
+      return NextResponse.json({ error: `Vui lòng cung cấp: ${[...missingFields, !validAttributes ? 'ít nhất một thuộc tính sản phẩm có giá trị' : ''].filter(Boolean).join(', ')}` }, { status: 400 })
+    }
 
     const media = body.images && Array.isArray(body.images) && body.images.length > 0
       ? body.images.map((img: any, index: number) => ({

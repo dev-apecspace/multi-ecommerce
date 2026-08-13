@@ -1,12 +1,13 @@
 import Link from "next/link"
 import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from "lucide-react"
+import { CompanyInformation } from "@/components/company-information"
 
 export function Footer() {
   return (
     <footer className="bg-slate-900 text-white mt-16">
       {/* Main Footer */}
       <div className="container-viewport py-12">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 xl:grid-cols-6 mb-8">
           {/* About */}
           <div>
             <h3 className="font-bold text-lg mb-4">Về Sàn TMĐT APECSPACE</h3>
@@ -34,18 +35,48 @@ export function Footer() {
             <h3 className="font-bold text-lg mb-4">Chính sách</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <Link href="/client/chinh-sach-bao-mat" className="hover:text-white transition">
+                <Link href="/client/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   Bảo mật thông tin
                 </Link>
               </li>
               <li>
-                <Link href="/client/dieu-khoan-dich-vu" className="hover:text-white transition">
+                <Link href="/client/dieu-khoan-dich-vu" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   Điều khoản dịch vụ
                 </Link>
               </li>
               <li>
-                <Link href="/client/quy-che-hoat-dong" className="hover:text-white transition">
-                  Quy chế hoạt động
+                <Link href="/client/dieu-kien-hoat-dong" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                  Điều kiện hoạt động
+                </Link>
+              </li>
+              <li>
+                <Link href="/client/co-che-giai-quyet-tranh-chap" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                  Cơ chế giải quyết tranh chấp
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Social organization feedback */}
+          <div>
+            <h3 className="font-bold text-lg mb-4">Phản ánh tổ chức xã hội</h3>
+            <ul className="space-y-3 text-sm text-gray-300">
+              <li>
+                <Link
+                  href="/client/tiep-nhan-phan-anh-to-chuc-xa-hoi"
+                  className="group flex items-start gap-2 hover:text-white transition"
+                >
+                  <span aria-hidden="true" className="mt-0.5 text-primary transition-transform group-hover:translate-x-0.5">›</span>
+                  <span>Tiếp nhận đánh giá, phản ánh, kiến nghị của tổ chức xã hội</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/client/danh-sach-phan-anh-to-chuc-xa-hoi"
+                  className="group flex items-start gap-2 hover:text-white transition"
+                >
+                  <span aria-hidden="true" className="mt-0.5 text-primary transition-transform group-hover:translate-x-0.5">›</span>
+                  <span>Danh sách đánh giá, phản ánh, kiến nghị của tổ chức xã hội</span>
                 </Link>
               </li>
             </ul>
@@ -112,8 +143,8 @@ export function Footer() {
         <div className="border-t border-gray-700 pt-8">
           <div className="text-center text-sm text-gray-400 space-y-2">
             <p>© 2025 Sàn TMĐT APECSPACE. Tất cả các quyền được bảo lưu.</p>
-            <p>Giấy phép ĐKKD số 0123456789 do Sở KH&ĐT cấp</p>
           </div>
+          <CompanyInformation className="mt-6 text-center text-gray-300" />
         </div>
       </div>
     </footer>

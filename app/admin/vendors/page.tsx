@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -25,6 +26,7 @@ interface Vendor {
   rating: number
   products: number
   followers: number
+  description?: string | null
   Shop?: {
     id?: number
     name?: string
@@ -55,6 +57,7 @@ interface VendorDocument {
 }
 
 export default function AdminVendorsPage() {
+  const searchParams = useSearchParams()
   const [status, setStatus] = useState<string>("all")
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
@@ -95,6 +98,23 @@ export default function AdminVendorsPage() {
   useEffect(() => {
     fetchVendors()
   }, [status, pagination.page, pagination.limit])
+
+  useEffect(() => {
+    const selectedVendorId = Number(searchParams.get("selectedVendorId"))
+    if (!selectedVendorId || isDetailsModalOpen) return
+    const vendor = allVendors.find((item) => item.id === selectedVendorId)
+    if (vendor) {
+      handleOpenDetails(vendor)
+      return
+    }
+    fetch(`/api/admin/vendors?id=${selectedVendorId}`)
+      .then((response) => response.json())
+      .then((result) => {
+        const matchedVendor = result.data || result
+        if (matchedVendor?.id) handleOpenDetails(matchedVendor)
+      })
+      .catch(() => undefined)
+  }, [allVendors, searchParams])
 
   useEffect(() => {
     if (selectedVendor && isDetailsModalOpen) {

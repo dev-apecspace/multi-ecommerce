@@ -145,6 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = data.user
       setUser(userData)
       setStoredUser(userData)
+      void Promise.all(['terms-of-service', 'privacy-policy'].map(async (policyCode) => {
+        const acceptanceResponse = await fetch('/api/policy-acceptances', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policyCode }),
+        })
+        if (!acceptanceResponse.ok) console.error(`Could not record ${policyCode} acceptance after registration`)
+      })).catch(() => undefined)
 
       // Verify auth by fetching current user from backend
       try {
@@ -194,6 +200,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = responseData.user
       setUser(userData)
       setStoredUser(userData)
+      void Promise.all(['terms-of-service', 'privacy-policy'].map(async (policyCode) => {
+        const acceptanceResponse = await fetch('/api/policy-acceptances', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ policyCode }),
+        })
+        if (!acceptanceResponse.ok) console.error(`Could not record ${policyCode} acceptance after vendor registration`)
+      })).catch(() => undefined)
 
       // Verify auth by fetching current user from backend
       try {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { ProductImageUpload } from "@/components/product-image-upload"
 import { ProductMultiImageUpload } from "@/components/product-multi-image-upload"
@@ -58,6 +59,9 @@ interface Product {
   specifications?: string
   shippingInfo?: string
   warranty?: string
+  taxApplied?: boolean
+  taxIncluded?: boolean
+  taxRate?: number
 
   status: 'pending' | 'approved' | 'rejected'
   ProductVariant?: ProductVariant[]
@@ -84,6 +88,7 @@ export default function EditProductPage() {
     specifications: "",
     shippingInfo: "",
     warranty: "",
+    taxIncluded: false,
 
   })
   const [variants, setVariants] = useState<ProductVariant[]>([])
@@ -143,6 +148,7 @@ export default function EditProductPage() {
         specifications: product.specifications || "",
         shippingInfo: product.shippingInfo || "",
         warranty: product.warranty || "",
+        taxIncluded: product.taxIncluded === true,
 
       })
       
@@ -243,9 +249,9 @@ export default function EditProductPage() {
           ...formData,
           stock: stockToSend,
           variants: filteredVariants,
-          taxApplied: false,
-          taxIncluded: true,
-          taxRate: 0,
+          taxApplied: true,
+          taxIncluded: formData.taxIncluded,
+          taxRate: 10,
           images: productImages.map(img => ({
             id: img.id,
             image: img.image || img.url,
@@ -390,6 +396,21 @@ export default function EditProductPage() {
                   />
                 </div>
               </div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+                <Checkbox
+                  checked={formData.taxIncluded}
+                  onCheckedChange={(checked) => setFormData({ ...formData, taxIncluded: checked === true })}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block font-medium">Giá sản phẩm đã bao gồm thuế VAT (10%)</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {formData.taxIncluded
+                      ? "Giá đã nhập là giá cuối cùng khách hàng thanh toán."
+                      : "Hệ thống sẽ tự cộng VAT 10% vào giá sản phẩm khi hiển thị và thanh toán."}
+                  </span>
+                </span>
+              </label>
             </CardContent>
           </Card>
 
