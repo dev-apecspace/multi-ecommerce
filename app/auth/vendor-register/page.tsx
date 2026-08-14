@@ -1,353 +1,189 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Mail, Lock, Eye, EyeOff, Loader2, User, Phone, Store } from 'lucide-react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, Loader2, Lock, Mail, MapPin, Phone, ShieldCheck, Store, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MultiDocumentUpload } from '@/components/multi-document-upload'
+import { Label } from '@/components/ui/label'
+import { VendorRegistrationDocumentsUpload } from '@/components/vendor-registration-documents-upload'
+import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/lib/auth-context'
+
+type BusinessDocument = { name: string; url?: string; documentType: string; file: File }
+
+const required = <span className="text-destructive"> *</span>
 
 export default function VendorRegisterPage() {
   const router = useRouter()
   const { vendorSignup, loading, error, clearError } = useAuth()
-  const [step, setStep] = useState('account')
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    name: '',
-    phone: '',
-    shopName: '',
-    logo: '',
-    businessDocuments: [] as Array<{ name: string; url: string }>,
-  })
-  const [localError, setLocalError] = useState('')
+  const { toast } = useToast()
+  const [step, setStep] = useState<'account' | 'shop'>('account')
   const [showPassword, setShowPassword] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const businessDocumentsRef = useRef<BusinessDocument[]>([])
+  const [localError, setLocalError] = useState('')
+  const [formData, setFormData] = useState({
+    name: '', email: '', phone: '', password: '', confirmPassword: '',
+    shopName: '', shopDescription: '', businessAddress: '', taxId: '', businessLicense: '', logo: '',
+    businessDocuments: [] as BusinessDocument[],
+  })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+  const update = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target
+    setFormData((current) => ({ ...current, [name]: value }))
   }
 
-  const handleNext = () => {
-    setLocalError('')
-    if (step === 'account') {
-      if (!formData.email || !formData.password || !formData.name) {
-        setLocalError('Vui lòng điền tất cả các trường bắt buộc')
-        return
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setLocalError('Mật khẩu không khớp')
-        return
-      }
-      if (formData.password.length < 8) {
-        setLocalError('Mật khẩu phải có ít nhất 8 ký tự')
-        return
-      }
-      setStep('business')
-    }
+  const setError = (message: string) => {
+    setLocalError(message)
+    toast({ title: 'Vui lòng kiểm tra thông tin', description: message, variant: 'destructive' })
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLocalError('')
-
-    if (!formData.shopName || !formData.logo || formData.businessDocuments.length === 0) {
-      setLocalError('Vui lòng điền Tên shop, tải lên logo và ít nhất 1 tài liệu')
-      return
+  const validateAccount = () => {
+    clearError()
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.password || !formData.confirmPassword) {
+      setError('Vui lòng điền đầy đủ thông tin tài khoản bắt buộc.')
+      return false
     }
+    if (formData.password.length < 8) { setError('Mật khẩu cần có ít nhất 8 ký tự.'); return false }
+    if (formData.password !== formData.confirmPassword) { setError('Xác nhận mật khẩu chưa khớp.'); return false }
+    setLocalError('')
+    return true
+  }
 
+  const validateShop = () => {
+    clearError()
+    const missingFields = [
+      !formData.shopName.trim() && 'Tên cửa hàng',
+      !formData.shopDescription.trim() && 'Mô tả cửa hàng',
+      !formData.businessAddress.trim() && 'Địa chỉ kinh doanh',
+      !formData.taxId.trim() && 'Mã số thuế',
+      !formData.businessLicense.trim() && 'Số giấy phép kinh doanh',
+      !logoFile && 'Logo cửa hàng',
+      !businessDocumentsRef.current.some((document) => document.file) && 'Ít nhất một hồ sơ/tệp đính kèm',
+    ].filter(Boolean)
+    if (missingFields.length) { setError(`Bạn chưa hoàn tất: ${missingFields.join(', ')}.`); return false }
+    if (!acceptedTerms) { setError('Bạn cần xác nhận thông tin và đồng ý với các chính sách.'); return false }
+    setLocalError('')
+    return true
+  }
+
+  const uploadLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!['image/jpeg', 'image/png'].includes(file.type)) { setError('Logo chỉ hỗ trợ định dạng JPG hoặc PNG.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('Logo không được vượt quá 5MB.'); return }
+    setLogoFile(file)
+    setFormData((current) => ({ ...current, logo: URL.createObjectURL(file) }))
+    toast({ title: 'Đã chọn logo', description: 'Logo sẽ chỉ được tải lên khi bạn gửi đăng ký.' })
+    event.target.value = ''
+  }
+
+  const uploadRegistrationFiles = async () => {
+    if (!logoFile) throw new Error('Vui lòng chọn logo cửa hàng.')
+    setUploadingLogo(true)
     try {
-      // Clear old session first
-      if (loading === false) {
-        try {
-          await fetch('/api/auth/logout', { 
-            method: 'POST',
-            credentials: 'include',
-          })
-        } catch (err) {
-          // Ignore logout errors, proceed with signup
-          console.error('Logout error during vendor register:', err)
-        }
-      }
+      const logoPayload = new FormData()
+      logoPayload.append('file', logoFile)
+      logoPayload.append('shopName', formData.shopName)
+      const logoResponse = await fetch('/api/auth/vendor-register/upload-logo', { method: 'POST', body: logoPayload })
+      const logoResult = await logoResponse.json()
+      if (!logoResponse.ok) throw new Error(logoResult.error || 'Không thể tải logo lên.')
 
-      await vendorSignup(formData)
-      router.push('/auth/vendor-pending')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Đăng ký thất bại'
-      setLocalError(message)
+      const uploadedDocuments = await Promise.all(businessDocumentsRef.current.map(async (document) => {
+        const payload = new FormData()
+        payload.append('file', document.file)
+        payload.append('shopName', formData.shopName)
+        const response = await fetch('/api/auth/vendor-register/upload-document', { method: 'POST', body: payload })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || `Không thể tải ${document.name}.`)
+        return { name: result.fileName || document.name, url: result.url, documentType: document.documentType }
+      }))
+      return { logo: logoResult.url as string, businessDocuments: uploadedDocuments }
+    } finally {
+      setUploadingLogo(false)
     }
   }
+
+  const handleRegister = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!validateShop()) return
+    try {
+      const uploadedFiles = await uploadRegistrationFiles()
+      await vendorSignup({ ...formData, ...uploadedFiles })
+      router.push('/auth/vendor-pending')
+    } catch (registrationError) {
+      setError(registrationError instanceof Error ? registrationError.message : 'Đăng ký nhà bán hàng thất bại.')
+    }
+  }
+
+  const errorMessage = localError || error
+  const fieldClass = 'h-11 border-slate-200 bg-white shadow-sm focus-visible:ring-orange-500'
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-2xl">
-        <div className="bg-card rounded-lg border border-border p-8">
-          <h1 className="text-3xl font-bold text-center mb-2">Sàn TMĐT APECSPACE</h1>
-          <p className="text-center text-muted-foreground mb-8">Đăng ký tài khoản nhà bán hàng</p>
-
-          {step === 'account' && (
-            <form onSubmit={(e) => { e.preventDefault(); handleNext() }} className="space-y-4">
-              {(localError || error) && (
-                <div className="p-3 bg-red-100 text-red-800 rounded-lg text-sm">
-                  {localError || error}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Tên đầy đủ</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      name="name"
-                      placeholder="Tên của bạn"
-                      value={formData.name}
-                      onChange={handleChange}
-                      className="pl-10"
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Số điện thoại</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      type="tel"
-                      name="phone"
-                      placeholder="Số điện thoại"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="pl-10"
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    type="email"
-                    name="email"
-                    placeholder="Email của bạn"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="pl-10"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Mật khẩu</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="Mật khẩu (ít nhất 8 ký tự)"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-10 py-2 border border-border rounded-lg"
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-                    disabled={loading}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Xác nhận mật khẩu</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    placeholder="Xác nhận mật khẩu"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className="w-full pl-10 py-2 border border-border rounded-lg"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full">
-                Tiếp tục
-              </Button>
-            </form>
-          )}
-
-          {step === 'business' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              {(localError || error) && (
-                <div className="p-3 bg-red-100 text-red-800 rounded-lg text-sm">
-                  {localError || error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Tên cửa hàng *</label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    name="shopName"
-                    placeholder="Tên cửa hàng của bạn"
-                    value={formData.shopName}
-                    onChange={handleChange}
-                    className="pl-10"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Logo cửa hàng * (JPG, PNG - tối đa 5MB)</label>
-                {formData.logo ? (
-                  <div className="flex items-center gap-3 p-4 border border-green-300 bg-green-50 rounded-lg">
-                    <img 
-                      src={formData.logo} 
-                      alt="Logo preview" 
-                      className="h-16 w-16 object-contain rounded"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-green-800">Logo đã tải lên</p>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, logo: '' }))}
-                        className="text-xs text-green-600 hover:underline mt-1"
-                        disabled={loading}
-                      >
-                        Thay đổi
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => document.getElementById('logo-upload')?.click()}
-                    className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
-                  >
-                    <p className="text-sm font-medium">Kéo thả logo hoặc click để chọn</p>
-                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG (tối đa 5MB)</p>
-                    <input
-                      id="logo-upload"
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        
-                        if (file.size > 5 * 1024 * 1024) {
-                          setLocalError('Logo quá lớn. Tối đa 5MB')
-                          return
-                        }
-                        
-                        if (!['image/jpeg', 'image/png'].includes(file.type)) {
-                          setLocalError('Chỉ chấp nhận JPG hoặc PNG')
-                          return
-                        }
-
-                        try {
-                          const formData = new FormData()
-                          formData.append('file', file)
-                          
-                          const response = await fetch('/api/upload', {
-                            method: 'POST',
-                            body: formData,
-                          })
-                          
-                          if (!response.ok) throw new Error('Upload thất bại')
-                          
-                          const data = await response.json()
-                          setFormData(prev => ({ ...prev, logo: data.url }))
-                          setLocalError('')
-                        } catch (err) {
-                          setLocalError('Upload logo thất bại')
-                        }
-                      }}
-                      className="hidden"
-                      disabled={loading}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Hồ sơ / Tiệp đính kèm * (Thêm một hoặc nhiều tài liệu)</label>
-                <MultiDocumentUpload
-                  onDocumentsChange={(docs) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      businessDocuments: docs.map(doc => ({ name: doc.name, url: doc.url })),
-                    }))
-                  }}
-                  disabled={loading}
-                  minDocuments={1}
-                />
-              </div>
-
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" className="mt-1" required disabled={loading} />
-                <span className="text-xs text-muted-foreground">
-                  Tôi xác nhận tất cả thông tin trên là chính xác và đúng sự thật. Tôi đồng ý với{' '}
-                  <Link href="/client/dieu-khoan-dich-vu" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    Điều khoản dịch vụ
-                  </Link>{' '}
-                  và{' '}
-                  <Link href="/client/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    Chính sách bảo mật
-                  </Link>
-                </span>
-              </label>
-
-              <div className="flex gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep('account')}
-                  className="w-full"
-                  disabled={loading}
-                >
-                  Quay lại
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={!formData.shopName || !formData.logo || formData.businessDocuments.length === 0 || loading}
-                  className="w-full"
-                >
-                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Đăng ký
-                </Button>
-              </div>
-            </form>
-          )}
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Đã có tài khoản?{' '}
-              <Link href="/auth/login?type=vendor" className="text-primary hover:underline">
-                Đăng nhập ngay
-              </Link>
-            </p>
+    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 px-4 py-8 sm:py-12">
+      <section className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-xl shadow-orange-950/5">
+        <header className="border-b border-orange-100 bg-[linear-gradient(120deg,#fff7ed_0%,#ffffff_52%,#fffaf0_100%)] px-6 py-7 sm:px-10">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-orange-600"><Store className="h-4 w-4" /> APECSPACE Marketplace</p>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Đăng ký trở thành nhà bán hàng</h1>
+              <p className="mt-2 text-sm text-slate-600">Cung cấp hồ sơ một lần, chủ động cập nhật tại Cài đặt shop sau khi đăng nhập.</p>
+            </div>
+            <div className="rounded-xl border border-orange-200 bg-white/80 px-4 py-3 text-sm shadow-sm">
+              <p className="font-semibold text-slate-800">Hồ sơ xét duyệt</p>
+              <p className="mt-1 text-xs text-slate-500">Thông tin được bảo mật</p>
+            </div>
           </div>
+          <ol className="mt-7 grid grid-cols-2 gap-3" aria-label="Tiến trình đăng ký">
+            {[['account', '1', 'Tài khoản', 'Thông tin chủ shop'], ['shop', '2', 'Hồ sơ cửa hàng', 'Thông tin kinh doanh']].map(([id, number, label, note]) => {
+              const active = step === id
+              const complete = step === 'shop' && id === 'account'
+              return <li key={id} className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${active ? 'border-orange-500 bg-orange-500 text-white shadow-sm' : complete ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-500'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-white text-orange-600' : complete ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{complete ? <CheckCircle2 className="h-4 w-4" /> : number}</span>
+                <span><span className="block text-sm font-bold">{label}</span><span className={`block text-xs ${active ? 'text-orange-100' : 'opacity-75'}`}>{note}</span></span>
+              </li>
+            })}
+          </ol>
+        </header>
+
+        <div className="px-6 py-7 sm:px-10 sm:py-9">
+          {errorMessage && <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{errorMessage}</div>}
+
+          {step === 'account' ? (
+            <form onSubmit={(event) => { event.preventDefault(); if (validateAccount()) setStep('shop') }} className="space-y-6">
+              <div><h2 className="text-lg font-bold text-slate-900">Thông tin tài khoản</h2><p className="mt-1 text-sm text-slate-500">Dùng để liên hệ và quản lý cửa hàng của bạn.</p></div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div><Label htmlFor="name">Họ và tên{required}</Label><div className="relative mt-2"><User className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="name" name="name" value={formData.name} onChange={update} placeholder="Nguyễn Văn A" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+                <div><Label htmlFor="phone">Số điện thoại{required}</Label><div className="relative mt-2"><Phone className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="phone" name="phone" value={formData.phone} onChange={update} placeholder="09xx xxx xxx" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+                <div className="sm:col-span-2"><Label htmlFor="email">Email đăng nhập{required}</Label><div className="relative mt-2"><Mail className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="email" name="email" type="email" value={formData.email} onChange={update} placeholder="email@doanhnghiep.vn" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+                <div><Label htmlFor="password">Mật khẩu{required}</Label><div className="relative mt-2"><Lock className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="password" name="password" type={showPassword ? 'text' : 'password'} value={formData.password} onChange={update} placeholder="Tối thiểu 8 ký tự" className={`${fieldClass} pl-10 pr-11`} disabled={loading} /><button type="button" aria-label="Hiện hoặc ẩn mật khẩu" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-slate-400 hover:text-slate-700">{showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button></div></div>
+                <div><Label htmlFor="confirmPassword">Xác nhận mật khẩu{required}</Label><div className="relative mt-2"><Lock className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="confirmPassword" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={update} placeholder="Nhập lại mật khẩu" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+              </div>
+              <div className="flex justify-end border-t border-slate-100 pt-6"><Button type="submit" className="h-11 min-w-40 bg-orange-600 px-6 font-semibold hover:bg-orange-700">Tiếp tục <ChevronRight className="ml-2 h-4 w-4" /></Button></div>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-7">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row"><div><h2 className="text-lg font-bold text-slate-900">Hồ sơ cửa hàng</h2><p className="mt-1 text-sm text-slate-500">Các mục có dấu <span className="text-destructive">*</span> là bắt buộc để gửi duyệt.</p></div><div className="flex items-center gap-2 text-xs font-medium text-emerald-700"><ShieldCheck className="h-4 w-4" /> Dữ liệu hiển thị cho quản trị viên</div></div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div><Label htmlFor="shopName">Tên cửa hàng{required}</Label><div className="relative mt-2"><Store className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="shopName" name="shopName" value={formData.shopName} onChange={update} placeholder="Tên hiển thị của cửa hàng" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+                <div><Label htmlFor="taxId">Mã số thuế{required}</Label><Input id="taxId" name="taxId" value={formData.taxId} onChange={update} placeholder="Ví dụ: 0319596563" className={`mt-2 ${fieldClass}`} disabled={loading} /></div>
+                <div className="sm:col-span-2"><Label htmlFor="shopDescription">Mô tả cửa hàng{required}</Label><textarea id="shopDescription" name="shopDescription" value={formData.shopDescription} onChange={update} placeholder="Giới thiệu ngắn về sản phẩm, ngành hàng hoặc thế mạnh của cửa hàng" rows={4} className="mt-2 flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50" disabled={loading} /></div>
+                <div className="sm:col-span-2"><Label htmlFor="businessAddress">Địa chỉ kinh doanh{required}</Label><div className="relative mt-2"><MapPin className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="businessAddress" name="businessAddress" value={formData.businessAddress} onChange={update} placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+                <div className="sm:col-span-2"><Label htmlFor="businessLicense">Số giấy phép kinh doanh{required}</Label><div className="relative mt-2"><Building2 className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><Input id="businessLicense" name="businessLicense" value={formData.businessLicense} onChange={update} placeholder="Số giấy chứng nhận đăng ký kinh doanh" className={`${fieldClass} pl-10`} disabled={loading} /></div></div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5"><Label htmlFor="logo-upload">Logo cửa hàng{required}</Label><p className="mt-1 text-xs text-slate-500">JPG, PNG · dung lượng tối đa 5MB · chỉ tải lên khi gửi đăng ký</p>{uploadingLogo ? <div className="mt-4 flex items-center justify-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-7 text-sm font-semibold text-orange-700"><Loader2 className="h-5 w-5 animate-spin" /> Đang tải hồ sơ đăng ký...</div> : formData.logo ? <div className="mt-4 flex items-center gap-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3"><img src={formData.logo} alt="Logo cửa hàng" className="h-14 w-14 rounded-lg object-contain bg-white" /><div className="min-w-0 flex-1"><p className="flex items-center gap-1 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" /> Logo đã chọn</p><p className="mt-1 text-xs text-emerald-700">Sẽ tải lên khi gửi đăng ký</p><button type="button" onClick={() => { setLogoFile(null); setFormData((current) => ({ ...current, logo: '' })) }} className="mt-1 text-xs font-medium text-orange-700 hover:underline">Thay đổi logo</button></div></div> : <label htmlFor="logo-upload" className="mt-4 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-orange-200 bg-white px-4 py-7 text-center transition hover:border-orange-500 hover:bg-orange-50"><span><Store className="mx-auto mb-2 h-6 w-6 text-orange-500" /><span className="block text-sm font-semibold text-slate-700">Chọn logo cửa hàng</span><span className="mt-1 block text-xs text-slate-500">File chỉ được lưu tạm trong trình duyệt</span></span></label>}<input id="logo-upload" type="file" accept="image/jpeg,image/png" onChange={uploadLogo} className="sr-only" disabled={loading || uploadingLogo} /></div>
+              <div className="rounded-xl border border-slate-200 p-5"><div className="mb-4"><Label>Hồ sơ / tệp đính kèm{required}</Label><p className="mt-1 text-xs text-slate-500">Tệp chỉ được tải vào hệ thống khi bạn gửi đăng ký.</p></div><VendorRegistrationDocumentsUpload documents={formData.businessDocuments} onChange={(documents) => { businessDocumentsRef.current = documents; setFormData((current) => ({ ...current, businessDocuments: documents })) }} disabled={loading || uploadingLogo} /></div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-orange-100 bg-orange-50/70 p-4 text-sm text-slate-700"><input type="checkbox" checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" disabled={loading} /><span>Tôi xác nhận các thông tin kê khai là chính xác và đồng ý với <Link href="/api/legal-documents/view/terms-of-service" target="_blank" rel="noopener noreferrer" className="font-medium text-orange-700 underline underline-offset-2">Điều khoản dịch vụ</Link> cùng <Link href="/api/legal-documents/view/privacy-policy" target="_blank" rel="noopener noreferrer" className="font-medium text-orange-700 underline underline-offset-2">Chính sách bảo mật</Link>.</span></label>
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-between"><Button type="button" variant="outline" onClick={() => { setLocalError(''); setStep('account') }} className="h-11 sm:min-w-36" disabled={loading || uploadingLogo}><ChevronLeft className="mr-2 h-4 w-4" /> Quay lại</Button><Button type="submit" className="h-11 bg-orange-600 px-7 font-semibold hover:bg-orange-700" disabled={loading || uploadingLogo}>{(loading || uploadingLogo) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{uploadingLogo ? 'Đang tải logo...' : 'Gửi đăng ký'}</Button></div>
+            </form>
+          )}
+          <p className="mt-7 text-center text-sm text-slate-600">Đã có tài khoản? <Link href="/auth/login?type=vendor" className="font-semibold text-orange-700 hover:underline">Đăng nhập ngay</Link></p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }

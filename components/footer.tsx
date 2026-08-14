@@ -35,22 +35,22 @@ export function Footer() {
             <h3 className="font-bold text-lg mb-4">Chính sách</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <Link href="/client/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                <Link href="/api/legal-documents/view/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   Bảo mật thông tin
                 </Link>
               </li>
               <li>
-                <Link href="/client/dieu-khoan-dich-vu" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                <Link href="/api/legal-documents/view/terms-of-service" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   Điều khoản dịch vụ
                 </Link>
               </li>
               <li>
-                <Link href="/client/dieu-kien-hoat-dong" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                <Link href="/api/legal-documents/view/website-operating-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   Điều kiện hoạt động
                 </Link>
               </li>
               <li>
-                <Link href="/client/co-che-giai-quyet-tranh-chap" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                <Link href="/api/legal-documents/view/dispute-resolution" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                   Cơ chế giải quyết tranh chấp
                 </Link>
               </li>

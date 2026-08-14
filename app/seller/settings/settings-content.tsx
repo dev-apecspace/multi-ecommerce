@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Save, Loader } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Save, Loader, ImageIcon, Pencil, Store, Upload, CheckCircle2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VendorApprovalBanner } from "@/components/vendor-approval-banner"
-import { ProductImageUpload } from "@/components/product-image-upload"
 import { useToast } from "@/hooks/use-toast"
 import { useLoading } from "@/hooks/use-loading"
 
@@ -41,6 +40,79 @@ interface ShippingData {
 interface PaymentData {
   bankTransfer: boolean
   e_wallet: boolean
+}
+
+function BrandAssetControl({
+  label,
+  helper,
+  imageUrl,
+  uploadType,
+  onUploaded,
+  cover = false,
+}: {
+  label: string
+  helper: string
+  imageUrl: string
+  uploadType: "logo" | "cover"
+  onUploaded: (url: string) => void
+  cover?: boolean
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [selecting, setSelecting] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState("")
+
+  const uploadFile = async (file?: File) => {
+    if (!file) return
+    setError("")
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.")
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Dung lượng ảnh tối đa là 5MB.")
+      return
+    }
+
+    setUploading(true)
+    try {
+      const body = new FormData()
+      body.append("file", file)
+      body.append("uploadType", uploadType)
+      const response = await fetch("/api/seller/vendor-upload", { method: "POST", body })
+      if (!response.ok) throw new Error("Upload thất bại")
+      const data = await response.json()
+      onUploaded(data.url)
+      setSelecting(false)
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Không thể tải ảnh lên.")
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ""
+    }
+  }
+
+  return (
+    <div className={cover ? "rounded-xl border border-slate-200 bg-white p-3 sm:p-4" : "rounded-xl border border-slate-200 bg-white p-4"}>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div><Label className="font-semibold text-slate-900">{label}</Label><p className="mt-1 text-xs text-muted-foreground">{helper}</p></div>
+        {imageUrl && <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />Đang dùng</span>}
+      </div>
+      {imageUrl ? (
+        <div className={cover ? "relative" : "flex items-center gap-4"}>
+          <img src={imageUrl} alt={`${label} hiện tại`} className={cover ? "aspect-[16/5] w-full rounded-lg border border-slate-200 bg-slate-100 object-cover" : "h-20 w-20 rounded-xl border border-slate-200 bg-white object-cover p-1"} />
+          {!cover && <div><p className="text-sm font-medium text-slate-900">Logo hiện tại</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Đây là ảnh đại diện công khai của shop.</p></div>}
+        </div>
+      ) : (
+        <div className={cover ? "flex aspect-[16/5] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-sm text-muted-foreground" : "flex h-20 w-20 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-muted-foreground"}><ImageIcon className="h-5 w-5" /></div>
+      )}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+        <p className="text-xs text-muted-foreground">{imageUrl ? "Ảnh đang hiển thị trên trang shop." : "Chưa có ảnh hiển thị."}</p>
+        {!selecting && <Button type="button" variant="outline" size="sm" className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800" onClick={() => setSelecting(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" />{imageUrl ? "Thay ảnh" : "Chọn ảnh"}</Button>}
+      </div>
+      {selecting && <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium text-slate-800">Chọn ảnh thay thế</p><button type="button" className="text-slate-500 hover:text-slate-800" onClick={() => { setSelecting(false); setError("") }} aria-label="Hủy chọn ảnh"><X className="h-4 w-4" /></button></div><p className="mt-1 text-xs text-muted-foreground">Ảnh hiện tại vẫn được giữ cho tới khi tải ảnh mới thành công.</p><input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => uploadFile(event.target.files?.[0])} /><Button type="button" size="sm" disabled={uploading} className="mt-3 bg-orange-600 hover:bg-orange-700" onClick={() => inputRef.current?.click()}>{uploading ? <><Loader className="mr-1.5 h-3.5 w-3.5 animate-spin" />Đang tải lên...</> : <><Upload className="mr-1.5 h-3.5 w-3.5" />Chọn tệp ảnh</>}</Button>{error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}</div>}
+    </div>
+  )
 }
 
 export default function SellerSettingsPage() {
@@ -227,72 +299,36 @@ export default function SellerSettingsPage() {
   }
 
   return (
-    <main className="p-6">
+    <main className="mx-auto w-full max-w-6xl p-4 sm:p-6">
       <VendorApprovalBanner />
-      <h1 className="text-3xl font-bold mb-8">Cài đặt shop</h1>
+      <div className="mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-orange-600">Thiết lập cửa hàng</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Cài đặt shop</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Cập nhật nhận diện và thông tin hiển thị công khai của cửa hàng.</p>
+      </div>
 
       <Tabs defaultValue="general">
-        <TabsList>
+        <TabsList className="mb-5 h-auto w-full justify-start overflow-x-auto rounded-lg bg-slate-100 p-1 sm:w-fit">
           <TabsTrigger value="general">Thông tin chung</TabsTrigger>
           <TabsTrigger value="policy">Chính sách</TabsTrigger>
           <TabsTrigger value="shipping">Vận chuyển</TabsTrigger>
           <TabsTrigger value="payment">Thanh toán</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thông tin shop</CardTitle>
+        <TabsContent value="general" className="mt-0">
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-5">
+              <CardTitle className="flex items-center gap-2 text-lg"><Store className="h-5 w-5 text-orange-600" /> Thông tin shop</CardTitle>
+              <p className="text-sm text-muted-foreground">Thông tin hiển thị công khai trên trang cửa hàng.</p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label>Logo vendor (Avatar chủ shop)</Label>
-                <div className="mt-2 space-y-4">
-                  {shopData.vendorLogo && (
-                    <div className="flex items-center gap-4">
-                      <div className="relative w-24 h-24">
-                        <img src={shopData.vendorLogo} alt="vendor logo" className="w-24 h-24 object-cover rounded-full border-2 border-gray-200" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-2">Logo hiện tại</p>
-                        <button
-                          type="button"
-                          onClick={() => setShopData(prev => ({ ...prev, vendorLogo: '' }))}
-                          className="text-sm text-orange-600 hover:text-orange-700 underline"
-                        >
-                          Đổi logo
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <ProductImageUpload
-                    onImageSelect={(url) => setShopData(prev => ({ ...prev, vendorLogo: url }))}
-                  />
+            <CardContent className="space-y-8 pt-6">
+              <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+                <div className="mb-4 flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><ImageIcon className="h-5 w-5" /></span><div><h2 className="font-semibold text-slate-900">Nhận diện cửa hàng</h2><p className="mt-0.5 text-sm text-muted-foreground">Quản lý logo và ảnh bìa của shop.</p></div></div>
+                <div className="relative pt-16 sm:pt-20">
+                  <div className="relative z-0"><BrandAssetControl label="Ảnh bìa shop" helper="Tỷ lệ đề xuất 16:5 · JPG, PNG, WEBP · tối đa 5MB" imageUrl={shopData.shopLogo} uploadType="cover" onUploaded={(url) => setShopData(prev => ({ ...prev, shopLogo: url }))} cover /></div>
+                  <div className="relative z-10 mx-3 -mt-10 w-auto sm:absolute sm:bottom-4 sm:left-5 sm:mx-0 sm:mt-0 sm:w-[285px]"><BrandAssetControl label="Logo cửa hàng" helper="JPG, PNG, WEBP · tối đa 5MB" imageUrl={shopData.vendorLogo} uploadType="logo" onUploaded={(url) => setShopData(prev => ({ ...prev, vendorLogo: url }))} /></div>
                 </div>
-              </div>
-
-              <div>
-                <Label>Ảnh bìa shop</Label>
-                <div className="mt-2 space-y-4">
-                  {shopData.shopLogo && (
-                    <div className="relative w-full">
-                      <img src={shopData.shopLogo} alt="shop cover" className="w-full h-40 object-cover rounded border border-gray-200" />
-                      <div className="absolute top-2 right-2">
-                        <button
-                          type="button"
-                          onClick={() => setShopData(prev => ({ ...prev, shopLogo: '' }))}
-                          className="bg-white hover:bg-gray-100 text-gray-600 px-3 py-1 rounded text-sm"
-                        >
-                          Đổi ảnh
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <ProductImageUpload
-                    onImageSelect={(url) => setShopData(prev => ({ ...prev, shopLogo: url }))}
-                  />
-                </div>
-              </div>
+              </section>
 
               <div>
                 <Label>Tên shop</Label>
@@ -315,7 +351,7 @@ export default function SellerSettingsPage() {
                 ></textarea>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Email liên hệ</Label>
                   <Input 
@@ -347,7 +383,7 @@ export default function SellerSettingsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Mã số thuế</Label>
                   <Input 
@@ -368,7 +404,7 @@ export default function SellerSettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div>
                 <div>
                   <Label>Tên chủ shop</Label>
                   <Input 
@@ -383,7 +419,7 @@ export default function SellerSettingsPage() {
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">Thông tin ngân hàng</h3>
                 
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="mb-4 grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label>Số tài khoản</Label>
                     <Input 

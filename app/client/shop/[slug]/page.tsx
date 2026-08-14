@@ -35,6 +35,11 @@ export default function ShopPage({ params }: ShopPageProps) {
   const [loading, setLoading] = useState(true)
   const [favorites, setFavorites] = useState<string[]>([])
   const [isFollowing, setIsFollowing] = useState(false)
+  const formatCount = (value: number | null | undefined) => {
+    const count = Number(value) || 0
+    if (count < 1000) return count.toLocaleString('vi-VN')
+    return `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}K`
+  }
   
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
 
@@ -118,6 +123,32 @@ export default function ShopPage({ params }: ShopPageProps) {
 
     fetchShopData()
   }, [resolvedParams.slug])
+
+  const handleChatWithShop = async () => {
+    if (!user) {
+      router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
+      return
+    }
+    if (!shop?.id) return
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/client/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendorId: shop.id }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.conversation?.id) {
+        throw new Error(data.error || 'Không thể bắt đầu trò chuyện')
+      }
+      router.push(`/client/chat?conversationId=${data.conversation.id}`)
+    } catch (error: any) {
+      toast({ title: 'Không thể mở trò chuyện', description: error.message || 'Vui lòng thử lại.', variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     const loadFavorites = async () => {
@@ -328,7 +359,7 @@ export default function ShopPage({ params }: ShopPageProps) {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Người theo dõi</p>
-                    <p className="font-bold">{(shop.followers / 1000).toFixed(0)}K</p>
+                     <p className="font-bold">{formatCount(shop.followers)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Phản hồi</p>
@@ -347,7 +378,7 @@ export default function ShopPage({ params }: ShopPageProps) {
                   >
                     {isFollowing ? "Đang theo dõi" : "Theo dõi"}
                   </Button>
-                  <Button variant="outline">Trò chuyện</Button>
+                  <Button variant="outline" onClick={handleChatWithShop}>Trò chuyện</Button>
                   <Button variant="outline" size="icon">
                     <Heart className="h-5 w-5" />
                   </Button>
@@ -526,7 +557,7 @@ export default function ShopPage({ params }: ShopPageProps) {
                       </p>
                     </section>
 
-                    <Button className="w-full">Trò chuyện với shop</Button>
+                    <Button className="w-full" onClick={handleChatWithShop}>Trò chuyện với shop</Button>
                   </CardContent>
                 </Card>
               </div>

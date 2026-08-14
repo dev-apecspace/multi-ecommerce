@@ -61,6 +61,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { data: approvedDocument, error: approvedCheckError } = await supabase
+      .from('VendorDocument')
+      .select('id')
+      .eq('vendorId', auth.vendorId)
+      .eq('status', 'approved')
+      .limit(1)
+      .maybeSingle()
+
+    if (approvedCheckError) return NextResponse.json({ error: approvedCheckError.message }, { status: 400 })
+    if (approvedDocument) {
+      return NextResponse.json({ error: 'Hồ sơ của shop đã được duyệt, bạn không thể tải thêm hoặc thay thế hồ sơ.' }, { status: 409 })
+    }
+
     const { data: document, error: docError } = await supabase
       .from('VendorDocument')
       .insert([{
@@ -101,7 +114,7 @@ export async function DELETE(request: NextRequest) {
 
     const { data: document } = await supabase
       .from('VendorDocument')
-      .select('vendorId')
+      .select('vendorId, status')
       .eq('id', documentId)
       .maybeSingle()
 
@@ -110,6 +123,10 @@ export async function DELETE(request: NextRequest) {
         { error: 'Unauthorized: Document does not belong to this vendor' },
         { status: 403 }
       )
+    }
+
+    if (document.status === 'approved') {
+      return NextResponse.json({ error: 'Không thể xóa hồ sơ đã được duyệt.' }, { status: 409 })
     }
 
     const { error } = await supabase

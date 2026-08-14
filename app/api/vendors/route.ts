@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
 
     if (slug) {
-      query = query.eq('slug', slug)
+      // Hỗ trợ URL cũ dùng ID, đồng thời ưu tiên slug cho URL shop chuẩn.
+      query = /^\d+$/.test(slug) ? query.eq('id', parseInt(slug)) : query.eq('slug', slug)
     } else {
       query = query.eq('status', status)
     }
@@ -49,8 +50,8 @@ export async function GET(request: NextRequest) {
     if (data && data.length > 0) {
       enrichedData = await Promise.all(
         data.map(async (vendor: any) => {
-          // Get UserProfile for avatar
-          let avatar = vendor.vendorLogo || null
+          // Logo/bìa được lưu chuẩn trên Vendor. UserProfile chỉ là fallback cho dữ liệu cũ.
+          let avatar = vendor.logo || vendor.vendorLogo || null
           if (vendor.userId) {
             const { data: userProfile } = await supabase
               .from('UserProfile')
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
               .maybeSingle()
             
             if (userProfile) {
-              avatar = userProfile.vendorLogo || userProfile.avatar || vendor.vendorLogo || null
+              avatar = vendor.logo || userProfile.vendorLogo || userProfile.avatar || vendor.vendorLogo || null
             }
           }
 
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
             .from('Product')
             .select('id')
             .eq('vendorId', vendor.id)
+            .eq('status', 'approved')
           
           // Calculate rating from reviews (via products)
           let calculatedRating = vendor.rating || 0
@@ -76,7 +78,7 @@ export async function GET(request: NextRequest) {
           if (vendorProducts && vendorProducts.length > 0) {
             const productIds = vendorProducts.map((p: any) => p.id)
             const { data: reviews } = await supabase
-              .from('Review')
+              .from('ProductReview')
               .select('rating')
               .in('productId', productIds)
             
@@ -87,18 +89,18 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // Get followers count (check if VendorFollow table exists, otherwise use vendor.followers)
+          // ShopFollow là nguồn dữ liệu theo dõi chuẩn, đồng bộ với API theo dõi ở Client.
           let followersCount = vendor.followers || 0
           try {
             const { count } = await supabase
-              .from('VendorFollow')
+              .from('ShopFollow')
               .select('*', { count: 'exact', head: true })
               .eq('vendorId', vendor.id)
             if (count !== null) {
               followersCount = count
             }
           } catch (e) {
-            // VendorFollow table might not exist, use vendor.followers
+            // Nếu bảng chưa sẵn sàng, dùng số đếm đã lưu trên Vendor.
           }
 
           const { data: shopData } = await supabase
@@ -108,6 +110,7 @@ export async function GET(request: NextRequest) {
             .maybeSingle()
           
           const shop = shopData || null
+          const coverImage = vendor.coverImage || shop?.image || shop?.coverImage || null
           let shopDetail = {}
           
           if (shop && shop.id) {
@@ -118,14 +121,34 @@ export async function GET(request: NextRequest) {
               .maybeSingle()
             shopDetail = detailData || {}
           }
+
+          // Thông tin liên hệ có thể nằm ở hồ sơ shop mới hoặc dữ liệu Vendor/User
+          // của các shop cũ. Luôn trả về một cấu trúc thống nhất cho Client.
+          let userContact: { email?: string | null; phone?: string | null } | null = null
+          if (vendor.userId) {
+            const { data: userData } = await supabase
+              .from('User')
+              .select('email, phone')
+              .eq('id', vendor.userId)
+              .maybeSingle()
+            userContact = userData
+          }
           
           return {
             ...vendor,
             logo: avatar,
             avatar: avatar,
+            image: coverImage,
+            banner: coverImage,
+            coverImage,
+            products: vendorProducts?.length ?? vendor.products ?? 0,
+            products_count: vendorProducts?.length ?? vendor.products ?? 0,
             rating: calculatedRating,
             reviews_count: reviewsCount,
             followers_count: followersCount || vendor.followers || 0,
+            email: (shopDetail as any)?.email || userContact?.email || vendor.email || null,
+            phone: (shopDetail as any)?.phone || userContact?.phone || vendor.phone || null,
+            address: (shopDetail as any)?.address || vendor.businessAddress || vendor.address || null,
             Shop: shop ? {
               ...shop,
               ShopDetail: shopDetail,

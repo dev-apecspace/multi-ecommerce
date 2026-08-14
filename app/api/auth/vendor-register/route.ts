@@ -17,6 +17,10 @@ export async function POST(request: NextRequest) {
       name,
       phone,
       shopName,
+      shopDescription,
+      businessAddress,
+      taxId,
+      businessLicense,
       logo,
       businessDocuments,
     } = await request.json()
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
       businessDocuments,
     })
 
-    if (!email || !password || !name || !shopName || !logo || !businessDocuments || businessDocuments.length === 0) {
+    if (!email || !password || !name || !phone || !shopName || !shopDescription || !businessAddress || !taxId || !businessLicense || !logo || !businessDocuments || businessDocuments.length === 0) {
       return NextResponse.json(
         { error: 'Email, password, name, shop name, logo, and at least one business document are required' },
         { status: 400 }
@@ -91,6 +95,11 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         name: shopName,
         slug: generateSlug(shopName),
+        description: shopDescription,
+        businessAddress,
+        taxId,
+        businessLicense,
+        logo,
         status: 'pending',
         rating: 0,
         products: 0,
@@ -112,6 +121,25 @@ export async function POST(request: NextRequest) {
     }
 
     const vendorId = vendorData?.[0]?.id
+
+    const documentsToCreate = businessDocuments.map((document: { name?: string; url?: string; documentType?: string }) => ({
+      vendorId,
+      documentType: document.documentType?.trim() || 'Hồ sơ đăng ký',
+      documentName: document.name || 'Tài liệu đăng ký',
+      documentUrl: document.url,
+      status: 'pending',
+    })).filter((document: { documentUrl?: string }) => Boolean(document.documentUrl))
+
+    const { error: documentsError } = await supabase
+      .from('VendorDocument')
+      .insert(documentsToCreate)
+
+    if (documentsError) {
+      console.error('Vendor documents insert error:', documentsError)
+      await supabase.from('Vendor').delete().eq('id', vendorId)
+      await supabase.from('User').delete().eq('id', user.id)
+      return NextResponse.json({ error: 'Không thể lưu hồ sơ đăng ký: ' + documentsError.message }, { status: 400 })
+    }
 
     const tokenPayload = {
       id: user.id,

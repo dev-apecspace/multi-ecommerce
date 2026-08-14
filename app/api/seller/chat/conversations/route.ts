@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
           .select('*', { count: 'exact', head: true })
           .eq('conversationId', conv.id)
           .eq('isRead', false)
-          .neq('senderId', vendorId)
+          .neq('senderId', auth.userId)
         
         const { data: messages } = await supabase
           .from('Message')

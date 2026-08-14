@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Star, Shield, Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,20 +15,35 @@ import { Pagination } from "@/components/pagination"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 
-export default function ShopsPage() {
+function ShopsContent() {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [favorites, setFavorites] = useState<number[]>([])
   const [followedShops, setFollowedShops] = useState<number[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "")
   const [sortBy, setSortBy] = useState("followers")
   const [shops, setShops] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [followingShopId, setFollowingShopId] = useState<number | null>(null)
   const pagination = usePagination({ initialPage: 1, initialLimit: 12 })
 
   const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const queryFromUrl = searchParams.get("search") || ""
+    setSearchQuery(queryFromUrl)
+    setDebouncedSearch(queryFromUrl)
+    pagination.setPage(1)
+  }, [searchParams])
+
+  const formatCount = (value: number | null | undefined) => {
+    const count = Number(value) || 0
+    if (count < 1000) return count.toLocaleString('vi-VN')
+    return `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}K`
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -47,6 +62,8 @@ export default function ShopsPage() {
         if (response.ok) {
           const data = await response.json()
           setFollowedShops(data.map((item: any) => item.vendorId))
+        } else {
+          console.error('Failed to fetch followed shops:', await response.text())
         }
       } catch (error) {
         console.error('Failed to fetch followed shops:', error)
@@ -61,7 +78,8 @@ export default function ShopsPage() {
       try {
         setLoading(true)
         const response = await fetch(
-          `/api/vendors?status=approved&limit=${pagination.limit}&offset=${pagination.offset}&search=${debouncedSearch}&sortBy=${sortBy}`
+          `/api/vendors?status=approved&limit=${pagination.limit}&offset=${pagination.offset}&search=${debouncedSearch}&sortBy=${sortBy}`,
+          { cache: 'no-store' }
         )
         const result = await response.json()
         setShops(result.data || [])
@@ -90,6 +108,7 @@ export default function ShopsPage() {
     }
 
     try {
+      setFollowingShopId(shopId)
       const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id
       const isFollowing = followedShops.includes(shopId)
 
@@ -98,18 +117,19 @@ export default function ShopsPage() {
           method: 'DELETE',
         })
         
+        const data = await response.json()
         if (response.ok) {
           setFollowedShops(prev => prev.filter(id => id !== shopId))
           setShops(prev => prev.map(shop => 
             shop.id === shopId 
-              ? { ...shop, followers: Math.max(0, shop.followers - 1) }
+              ? { ...shop, followers: data.followers ?? Math.max(0, shop.followers - 1) }
               : shop
           ))
           toast({
             title: 'Thành công',
             description: 'Đã hủy theo dõi cửa hàng'
           })
-        }
+        } else throw new Error(data.error || 'Không thể hủy theo dõi cửa hàng.')
       } else {
         const response = await fetch('/api/shop-follows', {
           method: 'POST',
@@ -117,25 +137,28 @@ export default function ShopsPage() {
           body: JSON.stringify({ userId, vendorId: shopId })
         })
 
+        const data = await response.json()
         if (response.ok) {
           setFollowedShops(prev => [...prev, shopId])
           setShops(prev => prev.map(shop => 
             shop.id === shopId 
-              ? { ...shop, followers: shop.followers + 1 }
+              ? { ...shop, followers: data.followers ?? shop.followers + 1 }
               : shop
           ))
           toast({
             title: 'Thành công',
             description: 'Đã theo dõi cửa hàng'
           })
-        }
+        } else throw new Error(data.error || 'Không thể theo dõi cửa hàng.')
       }
     } catch (error) {
       toast({
         title: 'Lỗi',
-        description: 'Không thể thay đổi trạng thái theo dõi',
+        description: error instanceof Error ? error.message : 'Không thể thay đổi trạng thái theo dõi',
         variant: 'destructive'
       })
+    } finally {
+      setFollowingShopId(null)
     }
   }
 
@@ -193,11 +216,11 @@ export default function ShopsPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {shops.map((shop) => (
-            <Link key={shop.id} href={`/client/shop/${shop.id}`}>
+            <Link key={shop.id} href={`/client/shop/${shop.slug || generateSlug(shop.name)}`}>
               <Card className="hover:shadow-lg transition-shadow overflow-hidden h-full">
                 <CardContent className="p-0">
-                  <div className="relative h-32 bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                    <Image src={shop.image || "/placeholder.svg"} alt={shop.name} fill className="object-cover" />
+                  <div className="relative h-32 bg-slate-50 p-5 dark:bg-slate-800">
+                    <Image src={shop.logo || shop.avatar || "/placeholder.svg"} alt={`Logo ${shop.name}`} fill className="object-contain p-4" />
                     <div className="absolute top-2 right-2">
                       <button
                         onClick={(e) => {
@@ -234,11 +257,11 @@ export default function ShopsPage() {
                       </div>
                       <div className="text-center">
                         <p className="text-muted-foreground">Sản phẩm</p>
-                        <p className="font-bold">{(shop.products / 1000).toFixed(1)}K</p>
+                        <p className="font-bold">{formatCount(shop.products ?? shop.products_count)}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-muted-foreground">Theo dõi</p>
-                        <p className="font-bold">{(shop.followers / 1000).toFixed(0)}K</p>
+                        <p className="font-bold">{formatCount(shop.followers ?? shop.followers_count)}</p>
                       </div>
                     </div>
 
@@ -248,10 +271,11 @@ export default function ShopsPage() {
                         variant={followedShops.includes(shop.id) ? "outline" : "default"} 
                         className="flex-1"
                         onClick={(e) => handleFollow(e, shop.id)}
+                        disabled={followingShopId === shop.id}
                       >
                         {followedShops.includes(shop.id) ? "Đang theo dõi" : "Theo dõi"}
                       </Button>
-                      <Button size="sm" variant="outline" className="flex-1">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={(event) => { event.preventDefault(); event.stopPropagation(); router.push(`/client/shop/${shop.slug || generateSlug(shop.name)}`) }}>
                         Ghé shop
                       </Button>
                     </div>
@@ -282,5 +306,13 @@ export default function ShopsPage() {
         </Card>
       </div>
     </main>
+  )
+}
+
+export default function ShopsPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <ShopsContent />
+    </Suspense>
   )
 }

@@ -187,6 +187,20 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
     }
 
+    if (body.status === 'approved') {
+      const { data: documents, error: documentsError } = await supabase
+        .from('VendorDocument')
+        .select('id, status')
+        .eq('vendorId', vendorId)
+
+      if (documentsError) return NextResponse.json({ error: documentsError.message }, { status: 400 })
+      const activeDocuments = (documents || []).filter((document) => document.status !== 'rejected')
+      const hasPendingDocument = activeDocuments.length === 0 || activeDocuments.some((document) => document.status !== 'approved')
+      if (hasPendingDocument) {
+        return NextResponse.json({ error: 'Cần duyệt toàn bộ hồ sơ hợp lệ của shop trước khi duyệt nhà bán hàng.' }, { status: 409 })
+      }
+    }
+
     const { data, error } = await supabase
       .from('Vendor')
       .update(body)

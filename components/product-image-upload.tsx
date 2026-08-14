@@ -8,9 +8,11 @@ import Image from 'next/image'
 interface ProductImageUploadProps {
   onImageSelect: (url: string) => void
   disabled?: boolean
+  uploadEndpoint?: string
+  uploadType?: 'logo' | 'cover'
 }
 
-export function ProductImageUpload({ onImageSelect, disabled = false }: ProductImageUploadProps) {
+export function ProductImageUpload({ onImageSelect, disabled = false, uploadEndpoint = '/api/upload', uploadType }: ProductImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
@@ -39,6 +41,7 @@ export function ProductImageUpload({ onImageSelect, disabled = false }: ProductI
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (uploadType) formData.append('uploadType', uploadType)
 
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
@@ -47,7 +50,7 @@ export function ProductImageUpload({ onImageSelect, disabled = false }: ProductI
         })
       }, 200)
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch(uploadEndpoint, {
         method: 'POST',
         body: formData,
       })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
+import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import Link from 'next/link'
@@ -8,12 +9,43 @@ import { Button } from '@/components/ui/button'
 
 export function VendorApprovalBanner() {
   const { user } = useAuth()
+  const [vendorStatus, setVendorStatus] = useState<string | null>(null)
+  const [statusLoaded, setStatusLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!user || user.role !== 'vendor') return
+
+    let active = true
+    fetch('/api/seller/vendor', { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Không thể tải trạng thái shop')
+        return response.json()
+      })
+      .then((data) => {
+        if (active) setVendorStatus(data.vendor?.status ?? null)
+      })
+      .catch(() => {
+        // Vendor là nguồn trạng thái chuẩn. Chỉ dùng trạng thái user khi API tạm thời lỗi.
+        if (active) setVendorStatus(user.status ?? null)
+      })
+      .finally(() => {
+        if (active) setStatusLoaded(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [user])
 
   if (!user || user.role !== 'vendor') {
     return null
   }
 
-  if (user.status === 'active' || user.status === 'approved') {
+  // Không suy ra shop đã được duyệt từ VendorDocument. Hồ sơ được duyệt chỉ là
+  // điều kiện để admin tiếp tục duyệt trạng thái Vendor ở bước riêng.
+  const approvalStatus = statusLoaded ? vendorStatus : null
+
+  if (approvalStatus === 'approved') {
     return (
       <Alert className="mb-6 border-green-200 bg-green-50 dark:bg-green-950/20">
         <CheckCircle className="h-4 w-4 text-green-600" />
@@ -24,18 +56,18 @@ export function VendorApprovalBanner() {
     )
   }
 
-  if (user.status === 'pending' || user.status === 'pending_approval') {
+  if (approvalStatus === 'pending' || approvalStatus === 'pending_approval' || !approvalStatus) {
     return (
       <Alert className="mb-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
         <AlertCircle className="h-4 w-4 text-yellow-600" />
         <AlertDescription>
           <div className="text-yellow-800 dark:text-yellow-300">
             <p className="font-semibold mb-2">
-              ⏳ Hồ sơ của bạn đang chờ phê duyệt
+              ⏳ Shop của bạn đang chờ phê duyệt
             </p>
             <p className="text-sm mb-3">
-              Bạn có thể tiếp tục hoàn thành hồ sơ, tải lên tài liệu, và cập nhật thông tin shop.
-              Các chức năng khác sẽ được mở khóa khi hồ sơ được phê duyệt.
+              Hồ sơ đã được duyệt chỉ là điều kiện cần. Quản trị viên sẽ duyệt shop ở bước tiếp theo;
+              các chức năng khác chỉ được mở khóa sau khi shop được duyệt.
             </p>
             <div className="flex gap-2">
               <Link href="/seller/documents">
@@ -55,7 +87,7 @@ export function VendorApprovalBanner() {
     )
   }
 
-  if (user.status === 'rejected') {
+  if (approvalStatus === 'rejected') {
     return (
       <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20">
         <AlertCircle className="h-4 w-4 text-red-600" />

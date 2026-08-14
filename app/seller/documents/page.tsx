@@ -40,6 +40,7 @@ export default function SellerDocumentsPage() {
     file: null as File | null,
   })
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
+  const hasApprovedDocument = documents.some((document) => document.status === 'approved')
 
   useEffect(() => {
     if (user?.id) {
@@ -93,6 +94,10 @@ export default function SellerDocumentsPage() {
   }
 
   const handleUpload = async () => {
+    if (hasApprovedDocument) {
+      toast({ title: 'Hồ sơ đã được duyệt', description: 'Bạn không thể tải thêm hoặc thay thế hồ sơ sau khi đã được duyệt.', variant: 'destructive' })
+      return
+    }
     if (!user?.id) {
       toast({
         title: 'Lỗi',
@@ -134,7 +139,7 @@ export default function SellerDocumentsPage() {
         credentials: 'include',
         body: JSON.stringify({
           documentName: formData.documentName,
-          documentUrl: uploadedFile.secure_url,
+          documentUrl: uploadedFile.url,
         }),
       })
 
@@ -269,9 +274,10 @@ export default function SellerDocumentsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Tải lên tài liệu mới</CardTitle>
+            <CardTitle>{hasApprovedDocument ? 'Hồ sơ đã được duyệt' : 'Tải lên tài liệu mới'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {hasApprovedDocument && <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Hồ sơ shop đã được duyệt. Chức năng tải lên đã được khóa để bảo toàn hồ sơ đã xác nhận.</p>}
             <div>
               <Label htmlFor="documentName">Tên tài liệu</Label>
               <Input
@@ -281,6 +287,7 @@ export default function SellerDocumentsPage() {
                 value={formData.documentName}
                 onChange={handleInputChange}
                 className="mt-2"
+                disabled={hasApprovedDocument}
               />
             </div>
 
@@ -290,6 +297,7 @@ export default function SellerDocumentsPage() {
                 id="documentFile"
                 type="file"
                 onChange={handleFileChange}
+                disabled={hasApprovedDocument}
                 className="mt-2"
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
               />
@@ -300,7 +308,7 @@ export default function SellerDocumentsPage() {
 
             <Button
               onClick={handleUpload}
-              disabled={uploading}
+              disabled={uploading || hasApprovedDocument}
               className="w-full"
             >
               <Upload className="h-4 w-4 mr-2" />

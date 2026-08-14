@@ -170,6 +170,7 @@ export async function GET(request: NextRequest) {
 
               // Calculate rating from reviews
               let calculatedRating = vendor.rating || 0
+              let reviewsCount = 0
               const { data: vendorProducts } = await supabase
                 .from('Product')
                 .select('id')
@@ -178,14 +179,26 @@ export async function GET(request: NextRequest) {
               if (vendorProducts && vendorProducts.length > 0) {
                 const productIds = vendorProducts.map((p: any) => p.id)
                 const { data: reviews } = await supabase
-                  .from('Review')
+                  .from('ProductReview')
                   .select('rating')
                   .in('productId', productIds)
                 
                 if (reviews && reviews.length > 0) {
                   const totalRating = reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0)
                   calculatedRating = totalRating / reviews.length
+                  reviewsCount = reviews.length
                 }
+              }
+
+              // ShopFollow is the canonical source for follower totals. The
+              // cached Vendor.followers value is kept only for legacy shops.
+              let followersCount = vendor.followers || 0
+              const { count: liveFollowersCount } = await supabase
+                .from('ShopFollow')
+                .select('*', { count: 'exact', head: true })
+                .eq('vendorId', vendor.id)
+              if (liveFollowersCount !== null) {
+                followersCount = liveFollowersCount
               }
 
               vendorMap.set(vendor.id, {
@@ -193,7 +206,8 @@ export async function GET(request: NextRequest) {
                 logo: avatar,
                 avatar: avatar,
                 rating: calculatedRating,
-                followers_count: vendor.followers || 0,
+                reviews_count: reviewsCount,
+                followers_count: followersCount,
               })
             })
           )

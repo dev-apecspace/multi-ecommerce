@@ -40,6 +40,7 @@ export function Navbar() {
   const { cartCount } = useCart()
   const { favoritesCount } = useFavoritesContext()
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchMode, setSearchMode] = useState<"products" | "shops">("products")
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [megaMenuOpen, setMegaMenuOpen] = useState(false)
@@ -74,24 +75,70 @@ export function Navbar() {
   }, [pathname])
 
   useEffect(() => {
+    let cancelled = false
     const timer = setTimeout(async () => {
       if (searchQuery.trim()) {
         try {
-          const res = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=8`)
+          const endpoint = searchMode === "products"
+            ? `/api/products?search=${encodeURIComponent(searchQuery)}&limit=8`
+            : `/api/vendors?status=approved&search=${encodeURIComponent(searchQuery)}&limit=8&offset=0`
+          const res = await fetch(endpoint, { cache: "no-store" })
           if (res.ok) {
             const data = await res.json()
-            setSearchResults(data.data || [])
+            if (!cancelled) setSearchResults(data.data || [])
           }
         } catch (error) {
           console.error("Failed to fetch search results", error)
         }
       } else {
-        setSearchResults([])
+        if (!cancelled) setSearchResults([])
       }
     }, 300)
 
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [searchQuery, searchMode])
+
+  const submitSearch = () => {
+    const query = searchQuery.trim()
+    if (!query) return
+    setShowSearchDropdown(false)
+    router.push(searchMode === "products" ? `/client/search?q=${encodeURIComponent(query)}` : `/client/shop?search=${encodeURIComponent(query)}`)
+  }
+
+  const searchModeToggle = (
+    <select
+      aria-label="Loại tìm kiếm"
+      value={searchMode}
+      onChange={(event) => {
+        setSearchMode(event.target.value as "products" | "shops")
+        setSearchResults([])
+        setShowSearchDropdown(false)
+      }}
+      className="h-10 shrink-0 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+    >
+      <option value="products">Sản phẩm</option>
+      <option value="shops">Cửa hàng</option>
+    </select>
+  )
+
+  const searchDropdown = searchMode === "shops" && showSearchDropdown && searchResults.length > 0 && (
+    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-[100] max-h-96 overflow-y-auto">
+      {searchResults.map((result) => {
+        const isProduct = searchMode === "products"
+        const destination = isProduct ? `/client/product/${result.slug || generateSlug(result.name)}` : `/client/shop/${result.slug || generateSlug(result.name)}`
+        const image = isProduct ? result.media?.[0]?.url || result.image || "/placeholder.svg" : result.logo || result.avatar || "/placeholder.svg"
+        return <Link key={`${searchMode}-${result.id}`} href={destination} onClick={() => setShowSearchDropdown(false)}>
+          <div className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer border-b border-border last:border-b-0 transition-colors">
+            <div className="relative w-12 h-12 flex-shrink-0 overflow-hidden rounded border border-border bg-muted"><Image src={image} alt={result.name} fill className="object-cover" /></div>
+            <div className="flex-1 min-w-0"><p className="text-sm font-medium line-clamp-1">{result.name}</p>{isProduct ? <p className="text-sm text-orange-600 dark:text-orange-400 font-semibold">{Number(result.salePrice ?? result.price ?? 0).toLocaleString("vi-VN")}₫</p> : <p className="text-xs text-muted-foreground">Cửa hàng {result.rating ? `• ${Number(result.rating).toFixed(1)} ★` : "mới"}</p>}</div>
+          </div>
+        </Link>
+      })}
+    </div>
+  )
 
   return (
     <>
@@ -126,7 +173,8 @@ export function Navbar() {
             </Link>
 
             {/* Search Bar - 50% width on desktop */}
-            <div className="hidden md:flex flex-1 max-w-2xl" ref={desktopSearchContainerRef}>
+            <div className="hidden md:flex flex-1 max-w-2xl gap-2" ref={desktopSearchContainerRef}>
+              {searchModeToggle}
               <div className="relative w-full">
                 <Input
                   type="text"
@@ -139,7 +187,7 @@ export function Navbar() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && searchQuery.trim()) {
                       setShowSearchDropdown(false)
-                      router.push(`/client/search?q=${encodeURIComponent(searchQuery)}`)
+                      submitSearch()
                     }
                   }}
                   onFocus={() => searchQuery && setShowSearchDropdown(true)}
@@ -147,7 +195,7 @@ export function Navbar() {
                 />
                 <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
 
-                {showSearchDropdown && searchResults.length > 0 && (
+                {searchMode === "products" && showSearchDropdown && searchResults.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-[100] max-h-96 overflow-y-auto">
                     {searchResults.map((product) => (
                       <Link
@@ -166,7 +214,7 @@ export function Navbar() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium line-clamp-2">{product.name}</p>
                             <p className="text-sm text-orange-600 dark:text-orange-400 font-semibold">
-                              {(product.salePrice || product.price).toLocaleString("vi-VN")}₫
+                              {Number(product.salePrice ?? product.price ?? 0).toLocaleString("vi-VN")}₫
                             </p>
                           </div>
                         </div>
@@ -174,6 +222,7 @@ export function Navbar() {
                     ))}
                   </div>
                 )}
+                {searchDropdown}
               </div>
             </div>
 
@@ -263,7 +312,8 @@ export function Navbar() {
           </div>
 
           {/* Mobile Search */}
-          <div className="md:hidden mt-3" ref={mobileSearchContainerRef}>
+          <div className="md:hidden mt-3 space-y-2" ref={mobileSearchContainerRef}>
+            {searchModeToggle}
             <div className="relative w-full">
               <Input
                 type="text"
@@ -276,7 +326,7 @@ export function Navbar() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && searchQuery.trim()) {
                     setShowSearchDropdown(false)
-                    router.push(`/client/search?q=${encodeURIComponent(searchQuery)}`)
+                    submitSearch()
                   }
                 }}
                 onFocus={() => searchQuery && setShowSearchDropdown(true)}
@@ -284,7 +334,7 @@ export function Navbar() {
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
 
-              {showSearchDropdown && searchResults.length > 0 && (
+              {searchMode === "products" && showSearchDropdown && searchResults.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg z-[100] max-h-96 overflow-y-auto">
                   {searchResults.map((product) => (
                     <Link
@@ -303,7 +353,7 @@ export function Navbar() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium line-clamp-2">{product.name}</p>
                           <p className="text-sm text-orange-600 dark:text-orange-400 font-semibold">
-                            {(product.salePrice || product.price).toLocaleString("vi-VN")}₫
+                            {Number(product.salePrice ?? product.price ?? 0).toLocaleString("vi-VN")}₫
                           </p>
                         </div>
                       </div>
@@ -311,6 +361,7 @@ export function Navbar() {
                   ))}
                 </div>
               )}
+              {searchDropdown}
             </div>
           </div>
         </div>

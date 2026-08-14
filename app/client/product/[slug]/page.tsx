@@ -21,6 +21,23 @@ interface ProductDetailPageProps {
   params: Promise<{ slug: string }>
 }
 
+function getFirstAttributeVariant(variants: any[], attributes: any[]) {
+  if (!variants.length) return null
+
+  const firstValues = (attributes || [])
+    .slice()
+    .sort((a: any, b: any) => (a.id || 0) - (b.id || 0))
+    .map((attribute: any) => (attribute.ProductAttributeValue || [])
+      .slice()
+      .sort((a: any, b: any) => (a.id || 0) - (b.id || 0))[0]?.value)
+    .filter(Boolean)
+
+  if (!firstValues.length) return variants[0]
+
+  const firstCombination = firstValues.join(' ').trim().toLocaleLowerCase('vi-VN')
+  return variants.find((variant: any) => String(variant.name || '').trim().toLocaleLowerCase('vi-VN') === firstCombination) || variants[0]
+}
+
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -79,13 +96,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             variants: prod.ProductVariant || [],
           }
 
-          // Use first variant price if available, otherwise fallback to product price
+          // Giá hiển thị là tổ hợp đầu tiên của từng thuộc tính (VD: S + Đỏ),
+          // không phụ thuộc thứ tự ProductVariant do database trả về.
           let campaignPrice = prod.salePrice
           let basePrice = prod.price
           let originalPrice = prod.originalPrice
 
           if (prod.ProductVariant && prod.ProductVariant.length > 0) {
-            const firstVar = prod.ProductVariant[0]
+            const firstVar = getFirstAttributeVariant(prod.ProductVariant, prod.ProductAttribute || [])
             campaignPrice = firstVar.salePrice ?? null
             basePrice = firstVar.price
             originalPrice = firstVar.originalPrice ?? firstVar.price

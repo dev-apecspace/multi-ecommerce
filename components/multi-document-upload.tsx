@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, FileText, AlertCircle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,17 +22,30 @@ interface MultiDocumentUploadProps {
   onDocumentsChange: (documents: Document[]) => void
   disabled?: boolean
   minDocuments?: number
+  uploadUrl?: string
 }
 
 export function MultiDocumentUpload({ 
   onDocumentsChange, 
   disabled = false,
-  minDocuments = 1 
+  minDocuments = 1,
+  uploadUrl
 }: MultiDocumentUploadProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [uploadForms, setUploadForms] = useState<UploadForm[]>([])
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const onDocumentsChangeRef = useRef(onDocumentsChange)
+
+  useEffect(() => {
+    onDocumentsChangeRef.current = onDocumentsChange
+  }, [onDocumentsChange])
+
+  // Keep the parent form in sync after React has committed the document state.
+  // This avoids a just-uploaded document being visually present but omitted at submit time.
+  useEffect(() => {
+    onDocumentsChangeRef.current(documents)
+  }, [documents])
 
   const handleAddUploadForm = () => {
     const newFormId = `form-${Date.now()}`
@@ -66,7 +79,6 @@ export function MultiDocumentUpload({
 
     const updatedDocs = [...documents, newDoc]
     setDocuments(updatedDocs)
-    onDocumentsChange(updatedDocs)
     
     handleRemoveUploadForm(formId)
     setError(null)
@@ -75,7 +87,6 @@ export function MultiDocumentUpload({
   const handleRemoveDocument = (id: string) => {
     const updatedDocs = documents.filter(doc => doc.id !== id)
     setDocuments(updatedDocs)
-    onDocumentsChange(updatedDocs)
   }
 
   return (
@@ -162,6 +173,7 @@ export function MultiDocumentUpload({
                 handleAddDocument(form.id, url, fileName)
               }}
               disabled={disabled}
+              uploadUrl={uploadUrl}
             />
           </div>
         </div>

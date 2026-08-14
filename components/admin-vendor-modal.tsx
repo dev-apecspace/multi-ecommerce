@@ -1,645 +1,118 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, File, Download, Check, X, Lock, Unlock } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { Check, CircleAlert, Download, FileText, Lock, Loader2, ShieldCheck, Store, Unlock, X } from 'lucide-react'
 
 interface Vendor {
-  id: number
-  name: string
-  status: string
-  joinDate: string
-  rating: number
-  products: number
-  followers: number
-  description?: string | null
-  Shop?: {
-    id?: number
-    name?: string
-    image?: string
-    locked?: boolean
-    lockedReason?: string
-    ShopDetail?: {
-      email?: string
-      phone?: string
-      address?: string
-      taxId?: string
-      businessLicense?: string
-      bankAccount?: string
-      bankName?: string
-    }
-  } | null
+  id: number; name: string; status: string; joinDate: string; rating: number; products: number; followers: number; description?: string | null
+  Shop?: { id?: number; name?: string; image?: string; locked?: boolean; lockedReason?: string; ShopDetail?: { email?: string; phone?: string; address?: string; taxId?: string; businessLicense?: string; bankAccount?: string; bankName?: string } } | null
 }
-
-interface VendorDocument {
-  id: number
-  vendorId: number
-  documentType: string
-  documentName: string
-  documentUrl: string
-  status: string
-  reviewNotes?: string
-  uploadedAt: string
-}
-
+interface VendorDocument { id: number; vendorId: number; documentType: string; documentName: string; documentUrl: string; status: string; reviewNotes?: string; uploadedAt: string }
 interface VendorModalProps {
-  vendor: Vendor | null
-  documents: VendorDocument[]
-  isOpen: boolean
-  onClose: () => void
-  onSave: (data: any) => void
-  onDeleteVendor?: (vendorId: number) => void
-  onApproveDocument?: (documentId: number, notes: string) => void
-  onRejectDocument?: (documentId: number, notes: string) => void
-  loading?: boolean
-  mode?: 'details' | 'management'
+  vendor: Vendor | null; documents: VendorDocument[]; isOpen: boolean; onClose: () => void; onSave: (data: any) => void
+  onDeleteVendor?: (vendorId: number) => void; onApproveDocument?: (documentId: number, notes: string) => void; onRejectDocument?: (documentId: number, notes: string) => void; loading?: boolean; mode?: 'details' | 'management'
 }
 
-export default function AdminVendorModal({
-  vendor,
-  documents,
-  isOpen,
-  onClose,
-  onSave,
-  onDeleteVendor,
-  onApproveDocument,
-  onRejectDocument,
-  loading = false,
-  mode = 'details',
-}: VendorModalProps) {
+const statusText: Record<string, string> = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Bị từ chối' }
+
+function StatusStamp({ status }: { status: string }) {
+  const styles = { approved: 'border-emerald-200 bg-emerald-50 text-emerald-700', rejected: 'border-red-200 bg-red-50 text-red-700', pending: 'border-amber-200 bg-amber-50 text-amber-700' }
+  return <Badge className={`border font-medium ${styles[status as keyof typeof styles] || 'border-slate-200 bg-slate-50 text-slate-700'}`}>{statusText[status] || status}</Badge>
+}
+
+function ReadonlyField({ label, value, className = '' }: { label: string; value?: string | number | null; className?: string }) {
+  return <div className={className}><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 break-words text-sm font-medium text-slate-900">{value || '-'}</p></div>
+}
+
+export default function AdminVendorModal({ vendor, documents, isOpen, onClose, onSave, onApproveDocument, onRejectDocument, loading = false }: VendorModalProps) {
   const { toast } = useToast()
-  const [formData, setFormData] = useState({
-    name: vendor?.name || '',
-  })
-  const [reviewNotes, setReviewNotes] = useState<{ [key: number]: string }>({})
-  const [activeTab, setActiveTab] = useState(mode === 'management' ? 'management' : 'details')
+  const [reviewNotes, setReviewNotes] = useState<Record<number, string>>({})
   const [newStatus, setNewStatus] = useState(vendor?.status || 'pending')
   const [showLockDialog, setShowLockDialog] = useState(false)
   const [lockReason, setLockReason] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const isLocked = vendor?.Shop?.locked || false
-
-  const showDetailsTab = mode === 'details'
-  const showManagementTab = mode === 'management'
-
+  useEffect(() => { setNewStatus(vendor?.status || 'pending'); setReviewNotes({}) }, [vendor?.id, vendor?.status, isOpen])
+  // Hồ sơ bị từ chối được ẩn khỏi tiến độ xét duyệt hiện hành; shop có thể nộp hồ sơ thay thế.
+  const activeDocuments = useMemo(() => documents.filter((doc) => doc.status !== 'rejected'), [documents])
+  const summary = useMemo(() => ({ approved: activeDocuments.filter((doc) => doc.status === 'approved').length, outstanding: activeDocuments.filter((doc) => doc.status !== 'approved').length, total: activeDocuments.length }), [activeDocuments])
   if (!vendor) return null
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
-
-
-
-  const handleSave = () => {
-    onSave(formData)
-  }
-
-  const handleDelete = () => {
-    if (confirm('Bạn có chắc muốn xóa nhà cung cấp này? Hành động này không thể hoàn tác.')) {
-      onDeleteVendor?.(vendor.id)
-    }
-  }
-
-  const handleApproveDoc = (docId: number) => {
-    onApproveDocument?.(docId, reviewNotes[docId] || '')
-  }
-
-  const handleRejectDoc = (docId: number) => {
-    onRejectDocument?.(docId, reviewNotes[docId] || '')
-  }
+  const isLocked = Boolean(vendor.Shop?.locked)
 
   const handleStatusChange = async (value: string) => {
     if (value === vendor.status) return
-
+    if (value === 'approved' && summary.outstanding > 0) {
+      toast({ title: 'Cần duyệt hồ sơ trước', description: `Còn ${summary.outstanding} hồ sơ chưa được phê duyệt. Hãy xử lý hồ sơ bên trên trước khi duyệt shop.`, variant: 'destructive' })
+      setNewStatus(vendor.status)
+      return
+    }
     setIsProcessing(true)
     try {
-      const response = await fetch(`/api/admin/vendors?id=${vendor.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: value }),
-      })
-
-      if (response.ok) {
-        setNewStatus(value)
-        toast({
-          title: 'Thành công',
-          description: `Cập nhật trạng thái thành "${
-            value === 'approved' ? 'Đã duyệt' : value === 'pending' ? 'Chờ duyệt' : 'Bị từ chối'
-          }"`,
-        })
-        onSave?.({ status: value })
-      } else {
-        throw new Error('Failed to update status')
-      }
-    } catch (err) {
-      toast({
-        title: 'Lỗi',
-        description: 'Không thể cập nhật trạng thái',
-        variant: 'destructive',
-      })
-      setNewStatus(vendor.status)
-    } finally {
-      setIsProcessing(false)
-    }
+      const response = await fetch(`/api/admin/vendors?id=${vendor.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: value }) })
+      if (!response.ok) throw new Error()
+      setNewStatus(value); toast({ title: 'Thành công', description: `Đã cập nhật trạng thái shop thành “${statusText[value] || value}”.` }); onSave({ status: value })
+    } catch { toast({ title: 'Lỗi', description: 'Không thể cập nhật trạng thái shop.', variant: 'destructive' }); setNewStatus(vendor.status) } finally { setIsProcessing(false) }
   }
-
   const handleLock = async () => {
     setIsProcessing(true)
     try {
-      const response = await fetch(`/api/admin/vendors?id=${vendor.id}&action=lock`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: lockReason }),
-      })
-
-      if (response.ok) {
-        toast({
-          title: 'Thành công',
-          description: 'Khóa nhà cung cấp thành công',
-        })
-        setShowLockDialog(false)
-        setLockReason('')
-        onSave?.({})
-      } else {
-        throw new Error('Failed to lock vendor')
-      }
-    } catch (err) {
-      toast({
-        title: 'Lỗi',
-        description: 'Không thể khóa nhà cung cấp',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsProcessing(false)
-    }
+      const response = await fetch(`/api/admin/vendors?id=${vendor.id}&action=lock`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: lockReason }) })
+      if (!response.ok) throw new Error()
+      toast({ title: 'Thành công', description: 'Đã khóa shop.' }); setShowLockDialog(false); setLockReason(''); onSave({})
+    } catch { toast({ title: 'Lỗi', description: 'Không thể khóa shop.', variant: 'destructive' }) } finally { setIsProcessing(false) }
   }
-
   const handleUnlock = async () => {
     setIsProcessing(true)
     try {
-      const response = await fetch(`/api/admin/vendors?id=${vendor.id}&action=unlock`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-
-      if (response.ok) {
-        toast({
-          title: 'Thành công',
-          description: 'Mở khóa nhà cung cấp thành công',
-        })
-        onSave?.({})
-      } else {
-        throw new Error('Failed to unlock vendor')
-      }
-    } catch (err) {
-      toast({
-        title: 'Lỗi',
-        description: 'Không thể mở khóa nhà cung cấp',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsProcessing(false)
-    }
+      const response = await fetch(`/api/admin/vendors?id=${vendor.id}&action=unlock`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      if (!response.ok) throw new Error()
+      toast({ title: 'Thành công', description: 'Đã mở khóa shop.' }); onSave({})
+    } catch { toast({ title: 'Lỗi', description: 'Không thể mở khóa shop.', variant: 'destructive' }) } finally { setIsProcessing(false) }
   }
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'default'
-      case 'rejected':
-        return 'destructive'
-      case 'pending':
-        return 'secondary'
-      default:
-        return 'outline'
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'Đã duyệt'
-      case 'rejected':
-        return 'Bị từ chối'
-      case 'pending':
-        return 'Chờ duyệt'
-      default:
-        return status
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`${mode === 'management' ? 'max-w-2xl' : 'max-w-3xl'} max-h-[90vh] overflow-y-auto`}>
-        <DialogHeader>
-          <DialogTitle>
-            {mode === 'management' ? 'Duyệt/Khóa nhà cung cấp' : 'Chi tiết nhà cung cấp'}: {vendor.name}
-          </DialogTitle>
-        </DialogHeader>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${mode === 'management' ? 'grid-cols-1' : 'grid-cols-4'}`}>
-            {showDetailsTab && (
-              <>
-                <TabsTrigger value="details">Thông tin</TabsTrigger>
-                <TabsTrigger value="documents">Tài liệu ({documents.length})</TabsTrigger>
-                <TabsTrigger value="shop">Chi tiết shop</TabsTrigger>
-              </>
-            )}
-            {showManagementTab && <TabsTrigger value="management">Duyệt/Khóa</TabsTrigger>}
-          </TabsList>
-
-          <TabsContent value="details" className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="name">Tên nhà cung cấp</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="mt-1"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Ngày tham gia</Label>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {new Date(vendor.joinDate).toLocaleDateString('vi-VN')}
-                </p>
-              </div>
-              <div>
-                <Label>Đánh giá</Label>
-                <p className="mt-2 text-sm text-muted-foreground">{vendor.rating}/5</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Sản phẩm</Label>
-                <p className="mt-2 text-sm text-muted-foreground">{vendor.products}</p>
-              </div>
-              <div>
-                <Label>Đánh giá</Label>
-                <p className="mt-2 text-sm text-muted-foreground">{vendor.rating}/5</p>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="management" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quản lý trạng thái và khóa</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Label htmlFor="status-select" className="mb-2 block">
-                    Trạng thái duyệt
-                  </Label>
-                  <Select
-                    value={newStatus}
-                    onValueChange={handleStatusChange}
-                    disabled={isProcessing}
-                  >
-                    <SelectTrigger id="status-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-yellow-600"></span>
-                          Chờ duyệt
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="approved">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-green-600"></span>
-                          Đã duyệt
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="rejected">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                          Bị từ chối
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="border-t pt-4">
-                  <Label className="mb-2 block">Trạng thái khóa</Label>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge
-                      variant={isLocked ? 'destructive' : 'default'}
-                      className="px-3 py-1"
-                    >
-                      {isLocked ? (
-                        <Lock className="h-3 w-3 mr-1" />
-                      ) : (
-                        <Unlock className="h-3 w-3 mr-1" />
-                      )}
-                      {isLocked ? 'Đã khóa' : 'Đang hoạt động'}
-                    </Badge>
-                  </div>
-
-                  {isLocked && vendor.Shop?.lockedReason && (
-                    <div className="bg-red-50 border border-red-200 rounded p-3 mb-4">
-                      <p className="text-sm font-semibold text-red-900 mb-1">Lý do khóa:</p>
-                      <p className="text-sm text-red-700">{vendor.Shop.lockedReason}</p>
-                    </div>
-                  )}
-
-                  {!isLocked ? (
-                    <Button
-                      variant="outline"
-                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => setShowLockDialog(true)}
-                      disabled={isProcessing}
-                    >
-                      <Lock className="h-4 w-4 mr-2" />
-                      Khóa nhà cung cấp
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleUnlock}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      <Unlock className="h-4 w-4 mr-2" />
-                      Mở khóa
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="documents" className="space-y-4">
-            {documents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Chưa có tài liệu nào
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {documents.map(doc => (
-                  <Card key={doc.id}>
-                    <CardContent className="pt-6">
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3 flex-1">
-                            <File className="h-4 w-4 text-muted-foreground mt-1 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm">{doc.documentName}</h4>
-                              <p className="text-xs text-muted-foreground">
-                                Loại: {doc.documentType}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Tải lên: {new Date(doc.uploadedAt).toLocaleDateString('vi-VN')}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge variant={getStatusBadgeVariant(doc.status)}>
-                            {getStatusText(doc.status)}
-                          </Badge>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => window.open(doc.documentUrl, '_blank')}
-                          >
-                            <Download className="h-3 w-3 mr-1" />
-                            Xem
-                          </Button>
-                        </div>
-
-                        {doc.status === 'pending' && (
-                          <>
-                            <Textarea
-                              placeholder="Nhận xét duyệt (tùy chọn)"
-                              value={reviewNotes[doc.id] || ''}
-                              onChange={(e) =>
-                                setReviewNotes(prev => ({
-                                  ...prev,
-                                  [doc.id]: e.target.value,
-                                }))
-                              }
-                              className="text-sm"
-                              rows={2}
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                onClick={() => handleApproveDoc(doc.id)}
-                                disabled={loading}
-                              >
-                                <Check className="h-3 w-3 mr-1" />
-                                Phê duyệt
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1 text-red-600 hover:text-red-700"
-                                onClick={() => handleRejectDoc(doc.id)}
-                                disabled={loading}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                Từ chối
-                              </Button>
-                            </div>
-                          </>
-                        )}
-
-                        {doc.reviewNotes && (
-                          <div className="bg-muted p-2 rounded text-sm">
-                            <p className="font-semibold text-xs mb-1">Nhận xét:</p>
-                            <p className="text-xs">{doc.reviewNotes}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="shop" className="space-y-4">
-            {vendor.Shop ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Tên shop</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">{vendor.name || '-'}</p>
-                  </div>
-                  <div>
-                    <Label>Email</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {vendor.Shop.ShopDetail?.email || '-'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Điện thoại</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {vendor.Shop.ShopDetail?.phone || '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Mã số thuế</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {vendor.Shop.ShopDetail?.taxId || '-'}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Địa chỉ</Label>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {vendor.Shop.ShopDetail?.address || '-'}
-                  </p>
-                </div>
-
-                <div>
-                  <Label>Mô tả shop</Label>
-                  <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{vendor.description || '-'}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Ngân hàng</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {vendor.Shop.ShopDetail?.bankName || '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Tài khoản ngân hàng</Label>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {vendor.Shop.ShopDetail?.bankAccount || '-'}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Số giấy phép kinh doanh</Label>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {vendor.Shop.ShopDetail?.businessLicense || '-'}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Chưa có thông tin shop
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        {showDetailsTab && (
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Đóng
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={loading}
-            >
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Lưu
-            </Button>
-          </DialogFooter>
-        )}
-        {showManagementTab && (
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isProcessing}
-            >
-              Đóng
-            </Button>
-          </DialogFooter>
-        )}
-      </DialogContent>
-
-      <AlertDialog open={showLockDialog} onOpenChange={setShowLockDialog}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Khóa nhà cung cấp</AlertDialogTitle>
-            <AlertDialogDescription>
-              Vui lòng nhập lý do khóa nhà cung cấp
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Lý do khóa (vd: Vi phạm chính sách, chất lượng sản phẩm kém...)"
-              value={lockReason}
-              onChange={(e) => setLockReason(e.target.value)}
-              className="min-h-[100px]"
-            />
+  return <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden p-0 sm:rounded-xl">
+      <DialogHeader className="border-b bg-slate-50 px-6 py-5 pr-12">
+        <div className="flex flex-wrap items-center gap-2"><DialogTitle className="text-lg font-bold text-slate-950">Hồ sơ xét duyệt: {vendor.name}</DialogTitle><StatusStamp status={newStatus} />{isLocked && <Badge className="border-red-200 bg-red-50 text-red-700"><Lock className="mr-1 h-3 w-3" />Đã khóa</Badge>}</div>
+        <p className="mt-1 text-sm text-slate-500">Xem thông tin, kiểm tra hồ sơ và cập nhật trạng thái shop trong một phiên duyệt.</p>
+      </DialogHeader>
+      <div className="max-h-[calc(90vh-174px)] space-y-6 overflow-y-auto px-6 py-5">
+        <section aria-labelledby="shop-information-title"><div className="mb-3 flex items-center gap-2"><Store className="h-4 w-4 text-slate-700" /><h2 id="shop-information-title" className="text-sm font-bold text-slate-950">Thông tin cửa hàng</h2></div>
+          <div className="grid gap-x-6 gap-y-4 rounded-lg border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2">
+            <ReadonlyField label="Tên shop" value={vendor.name} /><ReadonlyField label="Ngày tham gia" value={new Date(vendor.joinDate).toLocaleDateString('vi-VN')} />
+            <ReadonlyField label="Email" value={vendor.Shop?.ShopDetail?.email} /><ReadonlyField label="Số điện thoại" value={vendor.Shop?.ShopDetail?.phone} />
+            <ReadonlyField label="Địa chỉ" value={vendor.Shop?.ShopDetail?.address} className="sm:col-span-2" /><ReadonlyField label="Mã số thuế" value={vendor.Shop?.ShopDetail?.taxId} />
+            <ReadonlyField label="Số giấy phép kinh doanh" value={vendor.Shop?.ShopDetail?.businessLicense} /><ReadonlyField label="Mô tả shop" value={vendor.description} className="sm:col-span-2" />
           </div>
-
-          <AlertDialogCancel disabled={isProcessing}>
-            Hủy
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleLock}
-            disabled={isProcessing || !lockReason.trim()}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Xác nhận khóa
-          </AlertDialogAction>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Dialog>
-  )
+        </section>
+        <section aria-labelledby="documents-title" className="border-t border-slate-200 pt-6">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-slate-700" /><h2 id="documents-title" className="text-sm font-bold text-slate-950">Hồ sơ xét duyệt</h2></div><span className="text-xs text-slate-500">{summary.approved}/{summary.total} hồ sơ hợp lệ đã duyệt</span></div>
+          <div className={`mb-4 flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm ${summary.outstanding === 0 && summary.total > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+            {summary.outstanding === 0 && summary.total > 0 ? <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" /> : <CircleAlert className="h-4 w-4 shrink-0 text-amber-600" />}<span>{summary.outstanding === 0 && summary.total > 0 ? 'Tất cả hồ sơ hợp lệ đã được xác minh. Shop đủ điều kiện để phê duyệt.' : 'Duyệt toàn bộ hồ sơ hợp lệ trước, sau đó mới có thể phê duyệt shop.'}</span>
+          </div>
+          {activeDocuments.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">Chưa có hồ sơ hợp lệ để xét duyệt.</div> : <div className="space-y-3">{activeDocuments.map((document) => <article key={document.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="flex min-w-0 gap-3"><FileText className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{document.documentName}</p><p className="mt-0.5 text-xs text-slate-500">{document.documentType} · Tải lên {new Date(document.uploadedAt).toLocaleDateString('vi-VN')}</p></div></div><StatusStamp status={document.status} /></div>
+            <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => window.open(document.documentUrl, '_blank', 'noopener,noreferrer')}><Download className="mr-1.5 h-3.5 w-3.5" />Xem tài liệu</Button></div>
+            {document.status === 'pending' && <div className="mt-3 border-t border-slate-100 pt-3"><Label htmlFor={`notes-${document.id}`} className="text-xs text-slate-600">Nhận xét xét duyệt (tùy chọn)</Label><Textarea id={`notes-${document.id}`} className="mt-1.5 min-h-[68px] text-sm" placeholder="Ghi chú cho shop..." value={reviewNotes[document.id] || ''} onChange={(event) => setReviewNotes((previous) => ({ ...previous, [document.id]: event.target.value }))} /><div className="mt-2 flex flex-col gap-2 sm:flex-row"><Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onApproveDocument?.(document.id, reviewNotes[document.id] || '')} disabled={loading || isProcessing}><Check className="mr-1.5 h-3.5 w-3.5" />Phê duyệt tài liệu</Button><Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => onRejectDocument?.(document.id, reviewNotes[document.id] || '')} disabled={loading || isProcessing}><X className="mr-1.5 h-3.5 w-3.5" />Từ chối tài liệu</Button></div></div>}
+            {document.reviewNotes && <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600"><strong className="text-slate-700">Nhận xét:</strong> {document.reviewNotes}</p>}
+          </article>)}</div>}
+        </section>
+        <section aria-labelledby="status-management-title" className="border-t border-slate-200 pt-6"><div className="mb-3 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-slate-700" /><h2 id="status-management-title" className="text-sm font-bold text-slate-950">Quản lý trạng thái</h2></div>
+          <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/70 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><Label className="text-xs text-slate-600">Trạng thái phê duyệt shop</Label><div className="mt-1.5"><StatusStamp status={newStatus} /></div></div><div className="flex flex-wrap gap-2"><Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleStatusChange('approved')} disabled={isProcessing || newStatus === 'approved' || summary.outstanding > 0 || summary.total === 0}><Check className="mr-1.5 h-4 w-4" />Duyệt shop</Button><Button size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => handleStatusChange('rejected')} disabled={isProcessing || newStatus === 'rejected'}><X className="mr-1.5 h-4 w-4" />Từ chối shop</Button></div></div>
+            <div className="border-t border-slate-200 pt-4">{!isLocked ? <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => setShowLockDialog(true)} disabled={isProcessing}><Lock className="mr-1.5 h-4 w-4" />Khóa shop</Button> : <Button variant="outline" onClick={handleUnlock} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Unlock className="mr-1.5 h-4 w-4" />}Mở khóa shop</Button>}</div>
+          </div>
+          {isLocked && vendor.Shop?.lockedReason && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800"><span className="font-semibold">Lý do khóa:</span> {vendor.Shop.lockedReason}</div>}
+        </section>
+      </div>
+      <DialogFooter className="border-t bg-slate-50 px-6 py-4"><Button variant="outline" onClick={onClose} disabled={loading || isProcessing}>Đóng</Button></DialogFooter>
+    </DialogContent>
+    <AlertDialog open={showLockDialog} onOpenChange={setShowLockDialog}><AlertDialogContent className="max-w-md"><AlertDialogHeader><AlertDialogTitle>Khóa shop</AlertDialogTitle><AlertDialogDescription>Nhập lý do để thông báo cho shop về việc khóa tài khoản.</AlertDialogDescription></AlertDialogHeader><Textarea placeholder="Lý do khóa shop..." value={lockReason} onChange={(event) => setLockReason(event.target.value)} className="min-h-[100px]" /><div className="flex justify-end gap-2"><AlertDialogCancel disabled={isProcessing}>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleLock} disabled={isProcessing || !lockReason.trim()} className="bg-red-600 hover:bg-red-700">{isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Xác nhận khóa</AlertDialogAction></div></AlertDialogContent></AlertDialog>
+  </Dialog>
 }

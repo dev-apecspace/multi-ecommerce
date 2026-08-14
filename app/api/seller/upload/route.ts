@@ -1,54 +1,31 @@
-import { v2 as cloudinary } from 'cloudinary'
 import { NextRequest, NextResponse } from 'next/server'
+import { mkdir, writeFile } from 'fs/promises'
+import path from 'path'
 import { getAuthFromRequest, isVendor, unauthorizedResponse } from '@/lib/api-auth'
 
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-})
+export const runtime = 'nodejs'
+
+const MAX_SIZE = 10 * 1024 * 1024
+const EXTENSIONS = new Set(['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'])
+const TYPES = new Set(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'])
 
 export async function POST(request: NextRequest) {
-  try {
-    const auth = await getAuthFromRequest(request)
-    if (!auth || !isVendor(auth)) {
-      return unauthorizedResponse()
-    }
+  const auth = await getAuthFromRequest(request)
+  if (!auth || !isVendor(auth)) return unauthorizedResponse()
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+  const file = (await request.formData()).get('file') as File | null
+  if (!file) return NextResponse.json({ error: 'Vui lòng chọn tệp.' }, { status: 400 })
+  if (file.size > MAX_SIZE) return NextResponse.json({ error: 'Tệp tối đa 10MB.' }, { status: 400 })
 
-    if (!file) {
-      return NextResponse.json(
-        { error: 'File is required' },
-        { status: 400 }
-      )
-    }
-
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: 'auto',
-          folder: 'vendor-documents',
-        },
-        (error, result) => {
-          if (error) reject(error)
-          else resolve(result)
-        }
-      )
-
-      uploadStream.end(buffer)
-    })
-
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error('Upload error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Upload failed' },
-      { status: 500 }
-    )
+  const extension = path.extname(file.name).toLowerCase()
+  if (!EXTENSIONS.has(extension) || !TYPES.has(file.type)) {
+    return NextResponse.json({ error: 'Chỉ hỗ trợ PDF, DOC, DOCX, JPG hoặc PNG.' }, { status: 400 })
   }
+
+  const baseName = path.basename(file.name, extension).replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'ho-so'
+  const storedName = `${Date.now()}-${crypto.randomUUID()}-${baseName}${extension}`
+  const directory = path.join(process.cwd(), 'public', 'uploads', 'ho-so-cua-hang')
+  await mkdir(directory, { recursive: true })
+  await writeFile(path.join(directory, storedName), Buffer.from(await file.arrayBuffer()))
+  return NextResponse.json({ url: `/uploads/ho-so-cua-hang/${storedName}`, fileName: file.name })
 }

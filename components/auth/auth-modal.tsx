@@ -219,11 +219,11 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
                 <input type="checkbox" className="mt-1" required disabled={loading} />
                 <span className="text-xs text-muted-foreground">
                   Tôi đồng ý với{" "}
-                  <a href="/client/dieu-khoan-dich-vu" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  <a href="/api/legal-documents/view/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     Điều khoản dịch vụ
                   </a>{" "}
                   và{" "}
-                  <a href="/client/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  <a href="/api/legal-documents/view/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     Chính sách bảo mật
                   </a>
                 </span>

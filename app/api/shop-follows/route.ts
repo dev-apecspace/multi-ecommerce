@@ -63,23 +63,24 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.message.includes('duplicate')) {
-        return NextResponse.json({ message: 'Already following this shop' }, { status: 200 })
+        const { count } = await supabase.from('ShopFollow').select('id', { count: 'exact', head: true }).eq('vendorId', vendorId)
+        await supabase.from('Vendor').update({ followers: count || 0 }).eq('id', vendorId)
+        return NextResponse.json({ success: true, alreadyFollowing: true, followers: count || 0 }, { status: 200 })
       }
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    const { data: followCount } = await supabase
+    const { count } = await supabase
       .from('ShopFollow')
-      .select('id', { count: 'exact' })
+      .select('id', { count: 'exact', head: true })
       .eq('vendorId', vendorId)
 
-    const count = followCount?.length || 0
     await supabase
       .from('Vendor')
       .update({ followers: count })
       .eq('id', vendorId)
 
-    return NextResponse.json({ success: true, message: 'Following shop' }, { status: 201 })
+    return NextResponse.json({ success: true, message: 'Following shop', followers: count || 0 }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
@@ -105,18 +106,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    const { data: followCount } = await supabase
+    const { count } = await supabase
       .from('ShopFollow')
-      .select('id', { count: 'exact' })
+      .select('id', { count: 'exact', head: true })
       .eq('vendorId', parseInt(vendorId))
 
-    const count = followCount?.length || 0
     await supabase
       .from('Vendor')
       .update({ followers: count })
       .eq('id', parseInt(vendorId))
 
-    return NextResponse.json({ success: true, message: 'Unfollowed shop' })
+    return NextResponse.json({ success: true, message: 'Unfollowed shop', followers: count || 0 })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }

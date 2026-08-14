@@ -55,6 +55,28 @@ export function useChat(conversationId: number | null, options: UseChatOptions =
     fetchMessages()
   }, [conversationId])
 
+  // Realtime is used whenever the Message table is enabled in Supabase
+  // Realtime. Polling remains as a safe fallback for local deployments or
+  // projects where the publication has not been enabled yet.
+  useEffect(() => {
+    if (!conversationId) return
+
+    const refreshMessages = async () => {
+      try {
+        const res = await fetch(`/api/chat/messages?conversationId=${conversationId}`, { cache: 'no-store' })
+        const data = await res.json()
+        if (res.ok && Array.isArray(data.messages)) {
+          setMessages(data.messages)
+        }
+      } catch {
+        // Keep the currently visible messages when the connection is briefly unavailable.
+      }
+    }
+
+    const intervalId = window.setInterval(refreshMessages, 10000)
+    return () => window.clearInterval(intervalId)
+  }, [conversationId])
+
   // Subscribe to realtime updates
   useEffect(() => {
     if (!conversationId) return
@@ -112,6 +134,11 @@ export function useChat(conversationId: number | null, options: UseChatOptions =
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      if (data.message) {
+        setMessages((previous) => previous.some((message) => message.id === data.message.id)
+          ? previous
+          : [...previous, data.message])
+      }
       return data.message
     } catch (err: any) {
       setError(err.message)

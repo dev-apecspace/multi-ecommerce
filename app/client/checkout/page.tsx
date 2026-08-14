@@ -1062,7 +1062,7 @@ function CheckoutContent() {
               <div className="space-y-2">
                   <p className="text-sm font-semibold leading-6 text-foreground">
                     Bằng cách nhấn nút Đặt hàng, bạn đồng ý với các{' '}
-                    <Link href="/client/dieu-kien-hoat-dong" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">Điều kiện hoạt động</Link> của website.
+                    <Link href="/api/legal-documents/view/website-operating-conditions" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2">Điều kiện hoạt động</Link> của website.
                   </p>
                   <Button className="h-10 w-full" onClick={handleSubmit} disabled={loading}>
                     {loading ? "Đang xử lý..." : "Đặt hàng"}
@@ -1091,7 +1091,7 @@ function CheckoutContent() {
             <div className="rounded-md border bg-muted/30 p-4 text-sm leading-6">
               <p className="text-muted-foreground">Nhấn vào liên kết dưới đây để xem Hợp đồng trung gian thanh toán.</p>
               <Link
-                href="/client/hop-dong-trung-gian-thanh-toan"
+                href="/api/legal-documents/view/intermediary-payment-agreement"
                 className="mt-3 inline-flex items-center gap-1 font-medium text-primary underline underline-offset-4"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1114,7 +1114,7 @@ function CheckoutContent() {
             </DialogHeader>
             <div className="max-h-[48vh] space-y-3 overflow-y-auto rounded-md border bg-muted/30 p-4 text-sm leading-6">
               <p>Bạn xác nhận đã đọc và đồng ý với các điều kiện hoạt động của website áp dụng cho đơn hàng này.</p>
-              <p>Vui lòng tham khảo <Link href="/client/dieu-kien-hoat-dong" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">Điều kiện hoạt động</Link> để xem nội dung đầy đủ.</p>
+              <p>Vui lòng tham khảo <Link href="/api/legal-documents/view/website-operating-conditions" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">Điều kiện hoạt động</Link> để xem nội dung đầy đủ.</p>
             </div>
             <DialogFooter>
               <Button variant="outline" disabled={!!savingConsent} onClick={() => setConsentDialog(null)}>Hủy</Button>

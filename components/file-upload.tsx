@@ -9,9 +9,10 @@ interface FileUploadProps {
   accept?: string
   maxSize?: number
   disabled?: boolean
+  uploadUrl?: string
 }
 
-export function FileUpload({ onFileSelect, accept = '.pdf,.doc,.docx,.jpg,.png', maxSize = 10 * 1024 * 1024, disabled = false }: FileUploadProps) {
+export function FileUpload({ onFileSelect, accept = '.pdf,.doc,.docx,.jpg,.png', maxSize = 10 * 1024 * 1024, disabled = false, uploadUrl = '/api/upload' }: FileUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string } | null>(null)
@@ -44,7 +45,7 @@ export function FileUpload({ onFileSelect, accept = '.pdf,.doc,.docx,.jpg,.png',
         })
       }, 200)
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
       })
