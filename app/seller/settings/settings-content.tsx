@@ -93,7 +93,7 @@ function BrandAssetControl({
   }
 
   return (
-    <div className={cover ? "rounded-xl border border-slate-200 bg-white p-3 sm:p-4" : "rounded-xl border border-slate-200 bg-white p-4"}>
+    <div className={cover ? "relative z-20 rounded-xl border border-slate-200 bg-white p-3 sm:p-4" : "rounded-xl border border-slate-200 bg-white p-4"}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div><Label className="font-semibold text-slate-900">{label}</Label><p className="mt-1 text-xs text-muted-foreground">{helper}</p></div>
         {imageUrl && <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" />Đang dùng</span>}
@@ -322,7 +322,7 @@ export default function SellerSettingsPage() {
               <p className="text-sm text-muted-foreground">Thông tin hiển thị công khai trên trang cửa hàng.</p>
             </CardHeader>
             <CardContent className="space-y-8 pt-6">
-              <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+              <section className="shop-brand-assets rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
                 <div className="mb-4 flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><ImageIcon className="h-5 w-5" /></span><div><h2 className="font-semibold text-slate-900">Nhận diện cửa hàng</h2><p className="mt-0.5 text-sm text-muted-foreground">Quản lý logo và ảnh bìa của shop.</p></div></div>
                 <div className="relative pt-16 sm:pt-20">
                   <div className="relative z-0"><BrandAssetControl label="Ảnh bìa shop" helper="Tỷ lệ đề xuất 16:5 · JPG, PNG, WEBP · tối đa 5MB" imageUrl={shopData.shopLogo} uploadType="cover" onUploaded={(url) => setShopData(prev => ({ ...prev, shopLogo: url }))} cover /></div>
