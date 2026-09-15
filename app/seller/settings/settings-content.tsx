@@ -1,12 +1,16 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Save, Loader, ImageIcon, Pencil, Store, Upload, CheckCircle2, X } from "lucide-react"
+import { Save, Loader, ImageIcon, Pencil, Store, Upload, CheckCircle2, X, Check, ChevronsUpDown, Landmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { VendorApprovalBanner } from "@/components/vendor-approval-banner"
 import { useToast } from "@/hooks/use-toast"
 import { useLoading } from "@/hooks/use-loading"
@@ -24,7 +28,12 @@ interface ShopData {
   businessLicense: string
   bankAccount: string
   bankName: string
+  bankCode: string
+  bankBin: string
   bankBranch: string
+  walletProvider: string
+  walletAccount: string
+  walletQrUrl: string
 }
 
 interface PolicyData {
@@ -35,11 +44,6 @@ interface PolicyData {
 interface ShippingData {
   defaultMethod: string
   processingTime: string
-}
-
-interface PaymentData {
-  bankTransfer: boolean
-  e_wallet: boolean
 }
 
 function BrandAssetControl({
@@ -115,11 +119,128 @@ function BrandAssetControl({
   )
 }
 
+const WALLET_PROVIDERS = [
+  "MoMo",
+  "ZaloPay",
+  "ShopeePay",
+  "VNPay",
+  "Viettel Money",
+  "Payoo",
+  "Moca",
+  "AirPay",
+  "VTC Pay",
+  "Vimo",
+] as const
+
+interface VietQrBank {
+  bin: string
+  code: string
+  shortName: string
+  name: string
+  logo?: string
+}
+
+function BankLogo({ bank, size = "lg" }: { bank?: VietQrBank; size?: "sm" | "lg" }) {
+  const [failed, setFailed] = useState(false)
+  const dimensions = size === "sm" ? "h-10 w-10" : "h-10 w-10"
+
+  useEffect(() => setFailed(false), [bank?.logo])
+
+  if (!bank?.logo || failed) {
+    return <span aria-label={bank ? `Biểu tượng ${bank.shortName}` : "Biểu tượng ngân hàng"} className={`${dimensions} inline-flex shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400`}><Landmark className="h-5 w-5" aria-hidden="true" /></span>
+  }
+
+  return <span className={`${dimensions} inline-flex shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white p-0.5`}><img src={bank.logo} alt={`Logo ${bank.shortName}`} className="h-full w-full object-contain" onError={() => setFailed(true)} /></span>
+}
+
+function BankPicker({
+  banks,
+  selectedBin,
+  selectedName,
+  loading,
+  onSelect,
+}: {
+  banks: VietQrBank[]
+  selectedBin: string
+  selectedName: string
+  loading: boolean
+  onSelect: (bank: VietQrBank) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)")
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener("change", update)
+    return () => media.removeEventListener("change", update)
+  }, [])
+
+  const normalizedQuery = query.trim().toLocaleLowerCase("vi-VN")
+  const matchingBanks = banks.filter((bank) =>
+    [bank.shortName, bank.name, bank.code, bank.bin]
+      .some((value) => value.toLocaleLowerCase("vi-VN").includes(normalizedQuery)),
+  )
+  const selectedBank = banks.find((bank) => bank.bin === selectedBin)
+  const selectedLabel = selectedBank
+    ? `${selectedBank.shortName} — ${selectedBank.name}`
+    : selectedName
+      ? selectedName
+      : "Chọn ngân hàng"
+
+  const choose = (bank: VietQrBank) => {
+    onSelect(bank)
+    setOpen(false)
+    setQuery("")
+  }
+
+  const pickerContent = (
+    <Command className="rounded-lg" shouldFilter={false}>
+      <CommandInput value={query} onValueChange={setQuery} placeholder="Tìm tên, mã ngân hàng hoặc BIN..." />
+      <CommandList className="max-h-[min(19rem,calc(100vh-13rem))] sm:max-h-72">
+        {loading ? (
+          <div className="flex items-center gap-2 px-3 py-6 text-sm text-muted-foreground"><Loader className="h-4 w-4 animate-spin" />Đang tải danh sách ngân hàng...</div>
+        ) : (
+          <>
+            <CommandEmpty>Không tìm thấy ngân hàng phù hợp.</CommandEmpty>
+            <CommandGroup heading={`${matchingBanks.length} ngân hàng`}>
+              {matchingBanks.map((bank) => (
+                <CommandItem key={bank.bin} value={`${bank.shortName} ${bank.name} ${bank.code} ${bank.bin}`} onSelect={() => choose(bank)} className={`min-h-[3.5rem] py-1.5 ${selectedBin === bank.bin ? "bg-blue-50/80 text-slate-900" : ""}`}>
+                  <Check className={`h-4 w-4 shrink-0 ${selectedBin === bank.bin ? "opacity-100 text-blue-600" : "opacity-0"}`} />
+                  <BankLogo bank={bank} size="sm" />
+                  <span className="min-w-0 flex-1"><span className="block truncate font-medium">{bank.shortName} <span className="font-normal text-muted-foreground">— {bank.name}</span></span></span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+      </CommandList>
+    </Command>
+  )
+
+  const trigger = (
+    <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="mt-2 h-12 w-full justify-between gap-2 px-3 text-left font-normal hover:bg-slate-50" disabled={loading}>
+      <span className="flex min-w-0 flex-1 items-center gap-2">{!loading && <BankLogo bank={selectedBank} />}<span className="truncate">{loading ? "Đang tải danh sách ngân hàng..." : selectedLabel}</span></span>
+      <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Button>
+  )
+
+  if (isMobile) {
+    return <Dialog open={open} onOpenChange={setOpen}><Button type="button" variant="outline" role="combobox" aria-expanded={open} className="mt-2 h-12 w-full justify-between gap-2 px-3 text-left font-normal hover:bg-slate-50" disabled={loading} onClick={() => setOpen(true)}><span className="flex min-w-0 flex-1 items-center gap-2">{!loading && <BankLogo bank={selectedBank} />}<span className="truncate">{loading ? "Đang tải danh sách ngân hàng..." : selectedLabel}</span></span><ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" /></Button><DialogContent className="top-auto bottom-0 max-h-[82dvh] w-full max-w-none translate-x-0 translate-y-0 rounded-t-2xl p-0 sm:top-[50%] sm:bottom-auto sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%]"><DialogHeader className="border-b px-4 py-4"><DialogTitle>Chọn ngân hàng</DialogTitle></DialogHeader><div className="p-2">{pickerContent}</div></DialogContent></Dialog>
+  }
+
+  return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>{trigger}</PopoverTrigger><PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] min-w-[22rem] p-1">{pickerContent}</PopoverContent></Popover>
+}
+
 export default function SellerSettingsPage() {
   const { toast } = useToast()
   const { setIsLoading } = useLoading()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [banks, setBanks] = useState<VietQrBank[]>([])
+  const [banksError, setBanksError] = useState("")
 
   const [shopData, setShopData] = useState<ShopData>({
     shopName: '',
@@ -134,7 +255,12 @@ export default function SellerSettingsPage() {
     businessLicense: '',
     bankAccount: '',
     bankName: '',
+    bankCode: '',
+    bankBin: '',
     bankBranch: '',
+    walletProvider: '',
+    walletAccount: '',
+    walletQrUrl: '',
   })
 
   const [policyData, setPolicyData] = useState<PolicyData>({
@@ -147,14 +273,22 @@ export default function SellerSettingsPage() {
     processingTime: '24',
   })
 
-  const [paymentData, setPaymentData] = useState<PaymentData>({
-    bankTransfer: true,
-    e_wallet: false,
-  })
-
   useEffect(() => {
     fetchShopSettings()
+    fetchBanks()
   }, [])
+
+  const fetchBanks = async () => {
+    try {
+      setBanksError("")
+      const response = await fetch('/api/banks')
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Không thể tải danh sách ngân hàng.')
+      setBanks(Array.isArray(result.data) ? result.data : [])
+    } catch (error) {
+      setBanksError(error instanceof Error ? error.message : 'Không thể tải danh sách ngân hàng.')
+    }
+  }
 
   const fetchShopSettings = async () => {
     try {
@@ -183,9 +317,14 @@ export default function SellerSettingsPage() {
         address: shopDetail?.address || vendor?.businessAddress || '',
         taxId: shopDetail?.taxId || vendor?.taxId || '',
         businessLicense: shopDetail?.businessLicense || vendor?.businessLicense || '',
-        bankAccount: shopDetail?.bankAccount || vendor?.bankAccount || '',
-        bankName: shopDetail?.bankName || vendor?.bankName || '',
+        bankAccount: vendor?.bankAccount || shopDetail?.bankAccount || '',
+        bankName: vendor?.bankName || shopDetail?.bankName || '',
+        bankCode: vendor?.bankCode || '',
+        bankBin: vendor?.bankBin || '',
         bankBranch: shopDetail?.bankBranch || vendor?.bankBranch || '',
+        walletProvider: vendor?.walletProvider || '',
+        walletAccount: vendor?.walletAccount || '',
+        walletQrUrl: vendor?.walletQrUrl || '',
       }))
     } catch (error) {
       console.error('Error fetching vendor settings:', error)
@@ -416,41 +555,6 @@ export default function SellerSettingsPage() {
                 </div>
               </div>
 
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Thông tin ngân hàng</h3>
-                
-                <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label>Số tài khoản</Label>
-                    <Input 
-                      value={shopData.bankAccount}
-                      onChange={(e) => setShopData(prev => ({ ...prev, bankAccount: e.target.value }))}
-                      className="mt-2"
-                      placeholder="Nhập số tài khoản"
-                    />
-                  </div>
-                  <div>
-                    <Label>Tên ngân hàng</Label>
-                    <Input 
-                      value={shopData.bankName}
-                      onChange={(e) => setShopData(prev => ({ ...prev, bankName: e.target.value }))}
-                      className="mt-2"
-                      placeholder="Nhập tên ngân hàng"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Chi nhánh ngân hàng</Label>
-                  <Input 
-                    value={shopData.bankBranch}
-                    onChange={(e) => setShopData(prev => ({ ...prev, bankBranch: e.target.value }))}
-                    className="mt-2"
-                    placeholder="Nhập chi nhánh ngân hàng"
-                  />
-                </div>
-              </div>
-
               <Button 
                 onClick={handleSaveGeneral} 
                 disabled={saving}
@@ -572,12 +676,12 @@ export default function SellerSettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payment">
-          <Card>
-            <CardHeader>
+        <TabsContent value="payment" className="mt-0">
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 pb-5">
               <CardTitle>Cài đặt thanh toán</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5 pt-6">
               <div className="flex items-center gap-2">
                 <input 
                   type="checkbox" 
@@ -587,27 +691,63 @@ export default function SellerSettingsPage() {
                 />
                 <Label htmlFor="cod">Thanh toán khi nhận hàng (COD)</Label>
               </div>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="bankTransfer"
-                  checked={paymentData.bankTransfer}
-                  onChange={(e) => setPaymentData(prev => ({ ...prev, bankTransfer: e.target.checked }))}
-                />
-                <Label htmlFor="bankTransfer">Chuyển khoản ngân hàng</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="e_wallet"
-                  checked={paymentData.e_wallet}
-                  onChange={(e) => setPaymentData(prev => ({ ...prev, e_wallet: e.target.checked }))}
-                />
-                <Label htmlFor="e_wallet">Ví điện tử</Label>
-              </div>
+              <Tabs defaultValue="bank" className="w-full">
+                <TabsList className="h-auto rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  <TabsTrigger value="bank" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Tài khoản ngân hàng</TabsTrigger>
+                  <TabsTrigger value="wallet" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Ví điện tử</TabsTrigger>
+                </TabsList>
+                <TabsContent value="bank" className="mt-5 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div><Label>Số tài khoản</Label><Input value={shopData.bankAccount} onChange={(e) => setShopData(prev => ({ ...prev, bankAccount: e.target.value }))} className="mt-2" placeholder="Nhập số tài khoản" /></div>
+                    <div>
+                      <Label>Tên ngân hàng</Label>
+                      <BankPicker
+                        banks={banks}
+                        selectedBin={shopData.bankBin}
+                        selectedName={shopData.bankName}
+                        loading={!banks.length && !banksError}
+                        onSelect={(bank) => setShopData((prev) => ({
+                          ...prev,
+                          bankBin: bank.bin,
+                          bankCode: bank.code,
+                          bankName: bank.name,
+                        }))}
+                      />
+                      {banksError && <p className="mt-1.5 text-xs text-destructive">{banksError} <button type="button" className="underline" onClick={fetchBanks}>Tải lại</button></p>}
+                    </div>
+                  </div>
+                  <div><Label>Chi nhánh <span className="font-normal text-muted-foreground">(không bắt buộc)</span></Label><Input value={shopData.bankBranch} onChange={(e) => setShopData(prev => ({ ...prev, bankBranch: e.target.value }))} className="mt-2" placeholder="Nhập chi nhánh" /></div>
+                </TabsContent>
+                <TabsContent value="wallet" className="mt-5 space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="text-sm text-muted-foreground">Cần tên ví và số nhận tiền để mở phương thức thanh toán ví tại checkout.</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label>Nhà cung cấp ví <span className="font-normal text-muted-foreground">(không bắt buộc)</span></Label>
+                      <Select
+                        value={shopData.walletProvider || "__none"}
+                        onValueChange={(value) => setShopData((prev) => ({ ...prev, walletProvider: value === "__none" ? "" : value }))}
+                      >
+                        <SelectTrigger className="mt-2 h-auto min-h-10 w-full py-2 text-left">
+                          <SelectValue placeholder="Chọn ví điện tử" />
+                        </SelectTrigger>
+                        <SelectContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+                          <SelectItem value="__none" className="py-2.5 text-muted-foreground">Chưa cấu hình ví điện tử</SelectItem>
+                          {WALLET_PROVIDERS.map((wallet) => (
+                            <SelectItem key={wallet} value={wallet} className="py-2.5 font-medium text-slate-900">
+                              {wallet}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>Số điện thoại / tài khoản ví <span className="font-normal text-muted-foreground">(không bắt buộc)</span></Label><Input value={shopData.walletAccount} onChange={(e) => setShopData(prev => ({ ...prev, walletAccount: e.target.value }))} className="mt-2" placeholder="Nhập số nhận tiền" /></div>
+                  </div>
+                  <div><Label>Đường dẫn ảnh QR ví <span className="font-normal text-muted-foreground">(không bắt buộc)</span></Label><Input type="url" value={shopData.walletQrUrl} onChange={(e) => setShopData(prev => ({ ...prev, walletQrUrl: e.target.value }))} className="mt-2" placeholder="https://..." /><p className="mt-1.5 text-xs text-muted-foreground">Nếu để trống, khách vẫn nhận được thông tin ví để thanh toán thủ công.</p></div>
+                </TabsContent>
+              </Tabs>
 
               <Button 
-                onClick={handleSavePayment} 
+                onClick={handleSaveGeneral}
                 disabled={saving}
                 className="bg-orange-600 hover:bg-orange-700 mt-4"
               >

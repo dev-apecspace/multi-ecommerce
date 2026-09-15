@@ -45,19 +45,19 @@ export function MobileMenu({ onClose, onLogin }: MobileMenuProps) {
               <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
             <div className="flex flex-col gap-2">
-              <Link href="/client/profile" onClick={onClose}>
+              <Link href="/client/account" onClick={onClose}>
                 <Button variant="outline" size="sm" className="w-full justify-start gap-2">
                   <User className="h-4 w-4" />
                   Hồ sơ của tôi
                 </Button>
               </Link>
-              <Link href="/client/orders" onClick={onClose}>
+              <Link href="/client/order-history" onClick={onClose}>
                 <Button variant="outline" size="sm" className="w-full justify-start gap-2">
                   <ShoppingCart className="h-4 w-4" />
                   Đơn hàng
                 </Button>
               </Link>
-              <Link href="/client/settings" onClick={onClose}>
+              <Link href="/client/account?tab=settings" onClick={onClose}>
                 <Button variant="outline" size="sm" className="w-full justify-start gap-2">
                   <Settings className="h-4 w-4" />
                   Cài đặt

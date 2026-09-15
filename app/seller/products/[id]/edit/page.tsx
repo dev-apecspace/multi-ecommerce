@@ -375,7 +375,7 @@ export default function EditProductPage() {
               <CardTitle>Giá cả</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Giá bán *</Label>
                   <Input 
@@ -520,7 +520,7 @@ export default function EditProductPage() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <Label className="text-sm">Giá *</Label>
                         <Input 

@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const status = searchParams.get('status')
+    const orderNumber = searchParams.get('orderNumber')
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
 
@@ -31,9 +32,14 @@ export async function GET(request: NextRequest) {
         updatedAt,
         paymentMethod,
         paymentStatus,
+        paymentProofUrl,
+        paymentSubmittedAt,
+        paymentVerificationStatus,
+        paymentVerificationData,
+        paymentVerifiedAt,
         shippingAddress,
         estimatedDelivery,
-        Vendor(id, name),
+        Vendor(id, name, bankAccount, bankName, bankCode, bankBin, bankBranch, walletProvider, walletAccount, walletQrUrl),
         OrderItem(
           id,
           quantity,
@@ -50,6 +56,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       query = query.eq('status', status)
+    }
+
+    if (orderNumber) {
+      query = query.eq('orderNumber', orderNumber)
     }
 
     const { data, error, count } = await query
@@ -99,8 +109,27 @@ export async function POST(request: NextRequest) {
 
     const parsedUserId = parseInt(userId)
 
-    // Calculate shipping cost based on method
-    const shippingCostPerVendor = shippingMethod === "express" ? 30000 : 10000
+    const { data: settingsRecord, error: settingsError } = await supabase
+      .from('AdminSettings').select('value').eq('key', 'system').maybeSingle()
+    if (settingsError) return NextResponse.json({ error: settingsError.message }, { status: 400 })
+
+    let settings: any = { codEnabled: true, accountEnabled: true, walletEnabled: false, standardShippingFee: 10000, expressShippingFee: 30000 }
+    try {
+      const saved = settingsRecord?.value ? JSON.parse(settingsRecord.value) : {}
+      settings = { ...settings, ...saved, accountEnabled: saved.accountEnabled ?? saved.bankTransferEnabled ?? settings.accountEnabled, walletEnabled: saved.walletEnabled ?? saved.vnpayEnabled ?? settings.walletEnabled }
+    } catch { /* Use default settings when a legacy value cannot be parsed. */ }
+
+    const paymentMethods = Array.isArray(settings.paymentMethods) ? settings.paymentMethods : [{ id: 'cod', enabled: settings.codEnabled }, { id: 'bank', enabled: settings.accountEnabled }, { id: 'wallet', enabled: settings.walletEnabled }]
+    const shippingMethods = Array.isArray(settings.shippingMethods) ? settings.shippingMethods : [{ id: 'standard', enabled: true, fee: settings.standardShippingFee }, { id: 'express', enabled: true, fee: settings.expressShippingFee }]
+    const selectedPayment = paymentMethods.find((method: any) => method.id === paymentMethod)
+    const selectedShipping = shippingMethods.find((method: any) => method.id === shippingMethod)
+    if (!selectedPayment?.enabled) {
+      return NextResponse.json({ error: 'Phương thức thanh toán không khả dụng.' }, { status: 400 })
+    }
+    if (!selectedShipping?.enabled || !Number.isFinite(Number(selectedShipping.fee)) || Number(selectedShipping.fee) < 0) return NextResponse.json({ error: 'Hình thức vận chuyển không khả dụng.' }, { status: 400 })
+
+    // Always calculate fees on the server from the administrator's current configuration.
+    const shippingCostPerVendor = Number(selectedShipping.fee)
 
     // Group cart items by vendorId
     const itemsByVendor: Map<number, any[]> = new Map()
@@ -193,10 +222,10 @@ export async function POST(request: NextRequest) {
       const orderNumber = `ORD${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
       // Determine payment status based on payment method
-      // wallet: paid immediately
-      // bank: pending (needs confirmation)
+      // Bank QR and e-wallet transfers are reconciled manually when there is
+      // no provider callback, so both start as pending.
       // cod: pending (will be paid on delivery)
-      const paymentStatus = paymentMethod === 'wallet' ? 'paid' : 'pending'
+      const paymentStatus = 'pending'
 
       const { data: orderData, error: orderError } = await supabase
         .from('Order')
@@ -219,6 +248,7 @@ export async function POST(request: NextRequest) {
       }
 
       const orderId = orderData[0].id
+
       createdOrders.push(orderData[0])
 
       // Create OrderItems for this vendor with final price (prices already include tax from frontend)
@@ -342,7 +372,10 @@ export async function POST(request: NextRequest) {
         updatedAt,
         shippingAddress,
         paymentMethod,
-        Vendor(id, name),
+        paymentStatus,
+        paymentProofUrl,
+        paymentSubmittedAt,
+        Vendor(id, name, bankAccount, bankName, bankCode, bankBin, bankBranch, walletProvider, walletAccount, walletQrUrl),
         OrderItem(
           id,
           quantity,

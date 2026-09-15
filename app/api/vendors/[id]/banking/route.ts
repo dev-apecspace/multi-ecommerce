@@ -20,7 +20,7 @@ export async function GET(
 
     const { data: vendor, error: vendorError } = await supabase
       .from('Vendor')
-      .select('id, name, bankAccount, bankName, bankBranch')
+      .select('id, name, bankAccount, bankName, bankCode, bankBin, bankBranch, walletProvider, walletAccount, walletQrUrl')
       .eq('id', vendorId)
       .single()
 
@@ -33,7 +33,12 @@ export async function GET(
       vendorName: vendor.name,
       bankAccount: vendor.bankAccount || null,
       bankName: vendor.bankName || null,
+      bankCode: vendor.bankCode || null,
+      bankBin: vendor.bankBin || null,
       bankBranch: vendor.bankBranch || null,
+      walletProvider: vendor.walletProvider || null,
+      walletAccount: vendor.walletAccount || null,
+      walletQrUrl: vendor.walletQrUrl || null,
     })
   } catch (error) {
     return NextResponse.json(

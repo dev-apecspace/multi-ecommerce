@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { icon: Home, label: "Trang chủ", href: "/" },
   { icon: Grid, label: "Danh mục", href: "/client/category/dien-tu" },
-  { icon: Zap, label: "Flash Sale", href: "/client/cart" },
+  { icon: Zap, label: "Flash Sale", href: "/client#flash-scroll-container" },
   { icon: ShoppingCart, label: "Giỏ hàng", href: "/client/cart" },
   { icon: User, label: "Tài khoản", href: "/client/account" },
 ]
@@ -24,7 +24,7 @@ export function BottomNavigation() {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
 
           return (
-            <Link key={item.href} href={item.href} className="flex-1">
+            <Link key={`${item.label}-${item.href}`} href={item.href} className="flex-1">
               <div
                 className={cn(
                   "flex flex-col items-center justify-center py-3 px-2 text-xs font-medium transition-colors",

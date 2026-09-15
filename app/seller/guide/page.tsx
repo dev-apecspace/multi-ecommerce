@@ -13,7 +13,7 @@ export default function SellerGuidePage() {
       </div>
 
       <Tabs defaultValue="getting-started">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="getting-started">Bắt đầu</TabsTrigger>
           <TabsTrigger value="products">Sản phẩm</TabsTrigger>
           <TabsTrigger value="orders">Đơn hàng</TabsTrigger>

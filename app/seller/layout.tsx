@@ -24,13 +24,15 @@ export default function SellerLayout({
   }, [])
 
   return (
-    <div className="flex flex-col min-h-screen bg-background dark:bg-slate-950">
+    <div className="flex min-h-screen min-w-0 flex-col overflow-x-clip bg-background dark:bg-slate-950">
       <SellerTopBar />
-      <div className="flex flex-1 overflow-hidden pt-16 md:pt-0">
+      <div className="flex min-w-0 flex-1 overflow-hidden pt-16 md:pt-0">
         <SellerSidebar />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          <main className="min-w-0 flex-1">{children}</main>
+          <Footer compact />
+        </div>
       </div>
-      <Footer />
       <ExperimentalModeModal />
     </div>
   )

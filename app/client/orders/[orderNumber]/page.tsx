@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Truck, Package, CheckCircle, Star } from "lucide-react"
+import { ArrowLeft, Truck, Star, CreditCard, Wallet, Download, Copy, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,12 @@ import { useRealtimeOrder } from "@/hooks/use-realtime-order"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
 import { ReviewModal } from "@/components/review/review-modal"
+import { QrSaveButton } from '@/components/client/qr-save-button'
+import { orderStatusConfig } from '@/lib/order-status'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { PaymentProofProgress } from '@/components/client/payment-proof-progress'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface OrderItem {
   id: number
@@ -35,8 +41,11 @@ interface Order {
   date: string
   updatedAt: string
   paymentMethod: string
+  paymentStatus?: string
+  paymentProofUrl?: string | null
+  paymentSubmittedAt?: string | null
   shippingAddress: string
-  Vendor: { id: number; name: string }
+  Vendor: { id: number; name: string; bankAccount?: string | null; bankName?: string | null; bankCode?: string | null; bankBin?: string | null; bankBranch?: string | null; walletProvider?: string | null; walletAccount?: string | null; walletQrUrl?: string | null }
   OrderItem: OrderItem[]
 }
 
@@ -52,6 +61,15 @@ interface ReturnModalState {
   price: number
 }
 
+const getOrderQr = (order: Order) => {
+  if (order.paymentMethod === 'wallet') return order.Vendor?.walletQrUrl || null
+  const bankBin = order.Vendor?.bankBin
+  return bankBin && order.Vendor?.bankAccount
+    ? `https://img.vietqr.io/image/${bankBin}-${order.Vendor.bankAccount}-compact2.png?amount=${Math.round(order.total)}&addInfo=${encodeURIComponent(order.orderNumber)}`
+    : null
+}
+
+
 const isReturnable = (order: Order) => {
   if (order.status !== 'delivered') return false
   const deliveryDate = new Date(order.updatedAt)
@@ -62,7 +80,7 @@ const isReturnable = (order: Order) => {
 }
 
 interface PageProps {
-  params: Promise<{ id: string }>
+  params: Promise<{ orderNumber: string }>
 }
 
 export default function OrderDetailPage({ params }: PageProps) {
@@ -71,8 +89,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   const { user } = useAuth()
   const { setIsLoading } = useLoading()
   const resolvedParams = use(params)
-  const orderId = resolvedParams.id
-  const parsedOrderId = parseInt(orderId)
+  const orderNumber = decodeURIComponent(resolvedParams.orderNumber)
 
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
@@ -112,6 +129,79 @@ export default function OrderDetailPage({ params }: PageProps) {
     initialComment: null
   })
   const [orderReviews, setOrderReviews] = useState<Record<number, { id: number; rating: number; comment: string | null; createdAt: string }>>({})
+  const [proofSubmitting, setProofSubmitting] = useState(false)
+  const [proofConfirmation, setProofConfirmation] = useState<{ file: File | null; previewUrl: string | null } | null>(null)
+  const [proofOcr, setProofOcr] = useState<{ checking: boolean; status?: string; reason?: string }>({ checking: false })
+  const paymentProofOcrEnabled = process.env.NEXT_PUBLIC_PAYMENT_PROOF_OCR_ENABLED !== 'false'
+
+  const copyPaymentValue = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast({ title: `Đã sao chép ${label}` })
+    } catch {
+      toast({ title: 'Không thể sao chép', description: 'Vui lòng sao chép thủ công.', variant: 'destructive' })
+    }
+  }
+
+  const submitPaymentProof = async (file?: File) => {
+    if (!file || !order || !userId) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Ảnh chưa hợp lệ', description: 'Chỉ nhận JPG, PNG, WEBP tối đa 5MB.', variant: 'destructive' })
+      return
+    }
+    try {
+      setProofSubmitting(true)
+      const body = new FormData(); body.append('file', file); body.append('userId', String(userId))
+      const response = await fetch(`/api/client/orders/by-number/${encodeURIComponent(order.orderNumber)}/payment-proof`, { method: 'POST', body, credentials: 'include' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Không thể gửi minh chứng.')
+      toast({ title: 'Đã gửi minh chứng', description: result.data?.verification?.status === 'review' ? 'Ảnh đã được gửi để shop đối soát thủ công.' : 'Shop sẽ đối soát thanh toán của bạn.' })
+      fetchOrder()
+    } catch (error) {
+      toast({ title: 'Chưa thể gửi minh chứng', description: error instanceof Error ? error.message : 'Vui lòng thử lại.', variant: 'destructive' })
+    } finally {
+      setProofSubmitting(false)
+    }
+  }
+
+  const openProofConfirmation = () => { setProofConfirmation({ file: null, previewUrl: null }); setProofOcr({ checking: false }) }
+  const selectProofFile = async (file?: File) => {
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Ảnh chưa hợp lệ', description: 'Chỉ nhận JPG, PNG, WEBP tối đa 5MB.', variant: 'destructive' })
+      return
+    }
+    setProofConfirmation(current => {
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
+      return { file, previewUrl: URL.createObjectURL(file) }
+    })
+    if (!order) return
+    if (!paymentProofOcrEnabled) {
+      setProofOcr({ checking: false })
+      return
+    }
+    setProofOcr({ checking: true })
+    try {
+      const body = new FormData()
+      body.append('file', file); body.append('orderNumber', order.orderNumber); body.append('amount', String(order.total)); body.append('orderCreatedAt', order.date)
+      const response = await fetch('/api/client/payment-proof/preflight', { method: 'POST', body })
+      const result = await response.json().catch(() => null)
+      const verification = result?.data?.verification || result?.verification
+      setProofOcr({ checking: false, status: verification?.status || 'error', reason: verification?.reason || result?.error || 'Không thể kiểm tra ảnh.' })
+    } catch {
+      setProofOcr({ checking: false, status: 'error', reason: 'Không thể kết nối dịch vụ kiểm tra ảnh. Vui lòng thử lại.' })
+    }
+  }
+  const closeProofConfirmation = () => setProofConfirmation(current => {
+    if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
+    return null
+  })
+  const confirmPaymentProof = async () => {
+    const file = proofConfirmation?.file
+    if (!file) return
+    closeProofConfirmation()
+    await submitPaymentProof(file)
+  }
 
   useEffect(() => {
     if (user?.id) {
@@ -125,17 +215,14 @@ export default function OrderDetailPage({ params }: PageProps) {
   }, [user])
 
   useEffect(() => {
-    if (userId && orderId) {
-      if (Number.isNaN(parsedOrderId)) return
+    if (userId && orderNumber) {
       fetchOrder()
-      fetchOrderReturns(userId, parsedOrderId)
-      fetchOrderReviews(userId, parsedOrderId)
     }
-  }, [userId, orderId])
+  }, [userId, orderNumber])
 
   useRealtimeOrder({ 
-    orderId: !Number.isNaN(parsedOrderId) ? parsedOrderId : null, 
-    onUpdate: () => { if (userId && !Number.isNaN(parsedOrderId)) fetchOrder() }
+    orderId: order?.id ?? null,
+    onUpdate: () => { if (userId && order) fetchOrder() }
   })
 
   const fetchOrderReturns = async (currentUserId: number, currentOrderId: number) => {
@@ -193,11 +280,13 @@ export default function OrderDetailPage({ params }: PageProps) {
     try {
       setIsLoading(true)
       setLoading(true)
-      const response = await fetch(`/api/client/orders?userId=${userId}&limit=100&offset=0`)
+      const response = await fetch(`/api/client/orders/by-number/${encodeURIComponent(orderNumber)}?userId=${userId}`)
       const result = await response.json()
-      const foundOrder = result.data?.find((o: Order) => o.id === parseInt(orderId))
+      const foundOrder = result.data as Order | undefined
       if (foundOrder) {
         setOrder(foundOrder)
+        void fetchOrderReturns(userId!, foundOrder.id)
+        void fetchOrderReviews(userId!, foundOrder.id)
       } else {
         toast({ title: 'Lỗi', description: 'Không tìm thấy đơn hàng', variant: 'destructive' })
         router.push('/client/order-history')
@@ -251,20 +340,6 @@ export default function OrderDetailPage({ params }: PageProps) {
       initialRating: existingReview?.rating ?? null,
       initialComment: existingReview?.comment ?? null
     })
-  }
-
-  const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-    pending: { label: "Chờ xử lý", color: "bg-gray-100 text-gray-800", icon: <Package className="h-4 w-4" /> },
-    processing: { label: "Đã duyệt", color: "bg-blue-100 text-blue-800", icon: <Package className="h-4 w-4" /> },
-    shipped: { label: "Đang giao", color: "bg-yellow-100 text-yellow-800", icon: <Truck className="h-4 w-4" /> },
-    delivered: { label: "Đã giao", color: "bg-green-100 text-green-800", icon: <Truck className="h-4 w-4" /> },
-    completed: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800", icon: <CheckCircle className="h-4 w-4" /> },
-    cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800", icon: <Package className="h-4 w-4" /> },
-    return_pending: { label: "Đã gửi yêu cầu trả hàng", color: "bg-purple-100 text-purple-800", icon: <Package className="h-4 w-4" /> },
-    return_approved: { label: "Đã duyệt yêu cầu trả hàng", color: "bg-blue-100 text-blue-800", icon: <Package className="h-4 w-4" /> },
-    return_refund_confirmed: { label: "Đã hoàn tiền hàng", color: "bg-teal-100 text-teal-800", icon: <Package className="h-4 w-4" /> },
-    return_shipped: { label: "Đã trả hàng", color: "bg-emerald-100 text-emerald-800", icon: <CheckCircle className="h-4 w-4" /> },
-    returned: { label: "Đã trả hàng", color: "bg-indigo-100 text-indigo-800", icon: <CheckCircle className="h-4 w-4" /> }
   }
 
   const handleConfirmReceipt = async () => {
@@ -371,7 +446,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   const statusKey = getOrderStatusKey()
 
   return (
-    <main className="container-viewport py-8">
+    <main className="container-viewport client-order-detail py-8">
       {/* Header */}
       <div className="mb-8">
         <button
@@ -391,10 +466,10 @@ export default function OrderDetailPage({ params }: PageProps) {
           {/* Order Status */}
           <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <CardTitle>Trạng thái đơn hàng</CardTitle>
-                <Badge className={statusConfig[statusKey]?.color || statusConfig.pending.color}>
-                  {statusConfig[statusKey]?.label || statusKey}
+                <Badge className={orderStatusConfig[statusKey]?.color || orderStatusConfig.pending.color}>
+                  {orderStatusConfig[statusKey]?.label || statusKey}
                 </Badge>
               </div>
             </CardHeader>
@@ -411,6 +486,30 @@ export default function OrderDetailPage({ params }: PageProps) {
                         : order.paymentMethod}
                 </p>
               </div>
+              {['bank', 'wallet'].includes(order.paymentMethod) && (order.paymentStatus === 'paid' ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Đã được shop xác nhận thanh toán.</div>
+              ) : (
+                <section className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0"><h3 className="font-semibold text-slate-900 dark:text-slate-100">Thông tin thanh toán</h3>{!(order.paymentMethod === 'wallet' && !getOrderQr(order)) && <p className="mt-1 break-words text-sm text-slate-600 dark:text-slate-300">{order.paymentMethod === 'wallet' ? `${order.Vendor?.walletProvider || 'Ví điện tử'} · ${order.Vendor?.walletAccount || 'Chưa có thông tin ví'}` : `${order.Vendor?.bankName || 'Ngân hàng'} · ${order.Vendor?.bankAccount || 'Chưa có số tài khoản'}`}</p>}</div>
+                    {order.paymentMethod === 'wallet' ? <Wallet className="h-5 w-5 text-blue-600" /> : <CreditCard className="h-5 w-5 text-blue-600" />}
+                  </div>
+                  {order.paymentStatus === 'submitted' ? order.paymentProofUrl ? <div className="my-4"><p className="mb-2 text-center text-sm font-semibold text-amber-800">Ảnh minh chứng giao dịch</p><a href={order.paymentProofUrl} target="_blank" rel="noreferrer" className="mx-auto block w-fit overflow-hidden rounded-lg border bg-white"><img src={order.paymentProofUrl} alt={`Minh chứng thanh toán ${order.orderNumber}`} className="max-h-72 max-w-full object-contain" /></a></div> : <p className="my-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Đã gửi xác nhận thanh toán, đang chờ shop đối soát.</p> : getOrderQr(order) ? <img src={getOrderQr(order)!} alt={`Mã QR thanh toán ${order.orderNumber}`} className="mx-auto my-4 h-52 w-52 rounded-lg border bg-white object-contain p-2" /> : order.paymentMethod === 'wallet' ? <div className="my-4 overflow-hidden rounded-xl border border-blue-200 bg-white text-sm shadow-sm dark:border-blue-900 dark:bg-slate-950">
+                    <div className="border-b border-blue-100 bg-blue-100/70 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-800 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200">Thanh toán thủ công qua ví</div>
+                    {[
+                      ['Ví điện tử', order.Vendor?.walletProvider || 'Chưa có thông tin ví', order.Vendor?.walletProvider || ''],
+                      ['Số tài khoản / SĐT', order.Vendor?.walletAccount || 'Chưa có số nhận tiền', order.Vendor?.walletAccount || ''],
+                      ['Số tiền', `${Number(order.total).toLocaleString('vi-VN')}₫`, String(Math.round(Number(order.total)))],
+                      ['Nội dung', order.orderNumber, order.orderNumber],
+                    ].map(([label, displayValue, copyValue], index) => <div key={label} className={`flex min-w-0 items-center gap-3 border-b border-blue-50 px-3 py-2.5 last:border-0 dark:border-blue-950 ${index === 2 ? 'bg-blue-50/80 dark:bg-blue-950/30' : ''}`}><span className="w-28 shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">{label}</span><span className={`min-w-0 flex-1 break-all text-slate-900 dark:text-slate-100 ${index === 2 ? 'text-base font-bold text-blue-800 dark:text-blue-200' : 'font-semibold'}`}>{displayValue}</span><Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 border border-blue-100 bg-white text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900 dark:bg-slate-900" onClick={() => copyPaymentValue(copyValue, label)} disabled={!copyValue} aria-label={`Sao chép ${label}`}><Copy className="h-4 w-4" /></Button></div>)}
+                  </div> : <p className="my-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Shop chưa cấu hình thông tin nhận tiền. Vui lòng liên hệ shop để được hỗ trợ.</p>}
+                  {!(order.paymentMethod === 'wallet' && !getOrderQr(order) && order.paymentStatus !== 'submitted') && <div className="grid gap-1 text-sm sm:grid-cols-2"><p>Số tiền: <b>{Number(order.total).toLocaleString('vi-VN')}₫</b></p><p>Nội dung: <b className="font-mono">{order.orderNumber}</b></p></div>}
+                  <p className="mt-3 rounded-md bg-white/80 p-3 text-xs leading-5 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">Lưu ý: Hãy chụp màn hình giao dịch để đối soát trước khi gửi xác nhận thanh toán.</p>
+                  <PaymentProofProgress status={order.paymentStatus} />
+                  {order.paymentStatus !== 'submitted' && order.paymentMethod === 'bank' && getOrderQr(order) ? <QrSaveButton orderId={order.id} orderNumber={order.orderNumber} /> : null}
+                  {order.paymentStatus === 'submitted' ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">Đã gửi minh chứng — chờ shop xác nhận.</div> : order.paymentStatus !== 'paid' ? <div className="mt-3"><Button type="button" variant="outline" className="w-full border-dashed border-blue-300 bg-white text-blue-700 hover:bg-blue-50 dark:bg-slate-950" disabled={proofSubmitting} onClick={openProofConfirmation}><Upload className="mr-2 h-4 w-4" />{proofSubmitting ? 'Đang gửi minh chứng...' : 'Tải ảnh minh chứng thanh toán'}</Button><p className="mt-2 text-xs text-muted-foreground">Ảnh sẽ được shop đối soát; ảnh thiếu thông tin vẫn có thể cần kiểm tra thủ công.</p></div> : <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">Đã được xác nhận thanh toán.</div>}
+                </section>
+              ))}
               {order.status === 'delivered' && (
                 <>
                   <Button 
@@ -473,7 +572,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                   const productReview = orderReviews[item.Product.id]
                   return (
                     <div key={item.id} className="border-b pb-4 last:border-b-0">
-                      <div className="flex gap-4">
+                        <div className="flex min-w-0 gap-4">
                         <div className="relative w-20 h-20 flex-shrink-0 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                           <Image
                             src={displayImage}
@@ -482,9 +581,9 @@ export default function OrderDetailPage({ params }: PageProps) {
                             className="object-cover"
                           />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="flex justify-between gap-4">
-                            <div>
+                            <div className="min-w-0">
                               <p className="font-medium line-clamp-2">
                                 {item.Product.name}
                                 {(item.variantName || item.ProductVariant?.name) && ` - ${item.variantName || item.ProductVariant?.name}`}
@@ -638,8 +737,8 @@ export default function OrderDetailPage({ params }: PageProps) {
             title: "Thành công",
             description: "Yêu cầu trả hàng đã được gửi",
           })
-          if (userId && orderId) {
-            fetchOrderReturns(userId, parseInt(orderId))
+          if (userId && order) {
+            fetchOrderReturns(userId, order.id)
           }
           fetchOrder()
           setReturnModal(prev => ({ ...prev, open: false }))
@@ -653,8 +752,8 @@ export default function OrderDetailPage({ params }: PageProps) {
           orderItemId={returnStatusModal.orderItemId}
           userId={userId}
           onConfirmExchange={() => {
-            if (userId && orderId) {
-              fetchOrderReturns(userId, parseInt(orderId))
+            if (userId && order) {
+              fetchOrderReturns(userId, order.id)
             }
             fetchOrder()
           }}
@@ -672,14 +771,24 @@ export default function OrderDetailPage({ params }: PageProps) {
         initialComment={reviewModal.initialComment}
         onReviewSubmitted={() => {
           fetchOrder()
-          if (userId && orderId) {
-            const parsedOrderId = parseInt(orderId)
-            if (!Number.isNaN(parsedOrderId)) {
-              fetchOrderReviews(userId, parsedOrderId)
-            }
+          if (userId && order) {
+            fetchOrderReviews(userId, order.id)
           }
         }}
       />
+      <Dialog open={!!proofConfirmation} onOpenChange={(open) => !open && closeProofConfirmation()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Xác nhận gửi minh chứng</DialogTitle><DialogDescription>Hãy kiểm tra ảnh thuộc đúng đơn và hiển thị rõ số tiền, nội dung chuyển khoản cùng thời gian giao dịch.</DialogDescription></DialogHeader>
+          {proofConfirmation && <div className="space-y-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900"><p>Đơn hàng: <b className="font-mono">{order.orderNumber}</b></p><p className="mt-1">Số tiền: <b>{Number(order.total).toLocaleString('vi-VN')}₫</b></p></div>
+            <Label htmlFor="order-proof-file" className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-700 hover:bg-blue-50"><Upload className="h-4 w-4" />{proofConfirmation.file ? 'Chọn ảnh khác' : 'Chọn ảnh minh chứng'}</Label>
+            <Input id="order-proof-file" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { void selectProofFile(event.target.files?.[0]); event.currentTarget.value = '' }} />
+            {proofConfirmation.previewUrl ? <img src={proofConfirmation.previewUrl} alt="Xem trước minh chứng thanh toán" className="max-h-72 w-full rounded-lg border bg-white object-contain" /> : <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">Chưa chọn ảnh minh chứng.</p>}
+            {paymentProofOcrEnabled && (proofOcr.checking ? <p className="text-sm font-medium text-blue-700">Đang kiểm tra ảnh…</p> : proofOcr.status ? <p className={`rounded-md p-3 text-sm ${proofOcr.status === 'verified' ? 'bg-emerald-50 text-emerald-800' : proofOcr.status === 'review' ? 'bg-amber-50 text-amber-800' : 'bg-red-50 text-red-800'}`}>{proofOcr.reason}</p> : null)}
+          </div>}
+          <DialogFooter><Button variant="outline" onClick={closeProofConfirmation}>Hủy</Button><Button disabled={!proofConfirmation?.file || (paymentProofOcrEnabled && (proofOcr.checking || ['rejected', 'error', 'unavailable'].includes(proofOcr.status || '')))} onClick={() => void confirmPaymentProof()}>Xác nhận gửi minh chứng</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

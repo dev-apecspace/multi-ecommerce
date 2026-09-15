@@ -173,7 +173,6 @@ export default function SellerDashboardPage() {
             <TabsTrigger value="overview">Tổng quan</TabsTrigger>
             <TabsTrigger value="orders">Đơn hàng</TabsTrigger>
             <TabsTrigger value="products">Sản phẩm</TabsTrigger>
-            <TabsTrigger value="wallet">Ví tiền</TabsTrigger>
             <TabsTrigger value="analytics">Phân tích</TabsTrigger>
           </TabsList>
 

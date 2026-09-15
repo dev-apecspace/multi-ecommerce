@@ -461,7 +461,7 @@ export default function SellerCreateProductPage() {
               <CardTitle>Giá cả</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Giá bán *</Label>
                   <Input 
@@ -655,7 +655,7 @@ export default function SellerCreateProductPage() {
 
               {attributeInputBlocks.map((block) => (
                 <div key={block.id} className="border rounded p-4 bg-white">
-                  <div className="grid grid-cols-2 gap-4 items-start">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-start">
                     {/* Left side - Attribute Name */}
                     <div>
                       <div className="text-sm font-semibold text-gray-700 mb-2">Tên thuộc tính <span className="text-destructive">*</span></div>

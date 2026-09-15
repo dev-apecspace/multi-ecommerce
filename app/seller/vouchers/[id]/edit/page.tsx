@@ -179,7 +179,7 @@ export default function EditVoucherPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-2">Mức Giảm Giá *</label>
               <Input
@@ -223,7 +223,7 @@ export default function EditVoucherPage() {
           <CardTitle>Thông Tin Sử Dụng</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-2">Số Lần Dùng Tối Đa Mỗi Khách Hàng *</label>
               <Input
@@ -255,7 +255,7 @@ export default function EditVoucherPage() {
           <CardTitle>Thời Gian Hiệu Lực</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium mb-2">Ngày Bắt Đầu *</label>
               <Input

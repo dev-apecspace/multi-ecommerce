@@ -2,7 +2,17 @@ import Link from "next/link"
 import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from "lucide-react"
 import { CompanyInformation } from "@/components/company-information"
 
-export function Footer() {
+export function Footer({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <footer className="mt-16 border-t border-border bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
+        <div className="container-viewport py-8">
+          <CompanyInformation className="text-center text-slate-600 dark:text-gray-300" />
+        </div>
+      </footer>
+    )
+  }
+
   return (
     <footer className="bg-slate-900 text-white mt-16">
       {/* Main Footer */}

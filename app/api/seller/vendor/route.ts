@@ -105,9 +105,14 @@ export async function PATCH(request: NextRequest) {
     if (body.address) vendorData.businessAddress = body.address
     if (body.taxId) vendorData.taxId = body.taxId
     if (body.businessLicense) vendorData.businessLicense = body.businessLicense
-    if (body.bankAccount) vendorData.bankAccount = body.bankAccount
-    if (body.bankName) vendorData.bankName = body.bankName
-    if (body.bankBranch) vendorData.bankBranch = body.bankBranch
+    if (typeof body.bankAccount === 'string') vendorData.bankAccount = body.bankAccount.trim() || null
+    if (typeof body.bankName === 'string') vendorData.bankName = body.bankName.trim() || null
+    if (typeof body.bankCode === 'string') vendorData.bankCode = body.bankCode.trim() || null
+    if (typeof body.bankBin === 'string') vendorData.bankBin = body.bankBin.trim() || null
+    if (typeof body.bankBranch === 'string') vendorData.bankBranch = body.bankBranch.trim() || null
+    if (typeof body.walletProvider === 'string') vendorData.walletProvider = body.walletProvider.trim() || null
+    if (typeof body.walletAccount === 'string') vendorData.walletAccount = body.walletAccount.trim() || null
+    if (typeof body.walletQrUrl === 'string') vendorData.walletQrUrl = body.walletQrUrl.trim() || null
 
     const { data: updatedVendor, error: updateError } = await supabase
       .from('Vendor')
@@ -146,9 +151,9 @@ export async function PATCH(request: NextRequest) {
       if (body.ownerName) shopDetailData.ownerName = body.ownerName
       if (body.taxId) shopDetailData.taxId = body.taxId
       if (body.businessLicense) shopDetailData.businessLicense = body.businessLicense
-      if (body.bankAccount) shopDetailData.bankAccount = body.bankAccount
-      if (body.bankName) shopDetailData.bankName = body.bankName
-      if (body.bankBranch) shopDetailData.bankBranch = body.bankBranch
+      if (typeof body.bankAccount === 'string') shopDetailData.bankAccount = body.bankAccount.trim() || null
+      if (typeof body.bankName === 'string') shopDetailData.bankName = body.bankName.trim() || null
+      if (typeof body.bankBranch === 'string') shopDetailData.bankBranch = body.bankBranch.trim() || null
 
       if (Object.keys(shopDetailData).length > 0) {
         const { data: existingDetail } = await supabase

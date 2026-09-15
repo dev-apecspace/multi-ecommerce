@@ -44,6 +44,7 @@ const adminLinks: AdminLink[] = [
   { href: "/admin/products", label: "Quản lý sản phẩm", icon: Package },
   { href: "/admin/categories", label: "Quản lý danh mục", icon: Layers },
   { href: "/admin/vendors", label: "Quản lý nhà cung cấp", icon: Store },
+  { href: "/admin/vendor-monthly-fees", label: "Phí hàng tháng của shop", icon: Percent },
   { href: "/admin/orders", label: "Quản lý đơn hàng", icon: ShoppingBag },
   {
     href: "/admin/promotions",

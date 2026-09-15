@@ -14,6 +14,7 @@ import {
 import { CheckCircle, XCircle, Clock, Plus, Trash2, Lock } from "lucide-react"
 import { useAdminVendors } from "@/hooks/useSupabase"
 import AdminVendorModal from "@/components/admin-vendor-modal"
+import { AdminVendorFeeModal } from "@/components/admin-vendor-fee-modal"
 import { useToast } from "@/hooks/use-toast"
 import { Pagination } from "@/components/pagination"
 import { usePagination } from "@/hooks/use-pagination"
@@ -60,6 +61,7 @@ function AdminVendorsContent() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<string>("all")
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
+  const [isFeeModalOpen, setIsFeeModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isManagementModalOpen, setIsManagementModalOpen] = useState(false)
   const [documents, setDocuments] = useState<VendorDocument[]>([])
@@ -396,6 +398,13 @@ function AdminVendorsContent() {
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
+                          onClick={() => { setSelectedVendor(vendor); setIsFeeModalOpen(true) }}
+                        >
+                          Cấu hình phí
+                        </Button>
+                        <Button
+                          size="sm"
                           className="bg-blue-600 hover:bg-blue-700"
                           onClick={() => handleOpenManagement(vendor)}
                         >
@@ -429,6 +438,7 @@ function AdminVendorsContent() {
 
       {selectedVendor && (
         <>
+          <AdminVendorFeeModal vendor={selectedVendor} open={isFeeModalOpen} onClose={() => setIsFeeModalOpen(false)} />
           <AdminVendorModal
             vendor={selectedVendor}
             documents={documents}

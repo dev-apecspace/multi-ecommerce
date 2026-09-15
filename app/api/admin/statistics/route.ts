@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthFromRequest, isAdmin, unauthorizedResponse } from '@/lib/api-auth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,16 +9,22 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!isAdmin(auth)) return unauthorizedResponse()
+
     const [usersRes, vendorsRes, productsRes, ordersRes, reviewsRes] = await Promise.all([
       supabase.from('User').select('*', { count: 'exact' }),
       supabase.from('Vendor').select('*', { count: 'exact' }),
       supabase.from('Product').select('*', { count: 'exact' }),
-      supabase.from('Order').select('total', { count: 'exact' }),
+      supabase.from('Order').select('total, status', { count: 'exact' }),
       supabase.from('Review').select('*', { count: 'exact' }),
     ])
 
-    const totalRevenue = ordersRes.data?.reduce((sum: number, o: any) => sum + (o.total || 0), 0) || 0
-    const averageOrderValue = (ordersRes.count || 0) > 0 ? totalRevenue / ordersRes.count : 0
+    const settledOrders = ordersRes.data?.filter((order: any) =>
+      order.status === 'delivered' || order.status === 'completed'
+    ) || []
+    const totalRevenue = settledOrders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
+    const averageOrderValue = settledOrders.length > 0 ? totalRevenue / settledOrders.length : 0
 
     const stats = {
       users: {
@@ -34,7 +41,7 @@ export async function GET(request: NextRequest) {
         total: productsRes.count || 0,
       },
       orders: {
-        total: ordersRes.count || 0,
+        total: settledOrders.length,
         totalRevenue,
         averageOrderValue,
       },

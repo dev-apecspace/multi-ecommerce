@@ -439,7 +439,7 @@ export default function AccountContent() {
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-bold text-orange-600">{order.total.toLocaleString('vi-VN')}₫</p>
-                          <Link href={`/client/orders/${order.id}`}>
+                          <Link href={`/client/orders/${encodeURIComponent(order.orderNumber)}`}>
                             <Button variant="ghost" size="sm" className="mt-2">
                               Chi tiết <ChevronRight className="h-4 w-4" />
                             </Button>
@@ -493,7 +493,7 @@ export default function AccountContent() {
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-bold text-orange-600">{order.total.toLocaleString('vi-VN')}₫</p>
-                              <Link href={`/client/orders/${order.id}`}>
+                              <Link href={`/client/orders/${encodeURIComponent(order.orderNumber)}`}>
                                 <Button variant="ghost" size="sm" className="mt-2">
                                   Chi tiết <ChevronRight className="h-4 w-4" />
                                 </Button>

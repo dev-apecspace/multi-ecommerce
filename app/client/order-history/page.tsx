@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Star } from "lucide-react"
+import { ChevronLeft, ChevronRight, Star } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -16,6 +16,7 @@ import { useRealtimeOrder } from "@/hooks/use-realtime-order"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
 import { ReviewModal } from "@/components/review/review-modal"
+import { orderStatusConfig } from "@/lib/order-status"
 
 interface Order {
   id: number
@@ -67,6 +68,8 @@ export default function OrderHistoryPage() {
   const [userId, setUserId] = useState<number | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null)
   const [returnStatuses, setReturnStatuses] = useState<Record<number, string>>({})
   const [returnModal, setReturnModal] = useState<ReturnModalState>({
@@ -128,7 +131,7 @@ export default function OrderHistoryPage() {
     try {
       setLoading(true)
       setIsLoading(true)
-      const response = await fetch(`/api/client/orders?userId=${userId}`)
+      const response = await fetch(`/api/client/orders?userId=${userId}&limit=200&offset=0`)
       const result = await response.json()
       setOrders(result.data || [])
     } catch (error) {
@@ -236,20 +239,6 @@ export default function OrderHistoryPage() {
     })
   }
 
-  const statusConfig: Record<string, { label: string; color: string }> = {
-    pending: { label: "Chờ tiếp nhận", color: "bg-gray-100 text-gray-800" },
-    processing: { label: "Đã duyệt", color: "bg-blue-100 text-blue-800" },
-    shipped: { label: "Đang giao", color: "bg-yellow-100 text-yellow-800" },
-    delivered: { label: "Đã giao", color: "bg-green-100 text-green-800" },
-    completed: { label: "Hoàn thành", color: "bg-emerald-100 text-emerald-800" },
-    cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
-    return_pending: { label: "Đã gửi yêu cầu trả hàng", color: "bg-purple-100 text-purple-800" },
-    return_approved: { label: "Đã duyệt yêu cầu trả hàng", color: "bg-blue-100 text-blue-800" },
-    return_refund_confirmed: { label: "Đã hoàn tiền hàng", color: "bg-teal-100 text-teal-800" },
-    return_shipped: { label: "Đã trả hàng", color: "bg-emerald-100 text-emerald-800" },
-    returned: { label: "Đã trả hàng", color: "bg-indigo-100 text-indigo-800" }
-  }
-
   const canReviewOrder = (order: Order) => order.status === 'completed'
 
   const getProductDisplayName = (item: Order['OrderItem'][number]) => {
@@ -337,16 +326,35 @@ export default function OrderHistoryPage() {
   const deliveredOrders = orders.filter(o => o.status === 'delivered')
   const completedOrders = orders.filter(o => o.status === 'completed')
   const cancelledOrders = orders.filter(o => o.status === 'cancelled')
+  const ordersByTab: Record<string, Order[]> = {
+    all: allOrders,
+    pending: pendingOrders,
+    processing: processingOrders,
+    shipped: shippedOrders,
+    delivered: deliveredOrders,
+    completed: completedOrders,
+    cancelled: cancelledOrders,
+  }
+  const pageSize = 10
+  const activeOrders = ordersByTab[activeTab] || allOrders
+  const totalPages = Math.max(1, Math.ceil(activeOrders.length / pageSize))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const visibleOrders = activeOrders.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize)
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    setCurrentPage(1)
+  }
 
   return (
-    <main className="container-viewport py-8">
+    <main className="container-viewport client-order-history py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Lịch sử đơn hàng</h1>
         <p className="text-muted-foreground">Quản lý và theo dõi các đơn hàng của bạn</p>
       </div>
 
-      <Tabs defaultValue="all">
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList className="client-order-tabs">
           <TabsTrigger value="all">Tất cả ({allOrders.length})</TabsTrigger>
           <TabsTrigger value="pending">Chờ tiếp nhận ({pendingOrders.length})</TabsTrigger>
           <TabsTrigger value="processing">Đã duyệt ({processingOrders.length})</TabsTrigger>
@@ -364,9 +372,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            allOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -465,7 +473,7 @@ export default function OrderHistoryPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => router.push(`/client/orders/${order.id}`)}
+                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                       >
                         Chi tiết
                         <ChevronRight className="h-4 w-4 ml-2" />
@@ -486,9 +494,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            pendingOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -596,7 +604,7 @@ export default function OrderHistoryPage() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => router.push(`/client/orders/${order.id}`)}
+                          onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                         >
                           Chi tiết
                           <ChevronRight className="h-4 w-4 ml-2" />
@@ -618,9 +626,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            processingOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -719,7 +727,7 @@ export default function OrderHistoryPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => router.push(`/client/orders/${order.id}`)}
+                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                       >
                         Chi tiết
                         <ChevronRight className="h-4 w-4 ml-2" />
@@ -740,9 +748,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            shippedOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -841,7 +849,7 @@ export default function OrderHistoryPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => router.push(`/client/orders/${order.id}`)}
+                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                       >
                         Chi tiết
                         <ChevronRight className="h-4 w-4 ml-2" />
@@ -862,9 +870,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            deliveredOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -938,7 +946,7 @@ export default function OrderHistoryPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => router.push(`/client/orders/${order.id}`)}
+                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                       >
                         Chi tiết
                         <ChevronRight className="h-4 w-4 ml-2" />
@@ -959,9 +967,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            completedOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -1060,7 +1068,7 @@ export default function OrderHistoryPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => router.push(`/client/orders/${order.id}`)}
+                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                       >
                         Chi tiết
                         <ChevronRight className="h-4 w-4 ml-2" />
@@ -1081,9 +1089,9 @@ export default function OrderHistoryPage() {
               </CardContent>
             </Card>
           ) : (
-            cancelledOrders.map((order) => {
+            visibleOrders.map((order) => {
               const statusKey = getOrderStatusKey(order)
-              const statusData = statusConfig[statusKey] || statusConfig.pending
+              const statusData = orderStatusConfig[statusKey] || orderStatusConfig.pending
               return (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
@@ -1182,7 +1190,7 @@ export default function OrderHistoryPage() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => router.push(`/client/orders/${order.id}`)}
+                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
                       >
                         Chi tiết
                         <ChevronRight className="h-4 w-4 ml-2" />
@@ -1195,6 +1203,39 @@ export default function OrderHistoryPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {activeOrders.length > pageSize && (
+        <nav className="mt-6 flex flex-col items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 sm:flex-row" aria-label="Phân trang đơn hàng">
+          <p className="text-sm text-muted-foreground">
+            Hiển thị {(safeCurrentPage - 1) * pageSize + 1}–{Math.min(safeCurrentPage * pageSize, activeOrders.length)} trên {activeOrders.length} đơn hàng
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={safeCurrentPage === 1}
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Trước
+            </Button>
+            <span className="min-w-20 text-center text-sm font-medium">
+              {safeCurrentPage} / {totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={safeCurrentPage === totalPages}
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+            >
+              Sau
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </nav>
+      )}
 
       <CreateReturnModal
         open={returnModal.open}

@@ -29,6 +29,11 @@ export async function GET(request: NextRequest) {
         date,
         paymentMethod,
         paymentStatus,
+        paymentProofUrl,
+        paymentSubmittedAt,
+        paymentVerificationStatus,
+        paymentVerificationData,
+        paymentVerifiedAt,
         shippingAddress,
         estimatedDelivery,
         User(id, name, email, phone),
@@ -83,6 +88,11 @@ export async function GET(request: NextRequest) {
         date: order.date,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
+        paymentProofUrl: order.paymentProofUrl,
+        paymentSubmittedAt: order.paymentSubmittedAt,
+        paymentVerificationStatus: order.paymentVerificationStatus,
+        paymentVerificationData: order.paymentVerificationData,
+        paymentVerifiedAt: order.paymentVerifiedAt,
         shippingAddress: order.shippingAddress,
         estimatedDelivery: order.estimatedDelivery,
         User: order.User,
@@ -139,8 +149,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: `Cannot update order from ${currentStatus} to ${status}` }, { status: 400 })
     }
 
-    // If trying to approve/process order with bank transfer, check payment status
-    if ((status === 'processing' || status === 'shipped') && orderData.paymentMethod === 'bank') {
+    // Bank QR and e-wallet transfers must be reconciled before approval.
+    if ((status === 'processing' || status === 'shipped') && ['bank', 'wallet'].includes(orderData.paymentMethod)) {
       if (orderData.paymentStatus !== 'paid') {
         return NextResponse.json({ 
           error: 'Không thể duyệt đơn hàng. Vui lòng xác nhận thanh toán trước khi duyệt đơn.' 

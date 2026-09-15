@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -11,6 +11,11 @@ interface UseRealtimeOrderProps {
 
 export function useRealtimeOrder({ userId, orderId, vendorId, onUpdate }: UseRealtimeOrderProps) {
   const router = useRouter()
+  const onUpdateRef = useRef(onUpdate)
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+  }, [onUpdate])
 
   useEffect(() => {
     if (!userId && !orderId && !vendorId) return
@@ -41,8 +46,8 @@ export function useRealtimeOrder({ userId, orderId, vendorId, onUpdate }: UseRea
         },
         (payload) => {
           console.log('Order inserted:', payload)
-          if (onUpdate) {
-            onUpdate()
+          if (onUpdateRef.current) {
+            onUpdateRef.current()
           } else {
             router.refresh()
           }
@@ -58,8 +63,8 @@ export function useRealtimeOrder({ userId, orderId, vendorId, onUpdate }: UseRea
         },
         (payload) => {
           console.log('Order updated:', payload)
-          if (onUpdate) {
-            onUpdate()
+          if (onUpdateRef.current) {
+            onUpdateRef.current()
           } else {
             router.refresh()
           }
@@ -70,5 +75,5 @@ export function useRealtimeOrder({ userId, orderId, vendorId, onUpdate }: UseRea
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, orderId, vendorId, router, onUpdate])
+  }, [userId, orderId, vendorId, router])
 }

@@ -158,20 +158,20 @@ export default function SellerVouchersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Quản lý Voucher</h1>
           <p className="text-gray-600">Tạo và quản lý voucher giảm giá cho khách hàng</p>
         </div>
-        <Link href="/seller/vouchers/create">
-          <Button className="gap-2">
+        <Link href="/seller/vouchers/create" className="w-full sm:w-auto">
+          <Button className="w-full gap-2 sm:w-auto">
             <Plus size={20} />
             Tạo Voucher
           </Button>
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">Tổng Voucher</CardTitle>
@@ -199,7 +199,7 @@ export default function SellerVouchersPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-fit">
           <TabsTrigger value="approved">Đã duyệt</TabsTrigger>
           <TabsTrigger value="pending">Chờ duyệt</TabsTrigger>
           <TabsTrigger value="rejected">Bị từ chối</TabsTrigger>
@@ -221,8 +221,8 @@ export default function SellerVouchersPage() {
                 {vouchers.map(voucher => (
                   <Card key={voucher.id}>
                     <CardContent className="pt-6">
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-4">
+                      <div className="grid gap-4 md:grid-cols-12 md:items-center">
+                        <div className="md:col-span-4">
                           <div className="flex items-center gap-3">
                             <div className="bg-gray-100 p-3 rounded">
                               {voucher.discountType === 'percentage' ? (
@@ -238,7 +238,7 @@ export default function SellerVouchersPage() {
                           </div>
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="md:col-span-2">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-600">Giảm:</span>
@@ -258,7 +258,7 @@ export default function SellerVouchersPage() {
                           </div>
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="md:col-span-2">
                           <div className="space-y-2">
                             <div className="flex items-center gap-1 text-sm">
                               <Calendar size={14} />
@@ -277,7 +277,7 @@ export default function SellerVouchersPage() {
                           </div>
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="md:col-span-2">
                           <div className="space-y-1">
                             <div className="text-sm">
                               <span className="text-gray-600">Sử dụng: </span>
@@ -293,7 +293,7 @@ export default function SellerVouchersPage() {
                           </div>
                         </div>
 
-                        <div className="col-span-2 flex gap-2 justify-end">
+                        <div className="flex gap-2 md:col-span-2 md:justify-end">
                           <Button
                             variant="ghost"
                             size="sm"

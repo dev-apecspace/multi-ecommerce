@@ -30,8 +30,7 @@ export async function GET(request: NextRequest) {
         .from('Order')
         .select('*, User(*), OrderItem(*, Product(*))')
         .eq('vendorId', vendorId)
-        .order('createdAt', { ascending: false })
-        .limit(5),
+        .order('createdAt', { ascending: false }),
       supabase
         .from('Review')
         .select('rating')
@@ -39,25 +38,27 @@ export async function GET(request: NextRequest) {
     ])
 
     const productIds = productsRes.data?.map((p: any) => p.id) || []
-    const orderItemsRes = productIds.length > 0
+    const allOrders = ordersRes.data || []
+    const settledOrders = allOrders.filter((order: any) =>
+      order.status === 'delivered' || order.status === 'completed'
+    )
+    const settledOrderIds = settledOrders.map((order: any) => order.id)
+    const orderItemsRes = productIds.length > 0 && settledOrderIds.length > 0
       ? await supabase
           .from('OrderItem')
           .select('quantity, price, Product(*)')
           .in('productId', productIds)
+          .in('orderId', settledOrderIds)
       : { data: [] }
 
     const vendor = vendorRes.data
     const products = productsRes.data || []
-    const orders = ordersRes.data || []
+    const orders = allOrders.slice(0, 5)
     const reviews = reviewsRes.data || []
     const orderItems = orderItemsRes.data || []
 
-    const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
-    const allOrders = await supabase
-      .from('Order')
-      .select('*')
-      .eq('vendorId', vendorId)
-    const completedOrders = allOrders.data?.filter((o: any) => o.status === 'completed' || o.status === 'delivered').length || 0
+    const totalRevenue = settledOrders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
+    const completedOrders = settledOrders.length
     const averageRating = reviews.length > 0
       ? (reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
       : 0
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     const stats = {
       productCount: productsRes.count || 0,
-      orderCount: allOrders.count || 0,
+      orderCount: allOrders.length,
       completedOrders,
       totalRevenue,
       averageRating,

@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+.venv-ocr/
+__pycache__/
+*.py[cod]
 /.pnp
 .pnp.js
 

@@ -10,9 +10,9 @@ export default function ClientLayout({
   children: React.ReactNode
 }>) {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex min-h-screen min-w-0 flex-col overflow-x-clip">
       <Navbar />
-      <main className="flex-1 pb-20 md:pb-0">{children}</main>
+      <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
       <Footer />
       <BottomNavigation />
       <ExperimentalModeModal />

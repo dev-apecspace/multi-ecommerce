@@ -48,6 +48,10 @@ interface Order {
   date: string
   paymentMethod: string
   paymentStatus?: string
+  paymentProofUrl?: string | null
+  paymentSubmittedAt?: string | null
+  paymentVerificationStatus?: 'pending' | 'verified' | 'review' | 'rejected' | 'unavailable' | 'error'
+  paymentVerificationData?: { reason?: string; checks?: { amount?: boolean; content?: boolean; time?: boolean } } | null
   shippingAddress: string
   estimatedDelivery: string
   User: { id: number; name: string; email: string; phone: string }
@@ -84,6 +88,7 @@ export default function SellerOrdersPage() {
   const [newStatus, setNewStatus] = useState<string>("")
   const [trackingNumber, setTrackingNumber] = useState<string>("")
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [paymentApprovalOpen, setPaymentApprovalOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [activeTab, setActiveTab] = useState<string>("all")
   
@@ -168,7 +173,7 @@ export default function SellerOrdersPage() {
     }
   }
 
-  const handleConfirmPayment = async () => {
+  const handleConfirmPaymentAndApprove = async () => {
     if (!selectedOrder || !vendorId) return
 
     setIsLoading(true)
@@ -176,21 +181,18 @@ export default function SellerOrdersPage() {
     try {
       const response = await fetch(`/api/orders/${selectedOrder.id}/confirm-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approveOrder: true })
       })
 
       if (response.ok) {
         const result = await response.json()
-        toast({ title: 'Thành công', description: 'Đã xác nhận thanh toán' })
+        toast({ title: 'Thành công', description: 'Đã xác nhận thanh toán và duyệt đơn hàng' })
         
-        // Refresh orders list
+        setPaymentApprovalOpen(false)
+        setDetailsOpen(false)
+        setSelectedOrder(null)
         await fetchOrders()
-        
-        // Update selected order with paymentStatus = 'paid'
-        setSelectedOrder(prev => prev ? {
-          ...prev,
-          paymentStatus: 'paid'
-        } : null)
       } else {
         const error = await response.json()
         toast({ title: 'Lỗi', description: error.error || 'Không thể xác nhận thanh toán', variant: 'destructive' })
@@ -612,16 +614,36 @@ export default function SellerOrdersPage() {
                       <span className="text-muted-foreground">Trạng thái thanh toán:</span>{' '}
                       <span className={`font-medium ${
                         selectedOrder.paymentStatus === 'paid' ? 'text-green-600' :
-                        selectedOrder.paymentStatus === 'pending' ? 'text-yellow-600' :
+                        ['pending', 'submitted'].includes(selectedOrder.paymentStatus) ? 'text-yellow-600' :
                         'text-red-600'
                       }`}>
                         {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' :
                          selectedOrder.paymentStatus === 'pending' ? 'Chờ thanh toán' :
+                         selectedOrder.paymentStatus === 'submitted' ? 'Khách đã gửi minh chứng' :
                          selectedOrder.paymentStatus}
                       </span>
                     </p>
                   )}
                 </div>
+                {selectedOrder.paymentProofUrl && (
+                  <div className="mt-4 border-t border-blue-200 pt-4">
+                    <p className="mb-2 text-sm font-semibold">Minh chứng khách đã gửi</p>
+                    <a href={selectedOrder.paymentProofUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-white">
+                      <img src={selectedOrder.paymentProofUrl} alt={`Minh chứng thanh toán đơn ${selectedOrder.orderNumber}`} className="max-h-72 w-full object-contain" />
+                    </a>
+                    <p className="mt-2 text-xs text-muted-foreground">Kiểm tra ảnh và biến động số dư trước khi duyệt đơn.</p>
+                    {selectedOrder.paymentVerificationStatus && selectedOrder.paymentVerificationStatus !== 'pending' && (
+                      <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+                        selectedOrder.paymentVerificationStatus === 'verified' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' :
+                        selectedOrder.paymentVerificationStatus === 'rejected' ? 'border-red-200 bg-red-50 text-red-800' :
+                        'border-amber-200 bg-amber-50 text-amber-800'
+                      }`}>
+                        <p className="font-semibold">{selectedOrder.paymentVerificationStatus === 'verified' ? 'AI: thông tin ảnh khớp đơn hàng' : selectedOrder.paymentVerificationStatus === 'rejected' ? 'AI: ảnh chưa được nhận diện là giao dịch' : 'AI: cần đối soát thủ công'}</p>
+                        {selectedOrder.paymentVerificationData?.reason && <p className="mt-1">{selectedOrder.paymentVerificationData.reason}</p>}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Shipping Address */}
@@ -630,37 +652,19 @@ export default function SellerOrdersPage() {
                 <p className="text-sm text-muted-foreground">{formatShippingAddress(selectedOrder.shippingAddress)}</p>
               </div>
 
-              {/* Payment Confirmation for Bank Transfer */}
-              {selectedOrder.paymentMethod === 'bank' && selectedOrder.paymentStatus === 'pending' && (
-                <div className="border-t pt-4">
-                  <div className="bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg mb-3">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                      <strong>Lưu ý:</strong> Đơn hàng này thanh toán bằng chuyển khoản. Vui lòng xác nhận thanh toán trước khi duyệt đơn.
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={handleConfirmPayment}
-                    disabled={updating}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                  >
-                    {updating ? 'Đang xử lý...' : '✓ Xác nhận thanh toán'}
-                  </Button>
-                </div>
-              )}
-
               {/* Status Update Actions */}
               {selectedOrder.status === 'pending' && (
                 <div className="border-t pt-4 space-y-2">
                   <Button 
-                    onClick={handleApproveOrder}
-                    disabled={updating || (selectedOrder.paymentMethod === 'bank' && selectedOrder.paymentStatus !== 'paid')}
+                    onClick={() => ['bank', 'wallet'].includes(selectedOrder.paymentMethod) && selectedOrder.paymentStatus !== 'paid' ? setPaymentApprovalOpen(true) : handleApproveOrder()}
+                    disabled={updating}
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
                     {updating ? 'Đang xử lý...' : '✓ Duyệt đơn'}
                   </Button>
-                  {selectedOrder.paymentMethod === 'bank' && selectedOrder.paymentStatus !== 'paid' && (
+                  {['bank', 'wallet'].includes(selectedOrder.paymentMethod) && selectedOrder.paymentStatus !== 'paid' && (
                     <p className="text-xs text-yellow-600 text-center">
-                      Vui lòng xác nhận thanh toán trước khi duyệt đơn
+                      Bạn sẽ cần xác nhận đã nhận tiền trước khi duyệt đơn
                     </p>
                   )}
                   <Button 
@@ -718,6 +722,28 @@ export default function SellerOrdersPage() {
               }}
             >
               Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paymentApprovalOpen} onOpenChange={setPaymentApprovalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận đã nhận tiền</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Bạn chắc chắn đã nhận <strong className="text-green-700">{selectedOrder?.total.toLocaleString('vi-VN')}₫</strong> cho đơn <strong>{selectedOrder?.orderNumber}</strong>?
+            </p>
+            <p className="rounded-md bg-amber-50 p-3 text-amber-800">
+              Hãy kiểm tra giao dịch trong tài khoản ngân hàng hoặc ví điện tử trước khi xác nhận. Thao tác này sẽ đồng thời ghi nhận thanh toán và duyệt đơn.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentApprovalOpen(false)} disabled={updating}>Huỷ</Button>
+            <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmPaymentAndApprove} disabled={updating}>
+              {updating ? 'Đang xử lý...' : 'Đã nhận tiền & duyệt đơn'}
             </Button>
           </DialogFooter>
         </DialogContent>

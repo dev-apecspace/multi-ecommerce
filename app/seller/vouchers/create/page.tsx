@@ -103,20 +103,20 @@ export default function CreateVoucherPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-3 sm:items-center sm:gap-4">
         <Link href="/seller/vouchers">
           <Button variant="ghost" size="icon">
             <ArrowLeft size={20} />
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Tạo Voucher Mới</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Tạo Voucher Mới</h1>
           <p className="text-gray-600">Tạo voucher để khuyến khích khách hàng mua hàng</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Thông Tin Cơ Bản</CardTitle>
@@ -143,7 +143,7 @@ export default function CreateVoucherPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-2">Loại Voucher *</label>
                   <select
@@ -177,7 +177,7 @@ export default function CreateVoucherPage() {
               <CardTitle>Thông Tin Giảm Giá</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Mức Giảm Giá {formData.discountType === 'percentage' ? '(%)' : '(₫)'} *
@@ -225,7 +225,7 @@ export default function CreateVoucherPage() {
               <CardTitle>Thông Tin Sử Dụng</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-2">Số Lần Dùng Tối Đa Mỗi Khách Hàng *</label>
                   <Input
@@ -257,7 +257,7 @@ export default function CreateVoucherPage() {
               <CardTitle>Thời Gian Hiệu Lực</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-2">Ngày Bắt Đầu *</label>
                   <Input

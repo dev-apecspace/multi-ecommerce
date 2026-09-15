@@ -1,0 +1,3 @@
+# Use Python 3.9-3.11 for the local PaddleOCR inference engine.
+paddlepaddle==2.6.2
+paddleocr==2.9.1

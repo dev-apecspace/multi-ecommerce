@@ -21,11 +21,7 @@ export default function SellerWalletPage() {
     }
   }, [user?.vendorId, fetchWallet])
 
-  const transactions = Array.isArray(walletData) ? walletData : [
-    { id: 1, type: "income", description: "Bán hàng đơn ORD001", amount: 4999000, date: "2025-01-15", status: "Completed" },
-    { id: 2, type: "withdraw", description: "Rút tiền", amount: -5000000, date: "2025-01-10", status: "Completed" },
-    { id: 3, type: "income", description: "Bán hàng đơn ORD002", amount: 2499000, date: "2025-01-14", status: "Completed" },
-  ]
+  const transactions = walletData?.transactions || []
 
   if (loading) {
     return (
@@ -53,7 +49,7 @@ export default function SellerWalletPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm opacity-90">Số dư ví</p>
-                <p className="text-3xl font-bold mt-2">125.45 Triệu</p>
+                <p className="text-3xl font-bold mt-2">{(walletData?.balance || 0).toLocaleString('vi-VN')} ₫</p>
               </div>
               <Wallet className="h-12 w-12 opacity-50" />
             </div>
@@ -64,12 +60,12 @@ export default function SellerWalletPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Doanh thu tháng này</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">125.45 Triệu</p>
+                <p className="text-sm text-muted-foreground">Tổng doanh thu đã hoàn tất</p>
+                <p className="text-3xl font-bold text-green-600 mt-2">{(walletData?.totalEarnings || 0).toLocaleString('vi-VN')} ₫</p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">+8% so với tháng trước</p>
+            <p className="text-xs text-muted-foreground mt-2">Từ các đơn đã hoàn tất</p>
           </CardContent>
         </Card>
 
@@ -78,7 +74,7 @@ export default function SellerWalletPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Đang chờ</p>
-                <p className="text-3xl font-bold text-yellow-600 mt-2">2.5 Triệu</p>
+                <p className="text-3xl font-bold text-yellow-600 mt-2">{(walletData?.pendingAmount || 0).toLocaleString('vi-VN')} ₫</p>
               </div>
               <Send className="h-8 w-8 text-yellow-600 opacity-50" />
             </div>
@@ -117,7 +113,7 @@ export default function SellerWalletPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.map((tx) => (
+                    {transactions.map((tx: any) => (
                       <tr key={tx.id} className="border-b border-border hover:bg-muted">
                         <td className="py-3 px-4">
                           <span className={`px-2 py-1 rounded text-xs ${
@@ -130,9 +126,9 @@ export default function SellerWalletPage() {
                         <td className={`py-3 px-4 font-semibold ${tx.amount > 0 ? "text-green-600" : "text-red-600"}`}>
                           {tx.amount > 0 ? "+" : ""}{(tx.amount / 1000000).toFixed(2)} Tr
                         </td>
-                        <td className="py-3 px-4">{tx.date}</td>
+                        <td className="py-3 px-4">{tx.date ? new Date(tx.date).toLocaleDateString('vi-VN') : '—'}</td>
                         <td className="py-3 px-4">
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Hoàn thành</span>
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">{tx.status === 'completed' ? 'Hoàn thành' : tx.status}</span>
                         </td>
                       </tr>
                     ))}
