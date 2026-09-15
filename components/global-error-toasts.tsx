@@ -11,6 +11,15 @@ function getSafeMessage(error: unknown) {
   return GENERIC_ERROR_MESSAGE
 }
 
+function isBrowserExtensionError(error: unknown) {
+  const source = error instanceof Error
+    ? error.stack || error.message
+    : typeof error === "object" && error !== null && "stack" in error
+      ? String(error.stack || "")
+      : ""
+  return /(?:chrome-extension|moz-extension|safari-web-extension):\/\//i.test(source)
+}
+
 /** Displays a fallback for errors that would otherwise only reach the console. */
 export function GlobalErrorToasts() {
   const lastShownAt = useRef(0)
@@ -24,9 +33,13 @@ export function GlobalErrorToasts() {
     }
     const onError = (event: ErrorEvent) => {
       if (/ResizeObserver loop/i.test(event.message)) return
+      if (/(?:chrome-extension|moz-extension|safari-web-extension):\/\//i.test(event.filename) || isBrowserExtensionError(event.error)) return
       showError(event.error ?? event.message)
     }
-    const onUnhandledRejection = (event: PromiseRejectionEvent) => showError(event.reason)
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (isBrowserExtensionError(event.reason)) return
+      showError(event.reason)
+    }
 
     window.addEventListener("error", onError)
     window.addEventListener("unhandledrejection", onUnhandledRejection)
