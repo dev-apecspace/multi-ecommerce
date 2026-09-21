@@ -29,6 +29,13 @@ interface Order {
   status: string
   total: number
   date: string
+  paymentMethod?: string
+  paymentStatus?: string
+  paymentProofUrl?: string | null
+  paymentSubmittedAt?: string | null
+  paymentVerificationStatus?: 'pending' | 'verified' | 'review' | 'rejected' | 'unavailable' | 'error'
+  paymentVerificationData?: { reason?: string; checks?: { amount?: boolean; content?: boolean; time?: boolean } } | null
+  paymentVerifiedAt?: string | null
   User: { id: number; name: string; email: string }
   Vendor: { id: number; name: string }
   OrderItem: Array<{ 
@@ -283,6 +290,7 @@ export default function AdminOrdersPage() {
                   <p className="font-semibold">{selectedOrder.total.toLocaleString('vi-VN')}₫</p>
                 </div>
               </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><h3 className="mb-2 font-semibold">Thanh toán & minh chứng</h3><div className="grid gap-2 sm:grid-cols-2"><p><span className="text-muted-foreground">Phương thức:</span> {selectedOrder.paymentMethod === 'bank' ? 'Chuyển khoản' : selectedOrder.paymentMethod === 'wallet' ? 'Ví điện tử' : selectedOrder.paymentMethod === 'cod' ? 'Thanh toán khi nhận hàng' : selectedOrder.paymentMethod || '—'}</p><p><span className="text-muted-foreground">Trạng thái:</span> <span className={selectedOrder.paymentStatus === 'paid' ? 'font-medium text-emerald-600' : ['pending', 'submitted'].includes(selectedOrder.paymentStatus || '') ? 'font-medium text-amber-600' : 'font-medium text-red-600'}>{selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' : selectedOrder.paymentStatus === 'submitted' ? 'Đã gửi minh chứng' : selectedOrder.paymentStatus === 'pending' ? 'Chờ thanh toán' : selectedOrder.paymentStatus || '—'}</span></p>{selectedOrder.paymentSubmittedAt && <p><span className="text-muted-foreground">Gửi minh chứng:</span> {new Date(selectedOrder.paymentSubmittedAt).toLocaleString('vi-VN')}</p>}{selectedOrder.paymentVerifiedAt && <p><span className="text-muted-foreground">Xác minh lúc:</span> {new Date(selectedOrder.paymentVerifiedAt).toLocaleString('vi-VN')}</p>}</div>{selectedOrder.paymentProofUrl && <div className="mt-4 border-t border-slate-200 pt-4"><p className="mb-2 font-semibold">Ảnh minh chứng thanh toán</p><a href={selectedOrder.paymentProofUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-white"><img src={selectedOrder.paymentProofUrl} alt={`Minh chứng thanh toán đơn ${selectedOrder.orderNumber}`} className="max-h-80 w-full object-contain" /></a>{selectedOrder.paymentVerificationStatus && selectedOrder.paymentVerificationStatus !== 'pending' && <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${selectedOrder.paymentVerificationStatus === 'verified' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : selectedOrder.paymentVerificationStatus === 'rejected' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><p className="font-semibold">{selectedOrder.paymentVerificationStatus === 'verified' ? 'Đối soát tự động: thông tin ảnh khớp đơn hàng' : selectedOrder.paymentVerificationStatus === 'rejected' ? 'Đối soát tự động: ảnh chưa được nhận diện là giao dịch' : 'Đối soát tự động: cần kiểm tra thủ công'}</p>{selectedOrder.paymentVerificationData?.reason && <p className="mt-1">{selectedOrder.paymentVerificationData.reason}</p>}</div>}</div>}</div>
 
               <div className="border-t pt-4">
                 <p className="font-semibold mb-3">Sản phẩm</p>

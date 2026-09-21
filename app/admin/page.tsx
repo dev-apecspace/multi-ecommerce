@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle2, XCircle, Clock, AlertCircle, Eye, Download, User, Store, Users, ShoppingCart, DollarSign } from "lucide-react"
+import { CheckCircle2, XCircle, Clock, AlertCircle, Eye, Download, User, Store, Users, ShoppingCart, DollarSign, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer } from "recharts"
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from "@/hooks/use-toast"
+
+function StatLabel({ label, detail }: { label: string; detail: string }) {
+  return <div className="flex items-center gap-1"><p className="text-xs font-medium text-muted-foreground">{label}</p><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`Giải thích ${label}`} className="rounded-full text-muted-foreground transition-colors hover:text-foreground"><Info className="h-3.5 w-3.5" /></button></TooltipTrigger><TooltipContent side="top" className="max-w-72 whitespace-pre-line leading-relaxed">{detail}</TooltipContent></Tooltip></div>
+}
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("pending")
@@ -28,16 +33,22 @@ export default function AdminPage() {
     products: 0,
     orders: 0,
     revenue: 0,
+    temporaryRevenue: 0,
+    cancelledValue: 0,
+    orderStatus: { pending: 0, processing: 0, shipped: 0, delivered: 0, completed: 0, cancelled: 0 },
+    productStatus: { pending: 0, approved: 0, rejected: 0 },
+    activeUsers: 0,
   })
   const [vendors, setVendors] = useState<any>({ pending: [], approved: [], rejected: [] })
   const [loading, setLoading] = useState(true)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true)
         const [statsRes, pendingRes, approvedRes, rejectedRes] = await Promise.all([
-          fetch('/api/admin/statistics'),
+          fetch(`/api/admin/statistics?start=${dateRange.start}&end=${dateRange.end}`),
           fetch('/api/admin/vendors?status=pending&limit=10'),
           fetch('/api/admin/vendors?status=approved&limit=10'),
           fetch('/api/admin/vendors?status=rejected&limit=10'),
@@ -57,6 +68,11 @@ export default function AdminPage() {
           products: statsData.products?.total || 0,
           orders: statsData.orders?.total || 0,
           revenue: statsData.orders?.totalRevenue || 0,
+          temporaryRevenue: statsData.orders?.temporaryRevenue || 0,
+          cancelledValue: statsData.orders?.cancelledValue || 0,
+          orderStatus: { pending: statsData.orders?.pending || 0, processing: statsData.orders?.processing || 0, shipped: statsData.orders?.shipped || 0, delivered: statsData.orders?.delivered || 0, completed: statsData.orders?.completed || 0, cancelled: statsData.orders?.cancelled || 0 },
+          productStatus: { pending: statsData.products?.pending || 0, approved: statsData.products?.approved || 0, rejected: statsData.products?.rejected || 0 },
+          activeUsers: statsData.users?.active || 0,
         })
 
         setVendors({
@@ -72,15 +88,17 @@ export default function AdminPage() {
     }
 
     fetchData()
-  }, [])
+  }, [dateRange.start, dateRange.end])
 
   return (
     <main className="min-h-screen bg-surface dark:bg-slate-950">
       <div className="px-4 md:px-6 py-4 md:py-6">
         {/* Header */}
-        <div className="mb-6 md:mb-8">
+        <div className="mb-6 md:mb-8 flex flex-wrap items-end justify-between gap-3">
+          <div>
           <h1 className="text-2xl md:text-3xl font-bold">Bảng điều khiển quản lý</h1>
           <p className="text-sm md:text-base text-muted-foreground">Quản lý người bán, danh mục, đơn hàng</p>
+          </div><div className="flex gap-2 text-xs"><label>Từ ngày<input type="date" value={dateRange.start} onChange={(event) => setDateRange((range) => ({ ...range, start: event.target.value }))} className="mt-1 block rounded border bg-background px-2 py-1" /></label><label>Đến ngày<input type="date" value={dateRange.end} onChange={(event) => setDateRange((range) => ({ ...range, end: event.target.value }))} className="mt-1 block rounded border bg-background px-2 py-1" /></label>{(dateRange.start || dateRange.end) && <Button size="sm" variant="outline" onClick={() => setDateRange({ start: '', end: '' })}>Tất cả</Button>}</div>
         </div>
 
         {/* Stats */}
@@ -89,44 +107,9 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">CHỜ DUYỆT</p>
-                  <p className="text-3xl font-bold mt-1">{stats.pending}</p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">ĐÃ PHÁT HÀNH</p>
-                  <p className="text-3xl font-bold mt-1">{stats.approved}</p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">TỪ CHỐI</p>
-                  <p className="text-3xl font-bold mt-1">{stats.rejected}</p>
-                </div>
-                <XCircle className="h-8 w-8 text-red-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">TỔNG NGƯỜI BÁN</p>
+                  <StatLabel label="TỔNG NGƯỜI BÁN" detail={'Đếm tất cả hồ sơ shop trong hệ thống.\n• Chờ: shop đang chờ admin xét duyệt.\n• Đã duyệt: shop được phép hoạt động.\n• Từ chối: hồ sơ chưa đáp ứng điều kiện hoặc bị admin từ chối.'} />
                   <p className="text-3xl font-bold mt-1">{stats.total}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Chờ: {stats.pending}</span><span className="text-emerald-600">Đã duyệt: {stats.approved}</span><span className="text-red-600">Từ chối: {stats.rejected}</span></div>
                 </div>
                 <Store className="h-8 w-8 text-primary" />
               </div>
@@ -137,8 +120,9 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">NGƯỜI DÙNG</p>
+                  <StatLabel label="NGƯỜI DÙNG" detail={'Đếm toàn bộ tài khoản khách hàng trong database.\n• Hoạt động: tài khoản có trạng thái active.\n• Không tính tài khoản đã bị vô hiệu hóa hoặc xóa.'} />
                   <p className="text-3xl font-bold mt-1">{stats.users}</p>
+                  <p className="mt-2 text-[10px] font-bold leading-none text-blue-600">Hoạt động: {stats.activeUsers}</p>
                 </div>
                 <Users className="h-8 w-8 text-blue-500" />
               </div>
@@ -149,8 +133,9 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">SẢN PHẨM</p>
+                  <StatLabel label="SẢN PHẨM" detail={'Đếm toàn bộ sản phẩm.\n• Chờ: shop gửi chờ kiểm duyệt.\n• Hiển thị: approved, có thể xuất hiện trên sàn.\n• Từ chối: không đạt yêu cầu kiểm duyệt.'} />
                   <p className="text-3xl font-bold mt-1">{stats.products}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Chờ: {stats.productStatus?.pending || 0}</span><span className="text-emerald-600">Hiển thị: {stats.productStatus?.approved || 0}</span><span className="text-red-600">Từ chối: {stats.productStatus?.rejected || 0}</span></div>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-orange-500" />
               </div>
@@ -161,8 +146,9 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">ĐƠN HÀNG</p>
+                  <StatLabel label="ĐƠN HÀNG" detail={'Đếm tất cả đơn hàng, gồm cả đơn đã hủy.\n• Chờ: đơn mới hoặc đang được shop xử lý.\n• Giao: đang vận chuyển hoặc đã giao chờ hoàn tất.\n• Hoàn tất: giao dịch đã kết thúc thành công.\n• Hủy: đơn bị hủy, không tính vào doanh thu.'} />
                   <p className="text-3xl font-bold mt-1">{stats.orders}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Chờ: {(stats.orderStatus?.pending || 0) + (stats.orderStatus?.processing || 0)}</span><span className="text-blue-600">Giao: {(stats.orderStatus?.shipped || 0) + (stats.orderStatus?.delivered || 0)}</span><span className="text-emerald-600">Hoàn tất: {stats.orderStatus?.completed || 0}</span><span className="text-red-600">Hủy: {stats.orderStatus?.cancelled || 0}</span></div>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-purple-500" />
               </div>
@@ -173,8 +159,9 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">TỔNG DOANH THU</p>
+                  <StatLabel label="TỔNG DOANH THU" detail={'Doanh thu ghi nhận:\n• Đơn đã giao hoặc hoàn tất.\n• Hoặc đơn chuyển khoản/ví đã xác nhận nhận tiền.\n\nTạm tính: đơn chưa hủy nhưng chưa đạt điều kiện ghi nhận.\nHủy: chỉ dùng đối soát, không cộng vào doanh thu.'} />
                   <p className="text-2xl font-bold mt-1">{(stats.revenue / 1000000).toFixed(1)}M₫</p>
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Tạm tính: {(stats.temporaryRevenue / 1000000).toFixed(1)}M₫</span><span className="text-red-600">Hủy: {(stats.cancelledValue / 1000000).toFixed(1)}M₫</span></div>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-600" />
               </div>
@@ -209,7 +196,7 @@ export default function AdminPage() {
                     <Cell fill="#22c55e" />
                     <Cell fill="#ef4444" />
                   </Pie>
-                  <Tooltip />
+                  <ChartTooltip />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -231,7 +218,7 @@ export default function AdminPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
-                  <Tooltip />
+                  <ChartTooltip />
                   <Bar dataKey="value" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
@@ -470,7 +457,7 @@ export default function AdminPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(value: any) => {
+                      <ChartTooltip formatter={(value: any) => {
                         if (value > 1000000) return `${(value / 1000000).toFixed(1)}M₫`
                         return `${value.toLocaleString('vi-VN')}₫`
                       }} />

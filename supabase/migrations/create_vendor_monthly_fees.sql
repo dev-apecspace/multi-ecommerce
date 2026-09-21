@@ -35,16 +35,17 @@ CREATE TABLE IF NOT EXISTS "VendorMonthlyFee" (
 
 ALTER TABLE "VendorMonthlyFee"
   ADD COLUMN IF NOT EXISTS "feeType" VARCHAR(20) NOT NULL DEFAULT 'fixed',
+  ADD COLUMN IF NOT EXISTS "collectedAmount" NUMERIC(15, 2) NOT NULL DEFAULT 0 CHECK ("collectedAmount" >= 0),
   ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'uncollected';
 
-UPDATE "VendorMonthlyFee" SET status = 'uncollected' WHERE status NOT IN ('uncollected', 'collected');
+UPDATE "VendorMonthlyFee" SET status = 'uncollected' WHERE status NOT IN ('uncollected', 'partially_collected', 'collected');
 
 ALTER TABLE "VendorMonthlyFee"
   DROP CONSTRAINT IF EXISTS "VendorMonthlyFee_status_check",
   DROP CONSTRAINT IF EXISTS "VendorMonthlyFee_feeType_check";
 
 ALTER TABLE "VendorMonthlyFee"
-  ADD CONSTRAINT "VendorMonthlyFee_status_check" CHECK (status IN ('uncollected', 'collected')),
+  ADD CONSTRAINT "VendorMonthlyFee_status_check" CHECK (status IN ('uncollected', 'partially_collected', 'collected')),
   ADD CONSTRAINT "VendorMonthlyFee_feeType_check" CHECK ("feeType" IN ('fixed', 'percentage'));
 
 CREATE INDEX IF NOT EXISTS "idx_vendor_monthly_fee_month" ON "VendorMonthlyFee"("billingMonth");

@@ -44,7 +44,6 @@ const adminLinks: AdminLink[] = [
   { href: "/admin/products", label: "Quản lý sản phẩm", icon: Package },
   { href: "/admin/categories", label: "Quản lý danh mục", icon: Layers },
   { href: "/admin/vendors", label: "Quản lý nhà cung cấp", icon: Store },
-  { href: "/admin/vendor-monthly-fees", label: "Phí hàng tháng của shop", icon: Percent },
   { href: "/admin/orders", label: "Quản lý đơn hàng", icon: ShoppingBag },
   {
     href: "/admin/promotions",
@@ -59,7 +58,10 @@ const adminLinks: AdminLink[] = [
   { href: "/admin/policy-acceptances", label: "Lịch sử chấp nhận", icon: FileCheck2 },
   { href: "/admin/social-organization-feedback", label: "Phản ánh tổ chức xã hội", icon: MessageSquareText },
   // { href: "/admin/withdraw-requests", label: "Quản lý yêu cầu rút tiền", icon: Download },
-  { href: "/admin/reports", label: "Báo cáo & Thống kê", icon: TrendingUp },
+  { href: "/admin/vendor-monthly-fees", label: "Phí hợp tác hàng tháng", icon: Percent },
+  { href: "/admin/reports", label: "Tài chính & Đối soát", icon: TrendingUp, subItems: [
+    { href: "/admin/reports", label: "Báo cáo & Thống kê" },
+  ] },
   { href: "/admin/settings", label: "Cài đặt hệ thống", icon: Settings },
 ]
 

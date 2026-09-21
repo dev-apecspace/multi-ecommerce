@@ -93,10 +93,6 @@ temp/
 *.sqlite
 *.sqlite3
 
-# Uploads and media
-/public/uploads/
-/uploads/
-
 # IDE
 .vscode/settings.json
 .idea/

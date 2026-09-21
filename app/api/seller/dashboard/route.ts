@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
     }
 
     const vendorId = auth.vendorId
+    const params = new URL(request.url).searchParams
+    const month = params.get('month') || new Date().toISOString().slice(0, 7)
 
     const [vendorRes, productsRes, ordersRes, reviewsRes] = await Promise.all([
       supabase
@@ -32,16 +34,17 @@ export async function GET(request: NextRequest) {
         .eq('vendorId', vendorId)
         .order('createdAt', { ascending: false }),
       supabase
-        .from('Review')
-        .select('rating')
-        .eq('vendorId', vendorId),
+        .from('ProductReview')
+        .select('rating, productId'),
     ])
 
     const productIds = productsRes.data?.map((p: any) => p.id) || []
-    const allOrders = ordersRes.data || []
-    const settledOrders = allOrders.filter((order: any) =>
-      order.status === 'delivered' || order.status === 'completed'
-    )
+    const sourceOrders = ordersRes.data || []
+    const allOrders = sourceOrders.filter((order: any) => String(order.createdAt || '').slice(0, 7) === month)
+    const isRevenueEligible = (order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')
+    const settledOrders = allOrders.filter(isRevenueEligible)
+    const currentMonthOrders = allOrders
+    const currentMonthRevenueOrders = currentMonthOrders.filter(isRevenueEligible)
     const settledOrderIds = settledOrders.map((order: any) => order.id)
     const orderItemsRes = productIds.length > 0 && settledOrderIds.length > 0
       ? await supabase
@@ -54,11 +57,11 @@ export async function GET(request: NextRequest) {
     const vendor = vendorRes.data
     const products = productsRes.data || []
     const orders = allOrders.slice(0, 5)
-    const reviews = reviewsRes.data || []
+    const reviews = (reviewsRes.data || []).filter((review: any) => productIds.includes(review.productId))
     const orderItems = orderItemsRes.data || []
 
-    const totalRevenue = settledOrders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
-    const completedOrders = settledOrders.length
+    const totalRevenue = currentMonthRevenueOrders.reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
+    const completedOrders = currentMonthRevenueOrders.length
     const averageRating = reviews.length > 0
       ? (reviews.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
       : 0
@@ -103,6 +106,7 @@ export async function GET(request: NextRequest) {
       totalRevenue,
       averageRating,
       followers: vendor?.followers || 0,
+      orderStatus: { pending: currentMonthOrders.filter((o: any) => o.status === 'pending').length, processing: currentMonthOrders.filter((o: any) => o.status === 'processing').length, shipped: currentMonthOrders.filter((o: any) => o.status === 'shipped').length, delivered: currentMonthOrders.filter((o: any) => o.status === 'delivered').length, completed: currentMonthOrders.filter((o: any) => o.status === 'completed').length, cancelled: currentMonthOrders.filter((o: any) => o.status === 'cancelled').length },
     }
 
     return NextResponse.json({
@@ -110,6 +114,8 @@ export async function GET(request: NextRequest) {
       stats,
       recentOrders,
       topProducts,
+      selectedMonth: month,
+      monthly: Array.from({ length: 6 }, (_, index) => { const date = new Date(); date.setMonth(date.getMonth() - (5 - index)); const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; const monthOrders = sourceOrders.filter((order: any) => String(order.createdAt || '').slice(0, 7) === key); return { month: `T${date.getMonth() + 1}`, orders: monthOrders.length, revenue: monthOrders.filter(isRevenueEligible).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0) } }),
     })
   } catch (error) {
     return NextResponse.json(

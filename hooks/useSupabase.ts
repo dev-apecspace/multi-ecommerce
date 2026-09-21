@@ -571,11 +571,11 @@ export function useSellerDashboard(vendorId: number | null) {
     error: null,
   })
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchDashboard = useCallback(async (query = '') => {
     if (!vendorId) return
     setState((prev) => ({ ...prev, loading: true }))
     try {
-      const response = await fetch(`/api/seller/dashboard`, {
+      const response = await fetch(`/api/seller/dashboard${query}`, {
         credentials: 'include'
       })
       if (!response.ok) {

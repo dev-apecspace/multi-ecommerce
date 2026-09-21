@@ -11,6 +11,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const vendorId = Number(searchParams.get('id'))
+    if (searchParams.get('action') === 'orders' && Number.isInteger(vendorId) && vendorId > 0) {
+      const month = searchParams.get('month') || new Date().toISOString().slice(0, 7)
+      if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Tháng không hợp lệ.' }, { status: 400 })
+      const start = `${month}-01`; const end = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)).toISOString()
+      const { data, error } = await supabase.from('Order').select('id,orderNumber,total,status,paymentMethod,paymentStatus,createdAt').eq('vendorId', vendorId).gte('createdAt', start).lt('createdAt', end).order('createdAt', { ascending: false })
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+      const orders = data || []
+      const revenue = orders.filter((order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
+      return NextResponse.json({ month, orders, orderCount: orders.length, revenue })
+    }
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const offset = (page - 1) * limit
@@ -19,6 +30,7 @@ export async function GET(request: NextRequest) {
       .from('Vendor')
       .select('*', { count: 'exact' })
 
+    if (Number.isInteger(vendorId) && vendorId > 0) query = query.eq('id', vendorId)
     if (status) query = query.eq('status', status)
 
     const { data, error, count } = await query
@@ -58,10 +70,19 @@ export async function GET(request: NextRequest) {
             ? (reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length).toFixed(1)
             : 0
           
+          const { data: orderRows, error: orderError } = await supabase
+            .from('Order')
+            .select('total, status, paymentMethod, paymentStatus')
+            .eq('vendorId', vendor.id)
+          if (orderError) throw orderError
+          const orders = orderRows || []
+          const revenue = orders.filter((order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
           return {
             ...vendor,
             products: productCount || 0,
             rating: parseFloat(avgRating as string) || 0,
+            orderCount: orders.length,
+            revenue,
             Shop: {
               ShopDetail: {
                 email: userData?.email || '',

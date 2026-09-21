@@ -16,6 +16,7 @@ export default function SellerDashboardPage() {
   const { user } = useAuth()
   const { setIsLoading } = useLoading()
   const [activeTab, setActiveTab] = useState("overview")
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
   const { data: dashboardData, loading, error, fetchDashboard } = useSellerDashboard(user?.vendorId || null)
   
   const isPending = user?.status === 'pending' || user?.status === 'pending_approval'
@@ -23,9 +24,9 @@ export default function SellerDashboardPage() {
   useEffect(() => {
     if (user?.vendorId) {
       setIsLoading(true)
-      fetchDashboard().finally(() => setIsLoading(false))
+      fetchDashboard(`?month=${month}`).finally(() => setIsLoading(false))
     }
-  }, [user?.vendorId, fetchDashboard])
+  }, [user?.vendorId, fetchDashboard, month])
 
   const seller = {
     shopName: dashboardData?.vendor?.shopName ?? "Shop của tôi",
@@ -40,14 +41,7 @@ export default function SellerDashboardPage() {
 
   const recentOrders = dashboardData?.recentOrders || []
   const topProducts = dashboardData?.topProducts || []
-  const monthlyData = [
-    { month: "Jan", revenue: 45000000, orders: 300 },
-    { month: "Feb", revenue: 52000000, orders: 350 },
-    { month: "Mar", revenue: 48000000, orders: 320 },
-    { month: "Apr", revenue: 61000000, orders: 410 },
-    { month: "May", revenue: 98750000, orders: 580 },
-    { month: "Jun", revenue: 125450000, orders: 650 },
-  ]
+  const monthlyData = dashboardData?.monthly || []
 
   if (loading) {
     return (
@@ -66,6 +60,7 @@ export default function SellerDashboardPage() {
     totalRevenue: dashboardData?.stats?.totalRevenue ?? 0,
     averageRating: dashboardData?.stats?.averageRating ?? 0,
     followers: dashboardData?.stats?.followers ?? 0,
+    orderStatus: dashboardData?.stats?.orderStatus ?? { pending: 0, processing: 0, shipped: 0, delivered: 0, completed: 0, cancelled: 0 },
   }
 
   return (
@@ -103,7 +98,7 @@ export default function SellerDashboardPage() {
             <h1 className="text-2xl md:text-3xl font-bold truncate">{seller.shopName}</h1>
             <p className="text-xs md:text-base text-muted-foreground">Bảng điều khiển bán hàng {isPending && '(Chờ duyệt)'}</p>
           </div>
-          <div className="flex gap-2 w-full md:w-auto flex-shrink-0">
+          <div className="flex gap-2 w-full md:w-auto flex-shrink-0"><label className="text-xs font-medium">Kỳ báo cáo<input type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="mt-1 block rounded border bg-background px-2 py-1" /></label>
             <Button variant="outline" size="icon" className="h-9 w-9 md:h-10 md:w-10">
               <Bell className="h-4 md:h-5 w-4 md:w-5" />
             </Button>
@@ -123,9 +118,9 @@ export default function SellerDashboardPage() {
             <CardContent className="p-3 md:p-6">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-xs md:text-xs text-muted-foreground font-medium">DOANH THU THÁNG NÀY</p>
-                  <p className="text-lg md:text-2xl font-bold mt-1">{(stats.totalRevenue / 1000000).toFixed(1)}M₫</p>
-                  <p className="text-xs text-green-600 font-semibold mt-1 md:mt-2 hidden md:block">↑ 26%</p>
+                  <p className="text-xs md:text-xs text-muted-foreground font-medium">DOANH THU</p>
+                  <p className="text-lg md:text-2xl font-bold mt-1">{Number(stats.totalRevenue || 0).toLocaleString('vi-VN')} ₫</p>
+                  <p className="text-xs text-green-600 font-semibold mt-1 md:mt-2 hidden md:block">Đơn đủ điều kiện ghi nhận trong kỳ đã chọn</p>
                 </div>
                 <TrendingUp className="h-6 w-6 md:h-8 md:w-8 text-green-500 flex-shrink-0" />
               </div>
@@ -137,7 +132,7 @@ export default function SellerDashboardPage() {
               <div>
                 <p className="text-xs md:text-xs text-muted-foreground font-medium">ĐƠN HÀNG THÁNG NÀY</p>
                 <p className="text-lg md:text-2xl font-bold mt-1">{stats.completedOrders}</p>
-                <p className="text-xs text-muted-foreground mt-1 md:mt-2">{stats.orderCount} tổng</p>
+                <p className="text-xs font-semibold text-muted-foreground mt-1 md:mt-2">Chờ: {stats.orderStatus.pending + stats.orderStatus.processing} · Giao: {stats.orderStatus.shipped + stats.orderStatus.delivered} · Hoàn tất: {stats.orderStatus.completed} · Hủy: {stats.orderStatus.cancelled}</p>
               </div>
             </CardContent>
           </Card>

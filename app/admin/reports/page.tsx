@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LineChart as LineChartComponent, Line, BarChart as BarChartComponent, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
+const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')} ₫`
+
 export default function AdminReportsPage() {
   const [stats, setStats] = useState<any>({
     vendors: { total: 0, approved: 0, pending: 0, rejected: 0 },
@@ -32,14 +34,7 @@ export default function AdminReportsPage() {
     fetchData()
   }, [])
 
-  const monthlyData = [
-    { month: 'Jan', revenue: 450000000, orders: 300, users: 150 },
-    { month: 'Feb', revenue: 520000000, orders: 350, users: 180 },
-    { month: 'Mar', revenue: 480000000, orders: 320, users: 160 },
-    { month: 'Apr', revenue: 610000000, orders: 410, users: 220 },
-    { month: 'May', revenue: 987500000, orders: 580, users: 340 },
-    { month: 'Jun', revenue: 1254500000, orders: 650, users: 410 },
-  ]
+  const monthlyData = stats.monthly || []
 
   if (loading) {
     return (
@@ -59,11 +54,11 @@ export default function AdminReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Doanh thu</p>
-                <p className="text-2xl font-bold text-blue-600 mt-2">{(stats.orders?.totalRevenue / 1000000000).toFixed(1)} Tỷ đ</p>
+                <p className="text-2xl font-bold text-blue-600 mt-2">{money(stats.orders?.totalRevenue)}</p>
               </div>
               <Wallet className="h-8 w-8 text-blue-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Từ {stats.orders?.total || 0} đơn hàng</p>
+            <p className="text-xs text-muted-foreground mt-2">Từ {stats.orders?.eligibleRevenueOrders || 0} đơn đủ điều kiện ghi nhận</p>
           </CardContent>
         </Card>
 
@@ -76,7 +71,7 @@ export default function AdminReportsPage() {
               </div>
               <ShoppingBag className="h-8 w-8 text-green-600 opacity-50" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Trung bình: {(stats.orders?.averageOrderValue / 1000000).toFixed(1)}M₫</p>
+            <p className="text-xs text-muted-foreground mt-2">Giá trị đơn ghi nhận trung bình: {money(stats.orders?.averageOrderValue)}</p>
           </CardContent>
         </Card>
 
