@@ -121,7 +121,7 @@ export default function AdminReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: any) => `${(value / 1000000).toFixed(1)}M₫`} />
+                    <Tooltip formatter={(value: any) => `${Number(value || 0).toLocaleString('vi-VN')} ₫`} />
                     <Legend />
                     <Line type="monotone" dataKey="revenue" stroke="#3b82f6" name="Doanh thu" strokeWidth={2} />
                   </LineChartComponent>

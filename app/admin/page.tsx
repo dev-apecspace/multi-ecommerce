@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { CheckCircle2, XCircle, Clock, AlertCircle, Eye, Download, User, Store, Users, ShoppingCart, DollarSign, Info } from "lucide-react"
+import { CheckCircle2, XCircle, Clock, AlertCircle, Eye, Download, User, Store, Users, ShoppingCart, DollarSign, Info, Calendar, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -96,9 +96,50 @@ export default function AdminPage() {
         {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-wrap items-end justify-between gap-3">
           <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Bảng điều khiển quản lý</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Quản lý người bán, danh mục, đơn hàng</p>
-          </div><div className="flex gap-2 text-xs"><label>Từ ngày<input type="date" value={dateRange.start} onChange={(event) => setDateRange((range) => ({ ...range, start: event.target.value }))} className="mt-1 block rounded border bg-background px-2 py-1" /></label><label>Đến ngày<input type="date" value={dateRange.end} onChange={(event) => setDateRange((range) => ({ ...range, end: event.target.value }))} className="mt-1 block rounded border bg-background px-2 py-1" /></label>{(dateRange.start || dateRange.end) && <Button size="sm" variant="outline" onClick={() => setDateRange({ start: '', end: '' })}>Tất cả</Button>}</div>
+            <h1 className="text-2xl md:text-3xl font-bold">Bảng điều khiển quản lý</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Quản lý người bán, danh mục, đơn hàng</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 p-1.5 bg-card rounded-xl border border-border/80 shadow-sm text-xs">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/60 rounded-lg text-muted-foreground font-semibold">
+              <Calendar className="h-3.5 w-3.5 text-primary" />
+              <span>Thời gian</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground font-medium">Từ ngày:</span>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(event) => {
+                  const newStart = event.target.value
+                  setDateRange((range) => ({
+                    start: newStart,
+                    end: range.end || newStart,
+                  }))
+                }}
+                className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground font-medium">Đến ngày:</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(event) => setDateRange((range) => ({ ...range, end: event.target.value }))}
+                className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+            </div>
+            {(dateRange.start || dateRange.end) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDateRange({ start: '', end: '' })}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Đặt lại
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stats */}
@@ -160,8 +201,8 @@ export default function AdminPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <StatLabel label="TỔNG DOANH THU" detail={'Doanh thu ghi nhận:\n• Đơn đã giao hoặc hoàn tất.\n• Hoặc đơn chuyển khoản/ví đã xác nhận nhận tiền.\n\nTạm tính: đơn chưa hủy nhưng chưa đạt điều kiện ghi nhận.\nHủy: chỉ dùng đối soát, không cộng vào doanh thu.'} />
-                  <p className="text-2xl font-bold mt-1">{(stats.revenue / 1000000).toFixed(1)}M₫</p>
-                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Tạm tính: {(stats.temporaryRevenue / 1000000).toFixed(1)}M₫</span><span className="text-red-600">Hủy: {(stats.cancelledValue / 1000000).toFixed(1)}M₫</span></div>
+                  <p className="text-2xl font-bold mt-1">{Number(stats.revenue || 0).toLocaleString('vi-VN')} ₫</p>
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Tạm tính: {Number(stats.temporaryRevenue || 0).toLocaleString('vi-VN')} ₫</span><span className="text-red-600">Hủy: {Number(stats.cancelledValue || 0).toLocaleString('vi-VN')} ₫</span></div>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-600" />
               </div>
@@ -473,7 +514,7 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-center">
-                    <p className="text-5xl font-bold text-primary">{(stats.revenue / 1000000).toFixed(1)}M₫</p>
+                    <p className="text-5xl font-bold text-primary">{Number(stats.revenue || 0).toLocaleString('vi-VN')} ₫</p>
                     <p className="text-muted-foreground mt-2">Tổng cộng từ {stats.orders} đơn hàng</p>
                   </div>
                 </CardContent>

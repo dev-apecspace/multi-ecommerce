@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Plus, Settings, Bell, LogOut, TrendingUp, Eye, Download, AlertCircle, ShoppingCart, Users, Package } from "lucide-react"
+import { Plus, Settings, Bell, LogOut, TrendingUp, Eye, Download, AlertCircle, ShoppingCart, Users, Package, Calendar, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,6 +17,7 @@ export default function SellerDashboardPage() {
   const { setIsLoading } = useLoading()
   const [activeTab, setActiveTab] = useState("overview")
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' })
   const { data: dashboardData, loading, error, fetchDashboard } = useSellerDashboard(user?.vendorId || null)
   
   const isPending = user?.status === 'pending' || user?.status === 'pending_approval'
@@ -24,9 +25,12 @@ export default function SellerDashboardPage() {
   useEffect(() => {
     if (user?.vendorId) {
       setIsLoading(true)
-      fetchDashboard(`?month=${month}`).finally(() => setIsLoading(false))
+      const queryStr = (dateRange.startDate || dateRange.endDate)
+        ? `?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+        : `?month=${month}`
+      fetchDashboard(queryStr).finally(() => setIsLoading(false))
     }
-  }, [user?.vendorId, fetchDashboard, month])
+  }, [user?.vendorId, fetchDashboard, month, dateRange.startDate, dateRange.endDate])
 
   const seller = {
     shopName: dashboardData?.vendor?.shopName ?? "Shop của tôi",
@@ -98,7 +102,48 @@ export default function SellerDashboardPage() {
             <h1 className="text-2xl md:text-3xl font-bold truncate">{seller.shopName}</h1>
             <p className="text-xs md:text-base text-muted-foreground">Bảng điều khiển bán hàng {isPending && '(Chờ duyệt)'}</p>
           </div>
-          <div className="flex gap-2 w-full md:w-auto flex-shrink-0"><label className="text-xs font-medium">Kỳ báo cáo<input type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="mt-1 block rounded border bg-background px-2 py-1" /></label>
+          <div className="flex gap-2 w-full md:w-auto flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-2 p-1.5 bg-card rounded-xl border border-border/80 shadow-sm text-xs">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted/60 rounded-lg text-muted-foreground font-semibold">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <span>Bộ lọc thời gian</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground font-medium">Từ:</span>
+                <input
+                  type="date"
+                  value={dateRange.startDate}
+                  onChange={(e) => {
+                    const newStart = e.target.value
+                    setDateRange((prev) => ({
+                      startDate: newStart,
+                      endDate: prev.endDate || newStart,
+                    }))
+                  }}
+                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground font-medium">Đến:</span>
+                <input
+                  type="date"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
+                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+              {(dateRange.startDate || dateRange.endDate) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setDateRange({ startDate: '', endDate: '' })}
+                  className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Đặt lại
+                </Button>
+              )}
+            </div>
             <Button variant="outline" size="icon" className="h-9 w-9 md:h-10 md:w-10">
               <Bell className="h-4 md:h-5 w-4 md:w-5" />
             </Button>

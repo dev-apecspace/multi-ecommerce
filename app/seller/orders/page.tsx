@@ -628,8 +628,17 @@ export default function SellerOrdersPage() {
                 {selectedOrder.paymentProofUrl && (
                   <div className="mt-4 border-t border-blue-200 pt-4">
                     <p className="mb-2 text-sm font-semibold">Minh chứng khách đã gửi</p>
-                    <a href={selectedOrder.paymentProofUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-white">
-                      <img src={selectedOrder.paymentProofUrl} alt={`Minh chứng thanh toán đơn ${selectedOrder.orderNumber}`} className="max-h-72 w-full object-contain" />
+                    <a href={selectedOrder.paymentProofUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-white p-2 text-center">
+                      <img
+                        src={selectedOrder.paymentProofUrl}
+                        alt={`Minh chứng thanh toán đơn ${selectedOrder.orderNumber}`}
+                        className="max-h-96 max-w-full inline-block object-contain"
+                        onError={(e) => {
+                          const target = e.currentTarget
+                          target.onerror = null
+                          target.src = 'https://placehold.co/600x400?text=Minh+Ch%E1%BB%A9ng+Thanh+To%C3%A1n'
+                        }}
+                      />
                     </a>
                     <p className="mt-2 text-xs text-muted-foreground">Kiểm tra ảnh và biến động số dư trước khi duyệt đơn.</p>
                     {selectedOrder.paymentVerificationStatus && selectedOrder.paymentVerificationStatus !== 'pending' && (

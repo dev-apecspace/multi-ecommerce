@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
 
     const vendorId = auth.vendorId
     const params = new URL(request.url).searchParams
+    const startDate = params.get('startDate') || params.get('start')
+    const endDate = params.get('endDate') || params.get('end')
     const month = params.get('month') || new Date().toISOString().slice(0, 7)
 
     const [vendorRes, productsRes, ordersRes, reviewsRes] = await Promise.all([
@@ -40,7 +42,24 @@ export async function GET(request: NextRequest) {
 
     const productIds = productsRes.data?.map((p: any) => p.id) || []
     const sourceOrders = ordersRes.data || []
-    const allOrders = sourceOrders.filter((order: any) => String(order.createdAt || '').slice(0, 7) === month)
+    const allOrders = sourceOrders.filter((order: any) => {
+      const createdAt = order.createdAt ? new Date(order.createdAt) : null
+      if (!createdAt || isNaN(createdAt.getTime())) return false
+
+      if (startDate || endDate) {
+        if (startDate) {
+          const start = new Date(`${startDate}T00:00:00`)
+          if (createdAt < start) return false
+        }
+        if (endDate) {
+          const end = new Date(`${endDate}T23:59:59.999`)
+          if (createdAt > end) return false
+        }
+        return true
+      }
+
+      return String(order.createdAt || '').slice(0, 7) === month
+    })
     const isRevenueEligible = (order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')
     const settledOrders = allOrders.filter(isRevenueEligible)
     const currentMonthOrders = allOrders

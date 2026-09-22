@@ -60,6 +60,7 @@ const adminLinks: AdminLink[] = [
   // { href: "/admin/withdraw-requests", label: "Quản lý yêu cầu rút tiền", icon: Download },
   { href: "/admin/vendor-monthly-fees", label: "Phí hợp tác hàng tháng", icon: Percent },
   { href: "/admin/reports", label: "Tài chính & Đối soát", icon: TrendingUp, subItems: [
+    { href: "/admin/transactions", label: "Lịch sử giao dịch" },
     { href: "/admin/reports", label: "Báo cáo & Thống kê" },
   ] },
   { href: "/admin/settings", label: "Cài đặt hệ thống", icon: Settings },
