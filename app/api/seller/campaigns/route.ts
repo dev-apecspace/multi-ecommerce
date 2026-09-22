@@ -31,10 +31,12 @@ export async function GET(request: NextRequest) {
       campaignQuery = campaignQuery.eq('campaignType', campaignType)
     }
 
+    // Registration state is determined after loading the vendor's registrations.
+    // Apply pagination only after that state-based filter, otherwise a page can
+    // contain no matching campaigns while valid matches sit on later pages.
     campaignQuery = campaignQuery.order('startDate', { ascending: false })
-      .range(offset, offset + limit - 1)
 
-    const { data: campaigns, error: campaignError, count } = await campaignQuery
+    const { data: campaigns, error: campaignError } = await campaignQuery
 
     if (campaignError) {
       return NextResponse.json({ error: campaignError.message }, { status: 400 })
@@ -77,7 +79,8 @@ export async function GET(request: NextRequest) {
       filteredCampaigns = campaigns || []
     }
 
-    const campaignsWithStatus = filteredCampaigns.map((campaign) => {
+    const total = filteredCampaigns.length
+    const campaignsWithStatus = filteredCampaigns.slice(offset, offset + limit).map((campaign) => {
       const vendorRegistration = registrations?.find((r) => r.campaignId === campaign.id)
       const hasApprovedProducts = campaignsWithApprovedProducts.has(campaign.id)
       
@@ -98,7 +101,7 @@ export async function GET(request: NextRequest) {
       campaigns: campaignsWithStatus,
       registrations,
       pagination: {
-        total: count,
+        total,
         limit,
         offset,
       },

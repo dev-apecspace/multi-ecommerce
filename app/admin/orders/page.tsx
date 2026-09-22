@@ -168,7 +168,7 @@ export default function AdminOrdersPage() {
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
             <Label className="text-base">Lọc theo trạng thái:</Label>
-            <Select value={filterStatus || "all"} onValueChange={(value) => setFilterStatus(value === "all" ? "" : value)}>
+            <Select value={filterStatus || "all"} onValueChange={(value) => { setFilterStatus(value === "all" ? "" : value); pagination.setPage(1) }}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Tất cả" />
               </SelectTrigger>

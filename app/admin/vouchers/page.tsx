@@ -237,7 +237,7 @@ export default function AdminVouchersPage() {
         </Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); pagination.setPage(1) }}>
         <TabsList>
           <TabsTrigger value="pending">Chờ Duyệt ({stats.pending})</TabsTrigger>
           <TabsTrigger value="approved">Đã Duyệt ({stats.approved})</TabsTrigger>

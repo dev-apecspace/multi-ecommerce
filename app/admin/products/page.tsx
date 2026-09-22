@@ -263,7 +263,7 @@ export default function AdminProductsPage() {
           <CardTitle>Danh sách sản phẩm</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); pagination.setPage(1) }}>
             <TabsList>
               <TabsTrigger value="pending">Chờ duyệt ({stats.pending})</TabsTrigger>
               <TabsTrigger value="approved">Đã duyệt ({stats.approved})</TabsTrigger>

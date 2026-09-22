@@ -344,7 +344,7 @@ function AdminVendorsContent() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Danh sách nhà cung cấp</CardTitle>
-          <Select value={status} onValueChange={setStatus}>
+          <Select value={status} onValueChange={(value) => { setStatus(value); pagination.setPage(1) }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Lọc theo trạng thái" />
             </SelectTrigger>

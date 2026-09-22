@@ -167,12 +167,12 @@ export default function AdminUsersPage() {
                 placeholder="Tìm kiếm..." 
                 className="w-48"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); pagination.setPage(1) }}
               />
               <select
                 className="px-3 py-2 border border-border rounded-md text-sm"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'locked')}
+                onChange={(e) => { setStatusFilter(e.target.value as 'all' | 'active' | 'locked'); pagination.setPage(1) }}
               >
                 <option value="all">Tất cả</option>
                 <option value="active">Đang hoạt động</option>
