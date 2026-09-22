@@ -28,6 +28,7 @@ interface Vendor {
   products: number
   followers: number
   description?: string | null
+  monthlyFeeConfig?: { feeType: 'fixed' | 'percentage'; fixedMonthlyFee: number | string; revenueFeePercent: number | string; effectiveFrom?: string } | null
   Shop?: {
     id?: number
     name?: string
@@ -142,6 +143,13 @@ function AdminVendorsContent() {
   const handleOpenManagement = (vendor: Vendor) => {
     setSelectedVendor(vendor)
     setIsManagementModalOpen(true)
+  }
+
+  const handleFeeConfigSaved = (monthlyFeeConfig: NonNullable<Vendor['monthlyFeeConfig']>) => {
+    if (!selectedVendor) return
+    const updatedVendor = { ...selectedVendor, monthlyFeeConfig }
+    setSelectedVendor(updatedVendor)
+    setAllVendors((vendors) => vendors.map((vendor) => vendor.id === updatedVendor.id ? { ...vendor, monthlyFeeConfig } : vendor))
   }
 
   const handleSaveVendor = async (formData: any) => {
@@ -438,7 +446,7 @@ function AdminVendorsContent() {
 
       {selectedVendor && (
         <>
-          <AdminVendorFeeModal vendor={selectedVendor} open={isFeeModalOpen} onClose={() => setIsFeeModalOpen(false)} />
+          <AdminVendorFeeModal vendor={selectedVendor} open={isFeeModalOpen} onClose={() => setIsFeeModalOpen(false)} onSaved={handleFeeConfigSaved} />
           <AdminVendorModal
             vendor={selectedVendor}
             documents={documents}

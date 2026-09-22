@@ -69,7 +69,9 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const auth = await getAuthFromRequest(request); if (!isAdmin(auth)) return unauthorizedResponse(); const { vendorId, feeType, fixedMonthlyFee, revenueFeePercent } = await request.json()
   if (!Number.isInteger(vendorId) || !['fixed', 'percentage'].includes(feeType) || !Number.isFinite(fixedMonthlyFee) || !Number.isFinite(revenueFeePercent) || fixedMonthlyFee < 0 || revenueFeePercent < 0 || revenueFeePercent > 100) return NextResponse.json({ error: 'Cấu hình phí không hợp lệ.' }, { status: 400 })
-  const { error } = await supabase.from('VendorMonthlyFeeConfig').upsert({ vendorId, feeType, fixedMonthlyFee: feeType === 'fixed' ? fixedMonthlyFee : 0, revenueFeePercent: feeType === 'percentage' ? revenueFeePercent : 0, effectiveFrom: new Date().toISOString().slice(0, 10), updatedAt: new Date().toISOString() }); return error ? NextResponse.json({ error: error.message }, { status: 400 }) : NextResponse.json({ ok: true })
+  const config = { vendorId, feeType, fixedMonthlyFee: feeType === 'fixed' ? fixedMonthlyFee : 0, revenueFeePercent: feeType === 'percentage' ? revenueFeePercent : 0, effectiveFrom: new Date().toISOString().slice(0, 10), updatedAt: new Date().toISOString() }
+  const { error } = await supabase.from('VendorMonthlyFeeConfig').upsert(config)
+  return error ? NextResponse.json({ error: error.message }, { status: 400 }) : NextResponse.json({ ok: true, config })
 }
 
 export async function PATCH(request: NextRequest) {

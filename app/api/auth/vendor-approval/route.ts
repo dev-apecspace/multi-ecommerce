@@ -45,6 +45,30 @@ export async function POST(request: NextRequest) {
     }
 
     if (approved) {
+      const { data: vendor, error: vendorLookupError } = await supabase
+        .from('Vendor')
+        .select('id')
+        .eq('userId', vendorUserId)
+        .maybeSingle()
+      if (vendorLookupError || !vendor) {
+        return NextResponse.json({ error: 'Không tìm thấy hồ sơ shop.' }, { status: 404 })
+      }
+
+      const [{ data: documents, error: documentsError }, { data: monthlyFeeConfig, error: feeError }] = await Promise.all([
+        supabase.from('VendorDocument').select('id, status').eq('vendorId', vendor.id),
+        supabase.from('VendorMonthlyFeeConfig').select('vendorId').eq('vendorId', vendor.id).maybeSingle(),
+      ])
+      if (documentsError || feeError) {
+        return NextResponse.json({ error: documentsError?.message || feeError?.message || 'Không thể kiểm tra điều kiện duyệt shop.' }, { status: 400 })
+      }
+      const activeDocuments = (documents || []).filter((document) => document.status !== 'rejected')
+      if (activeDocuments.length === 0 || activeDocuments.some((document) => document.status !== 'approved')) {
+        return NextResponse.json({ error: 'Cần duyệt toàn bộ hồ sơ hợp lệ của shop trước khi duyệt nhà bán hàng.' }, { status: 409 })
+      }
+      if (!monthlyFeeConfig) {
+        return NextResponse.json({ error: 'Cần cấu hình phí hợp tác hàng tháng trước khi duyệt shop.' }, { status: 409 })
+      }
+
       const { error: userError } = await supabase
         .from('User')
         .update({ status: 'active' })
