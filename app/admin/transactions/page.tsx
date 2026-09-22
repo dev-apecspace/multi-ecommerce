@@ -132,6 +132,28 @@ export default function AdminTransactionsPage() {
     return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200"><Clock className="h-3.5 w-3.5 mr-1" /> Chờ xác nhận / Chờ giao</Badge>
   }
 
+  const getOrderStatusText = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'Chờ xác nhận'
+      case 'processing':
+        return 'Đang xử lý'
+      case 'shipping':
+      case 'shipped':
+      case 'delivering':
+        return 'Đang giao hàng'
+      case 'completed':
+      case 'delivered':
+        return 'Đã hoàn tất'
+      case 'cancelled':
+        return 'Đã hủy'
+      case 'refunded':
+        return 'Đã hoàn tiền'
+      default:
+        return status || 'Chờ xử lý'
+    }
+  }
+
   return (
     <main className="min-h-screen bg-surface dark:bg-slate-950 p-4 md:p-6">
       {/* Header */}
@@ -436,7 +458,7 @@ export default function AdminTransactionsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground font-medium">Trạng thái đơn hàng</p>
-                  <p className="font-medium capitalize text-xs">{selectedTx.status}</p>
+                  <p className="font-medium text-xs">{getOrderStatusText(selectedTx.status)}</p>
                 </div>
               </div>
 
