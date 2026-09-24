@@ -112,7 +112,16 @@ function CheckoutContent() {
     fetch('/api/settings').then(async response => {
       if (!response.ok) return
       const result = await response.json()
-      if (result.settings) setSystemSettings(result.settings)
+      if (result.settings) {
+        // Temporarily hide wallet payments and exclude them from checkout validation.
+        setSystemSettings({
+          ...result.settings,
+          walletEnabled: false,
+          paymentMethods: result.settings.paymentMethods.map((method: { id: string; label: string; enabled: boolean }) =>
+            method.id === 'wallet' ? { ...method, enabled: false } : method
+          ),
+        })
+      }
     }).catch(() => undefined)
   }, [])
 
@@ -583,7 +592,7 @@ function CheckoutContent() {
         return
       }
       if (!systemSettings.paymentMethods.some(method => method.id === formData.paymentMethod && method.enabled)) {
-        toast({ title: "Chưa chọn phương thức thanh toán", description: "Vui lòng chọn COD, chuyển khoản ngân hàng hoặc ví điện tử.", variant: "destructive" })
+        toast({ title: "Chưa chọn phương thức thanh toán", description: "Vui lòng chọn phương thức thanh toán đang khả dụng.", variant: "destructive" })
         goToStep("payment")
         return
       }
@@ -608,7 +617,7 @@ function CheckoutContent() {
       goToStep("payment")
     } else if (step === "payment") {
       if (!systemSettings.paymentMethods.some(method => method.id === formData.paymentMethod && method.enabled)) {
-        toast({ title: "Chưa chọn phương thức thanh toán", description: "Vui lòng chọn COD, chuyển khoản ngân hàng hoặc ví điện tử.", variant: "destructive" })
+        toast({ title: "Chưa chọn phương thức thanh toán", description: "Vui lòng chọn phương thức thanh toán đang khả dụng.", variant: "destructive" })
         return
       }
       setSiteTermsConfirmed(false)
