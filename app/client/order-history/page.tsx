@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
 import { useRealtimeOrder } from "@/hooks/use-realtime-order"
+import { RefundChatButton } from "@/components/orders/refund-chat-button"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
 import { ReviewModal } from "@/components/review/review-modal"
@@ -23,6 +24,8 @@ interface Order {
   orderNumber: string
   status: string
   total: number
+  paymentMethod?: string
+  paymentStatus?: string
   shippingCost: number
   date: string
   updatedAt: string
@@ -35,7 +38,7 @@ interface Order {
     variantId: number | null
     variantName?: string | null
     Product: { id: number; name: string; image?: string }
-    ProductVariant?: { id: number; name: string } | null
+    ProductVariant?: { id: number; name: string; image?: string } | null
   }>
 }
 
@@ -108,7 +111,7 @@ export default function OrderHistoryPage() {
   
   useEffect(() => {
     if (user?.id) {
-      setUserId(user.id)
+      setUserId(Number(user.id))
     } else {
       const storedUserId = localStorage.getItem('userId')
       if (storedUserId) {
@@ -469,6 +472,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -591,6 +595,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <div className="flex gap-2">
                         <Button 
@@ -723,6 +728,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -845,6 +851,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -928,7 +935,7 @@ export default function OrderHistoryPage() {
                                   className="mt-2 text-blue-600 hover:text-blue-700"
                                   onClick={() => handleOpenReturnModal(order.id, item)}
                                 >
-                                  Trả hàng hoàn tiền
+                                  Trả hàng
                                 </Button>
                               )
                             )}
@@ -942,6 +949,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -1064,6 +1072,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -1186,6 +1195,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
+                        <RefundChatButton order={order} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -1251,7 +1261,7 @@ export default function OrderHistoryPage() {
         onSuccess={() => {
           fetchOrders()
           if (userId) {
-            fetchPendingReturns(userId)
+            fetchReturnStatuses(userId)
           }
         }}
       />

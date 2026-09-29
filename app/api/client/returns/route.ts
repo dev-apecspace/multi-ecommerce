@@ -1,3 +1,4 @@
+import { getAuthFromRequest, unauthorizedResponse } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -27,7 +28,7 @@ const formatReturnRecords = (records: any[] | null | undefined) => {
           order: item?.order ?? index,
         }
       })
-      .filter((img) => Boolean(img))
+      .filter((img: any) => Boolean(img))
 
     const variantImage = record.ProductVariant?.image
 
@@ -55,6 +56,8 @@ const formatReturnRecords = (records: any[] | null | undefined) => {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth) return unauthorizedResponse()
     const body = await request.json()
     const { returnId, action, status, cancelReason } = body
 
@@ -67,18 +70,26 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'confirm_exchange') {
+      const { data: exchange } = await supabase.from('Return')
+        .select('status, returnType').eq('id', Number(returnId)).eq('userId', auth.userId).single()
+      if (!exchange || exchange.returnType !== 'exchange' || exchange.status !== 'shipped') {
+        return NextResponse.json({ error: 'Only shipped exchanges can be confirmed' }, { status: 400 })
+      }
       const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('Return')
         .update({ status: 'completed', completedAt: now })
+        .eq('status', 'shipped')
         .eq('id', parseInt(returnId))
+        .eq('userId', auth.userId)
         .select()
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 })
       }
 
-      return NextResponse.json(data?.[0])
+      if (!data?.length) return NextResponse.json({ error: 'Return status changed. Please refresh.' }, { status: 409 })
+      return NextResponse.json(data[0])
     }
 
     if (status === 'cancelled') {
@@ -86,6 +97,7 @@ export async function PATCH(request: NextRequest) {
         .from('Return')
         .select('status')
         .eq('id', parseInt(returnId))
+        .eq('userId', auth.userId)
         .single()
 
       if (existingReturn?.status !== 'pending') {
@@ -99,14 +111,17 @@ export async function PATCH(request: NextRequest) {
           cancelledAt: new Date().toISOString(),
           sellerNotes: cancelReason
         })
+        .eq('status', 'pending')
         .eq('id', parseInt(returnId))
+        .eq('userId', auth.userId)
         .select()
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 })
       }
 
-      return NextResponse.json(data?.[0])
+      if (!data?.length) return NextResponse.json({ error: 'Return status changed. Please refresh.' }, { status: 409 })
+      return NextResponse.json(data[0])
     }
 
     return NextResponse.json({ error: 'Invalid action or status' }, { status: 400 })
@@ -117,8 +132,10 @@ export async function PATCH(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth) return unauthorizedResponse()
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const userId = String(auth.userId)
     const status = searchParams.get('status')
     const orderId = searchParams.get('orderId')
     const limit = parseInt(searchParams.get('limit') || '20')
@@ -184,9 +201,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth) return unauthorizedResponse()
     const body = await request.json()
     const {
-      userId,
       orderId,
       orderItemId,
       productId,
@@ -199,6 +217,8 @@ export async function POST(request: NextRequest) {
       quantity = 1
     } = body
 
+    const userId = auth.userId
+
     console.log('[RETURN API] Creating return with data:', { userId, orderId, orderItemId, productId, variantId, reason, quantity })
 
     if (!userId || !orderId || !orderItemId || !reason || productId === undefined) {
@@ -207,7 +227,7 @@ export async function POST(request: NextRequest) {
     }
 
     const parsedOrderItemId = parseInt(orderItemId)
-    const parsedUserId = parseInt(userId)
+    const parsedUserId = Number(userId)
     const parsedOrderId = parseInt(orderId)
     const parsedProductId = parseInt(productId)
 
@@ -215,7 +235,7 @@ export async function POST(request: NextRequest) {
       .from('Return')
       .select('id, status')
       .eq('orderItemId', parsedOrderItemId)
-      .not('status', 'in', '("rejected","completed","cancelled")')
+      .not('status', 'in', '("rejected","cancelled")')
 
     if (activeReturnsError) {
       console.error('[RETURN API] Error checking existing returns:', activeReturnsError.message)
@@ -230,20 +250,36 @@ export async function POST(request: NextRequest) {
     const { data: orderItem, error: orderItemError } = await supabase
       .from('OrderItem')
       .select(`
+        orderId,
+        productId,
+        variantId,
         price, 
         quantity, 
         vendorId,
-        Order (
+        Order!inner (
+          userId,
           status,
           updatedAt
         )
       `)
       .eq('id', parsedOrderItemId)
+      .eq('orderId', parsedOrderId)
+      .eq('Order.userId', auth.userId)
       .single()
 
     if (orderItemError || !orderItem) {
       console.error('[RETURN API] Order item not found:', orderItemError?.message)
       return NextResponse.json({ error: 'Order item not found' }, { status: 404 })
+    }
+
+    if (orderItem.productId !== parsedProductId || (orderItem.variantId ?? null) !== (variantId ? Number(variantId) : null)) {
+      return NextResponse.json({ error: 'Product does not match the order item' }, { status: 400 })
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > orderItem.quantity) {
+      return NextResponse.json({ error: 'Invalid return quantity' }, { status: 400 })
+    }
+    if (returnType !== 'return' || typeof reason !== 'string' || !reason.trim() || !Array.isArray(images)) {
+      return NextResponse.json({ error: 'Invalid return request' }, { status: 400 })
     }
 
     // Check if order is delivered
@@ -262,7 +298,7 @@ export async function POST(request: NextRequest) {
     const diffTime = Math.abs(currentDate.getTime() - deliveryDate.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    if (diffDays > 3) {
+    if (!Number.isFinite(diffDays) || diffDays > 3) {
       return NextResponse.json({ 
         error: 'Return period expired. Returns are only accepted within 3 days of delivery.' 
       }, { status: 400 })

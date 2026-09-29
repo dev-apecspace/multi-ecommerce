@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useLoading } from "@/hooks/use-loading"
 import { useRealtimeOrder } from "@/hooks/use-realtime-order"
+import { RefundChatButton } from "@/components/orders/refund-chat-button"
 import { CreateReturnModal } from "@/components/returns/create-return-modal"
 import { ReturnStatusModal } from "@/components/returns/return-status-modal"
 import { ReviewModal } from "@/components/review/review-modal"
@@ -95,6 +96,7 @@ export default function OrderDetailPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<number | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [returnStatuses, setReturnStatuses] = useState<Record<number, string>>({})
   const [returnModal, setReturnModal] = useState<ReturnModalState>({
     open: false,
@@ -205,7 +207,7 @@ export default function OrderDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     if (user?.id) {
-      setUserId(user.id)
+      setUserId(Number(user.id))
     } else {
       const storedUserId = localStorage.getItem('userId')
       if (storedUserId) {
@@ -340,6 +342,26 @@ export default function OrderDetailPage({ params }: PageProps) {
       initialRating: existingReview?.rating ?? null,
       initialComment: existingReview?.comment ?? null
     })
+  }
+
+  const handleCancelOrder = async () => {
+    if (!order || cancelling) return
+    setCancelling(true)
+    try {
+      const response = await fetch('/api/client/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, status: 'cancelled' }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Không thể hủy đơn hàng')
+      toast({ title: 'Đã hủy đơn hàng' })
+      await fetchOrder()
+    } catch (error) {
+      toast({ title: 'Không thể hủy đơn', description: error instanceof Error ? error.message : 'Vui lòng thử lại.', variant: 'destructive' })
+    } finally {
+      setCancelling(false)
+    }
   }
 
   const handleConfirmReceipt = async () => {
@@ -656,7 +678,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                             className="text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
                             onClick={() => handleOpenReturnModal(order.id, item)}
                           >
-                            Trả hàng hoàn tiền
+                            Trả hàng
                           </Button>
                         </div>
                       ) : null}
@@ -711,6 +733,12 @@ export default function OrderDetailPage({ params }: PageProps) {
 
           {/* Actions */}
           <div className="space-y-2">
+            {order.status === 'pending' && (
+              <Button variant="outline" className="w-full" disabled={cancelling} onClick={handleCancelOrder}>
+                {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+              </Button>
+            )}
+            <RefundChatButton order={order} />
             <Button variant="outline" className="w-full">
               Liên hệ hỗ trợ
             </Button>

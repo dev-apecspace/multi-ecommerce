@@ -1,3 +1,4 @@
+import { getAuthFromRequest, isVendor, unauthorizedResponse } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -8,8 +9,10 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth || !isVendor(auth)) return unauthorizedResponse()
     const { searchParams } = new URL(request.url)
-    const vendorId = searchParams.get('vendorId')
+    const vendorId = String(auth.vendorId)
     const status = searchParams.get('status')
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
@@ -111,8 +114,11 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth || !isVendor(auth)) return unauthorizedResponse()
     const body = await request.json()
-    const { orderId, status, shippingTrackingNumber, vendorId } = body
+    const { orderId, status, shippingTrackingNumber } = body
+    const vendorId = String(auth.vendorId)
 
     if (!orderId || !status || !vendorId) {
       return NextResponse.json({ error: 'Order ID, status and vendor ID required' }, { status: 400 })
@@ -165,7 +171,9 @@ export async function PATCH(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('Order')
-      .update(updateData)
+      .update({ ...updateData, updatedAt: new Date().toISOString() })
+      .eq('status', currentStatus)
+      .eq('vendorId', auth.vendorId!)
       .eq('id', parseInt(orderId))
       .select(`
         id,

@@ -16,6 +16,10 @@ export function ChatLayout({ userId }: { userId: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(initialConvId ? parseInt(initialConvId) : null)
   const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    setSelectedId(initialConvId ? Number(initialConvId) : null)
+  }, [initialConvId])
+
   const fetchConversations = useCallback(async () => {
     try {
       const res = await fetch('/api/client/chat/conversations')

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthFromRequest, unauthorizedResponse } from '@/lib/api-auth'
 import { isCampaignActive } from '@/lib/price-utils'
 
 const supabase = createClient(
@@ -417,6 +418,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth) return unauthorizedResponse()
     const body = await request.json()
     const { orderId, status } = body
 
@@ -434,6 +437,7 @@ export async function PATCH(request: NextRequest) {
         OrderItem(id)
       `)
       .eq('id', parsedOrderId)
+      .eq('userId', auth.userId)
       .single()
 
     if (fetchError || !existingOrder) {
@@ -462,7 +466,9 @@ export async function PATCH(request: NextRequest) {
           .in('orderItemId', orderItemIds)
           .not('status', 'in', '("rejected","completed","cancelled")')
 
-        if (!returnsError && pendingReturns && pendingReturns.length > 0) {
+        if (returnsError) return NextResponse.json({ error: returnsError.message }, { status: 400 })
+
+        if (pendingReturns && pendingReturns.length > 0) {
           return NextResponse.json(
             { error: 'Cannot complete order with pending returns. Please wait for all returns to be processed.' },
             { status: 400 }
@@ -471,11 +477,15 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Compare the status again when writing, so concurrent seller updates win safely.
+    // Cancellation inventory is restored atomically by the database trigger.
     // Update order status
     const { data, error } = await supabase
       .from('Order')
-      .update({ status })
+      .update({ status, updatedAt: new Date().toISOString() })
+      .eq('status', existingOrder.status)
       .eq('id', parsedOrderId)
+      .eq('userId', auth.userId)
       .select(`
         id,
         orderNumber,
@@ -504,6 +514,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    if (!data?.length) return NextResponse.json({ error: 'Order status changed. Please refresh and try again.' }, { status: 409 })
     return NextResponse.json({ data: data[0] })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })

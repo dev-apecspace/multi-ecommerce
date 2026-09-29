@@ -1,3 +1,4 @@
+import { getAuthFromRequest, isVendor, unauthorizedResponse } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -27,7 +28,7 @@ const formatReturnRecords = (records: any[] | null | undefined) => {
           order: item?.order ?? index,
         }
       })
-      .filter((img) => Boolean(img))
+      .filter((img: any) => Boolean(img))
 
     const variantImage = record.ProductVariant?.image
     
@@ -71,8 +72,10 @@ const formatReturnRecords = (records: any[] | null | undefined) => {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth || !isVendor(auth)) return unauthorizedResponse()
     const { searchParams } = new URL(request.url)
-    const vendorId = searchParams.get('vendorId')
+    const vendorId = String(auth.vendorId)
     const status = searchParams.get('status')
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
@@ -139,6 +142,8 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth || !isVendor(auth)) return unauthorizedResponse()
     const body = await request.json()
     const {
       returnId,
@@ -180,13 +185,14 @@ export async function PATCH(request: NextRequest) {
         )
       `)
       .eq('id', returnIdNumber)
+      .eq('vendorId', auth.vendorId!)
       .single()
 
     if (fetchReturnError || !existingReturn) {
       return NextResponse.json({ error: 'Return request not found' }, { status: 404 })
     }
 
-    const paymentMethod = (existingReturn.Order?.paymentMethod || 'cod').toLowerCase()
+    const returnOrder = Array.isArray(existingReturn.Order) ? existingReturn.Order[0] : existingReturn.Order
     // Treat COD same as other payment methods (require refund step)
     const requiresRefund = existingReturn.returnType === 'return'
 
@@ -199,50 +205,6 @@ export async function PATCH(request: NextRequest) {
     }
     if (sanitizedTrackingUrl !== undefined) {
       baseUpdate.trackingUrl = sanitizedTrackingUrl || null
-    }
-
-    const restockIfNeeded = async () => {
-      if (existingReturn.returnType !== 'return') {
-        return
-      }
-
-      if (['restocked', 'completed'].includes(existingReturn.status)) {
-        return
-      }
-
-      const variantId = existingReturn.variantId
-      const productId = existingReturn.productId
-      const quantity = existingReturn.quantity
-
-      if (variantId) {
-        const { data: variant } = await supabase
-          .from('ProductVariant')
-          .select('stock')
-          .eq('id', variantId)
-          .single()
-
-        if (variant) {
-          const newStock = (variant.stock || 0) + quantity
-          await supabase
-            .from('ProductVariant')
-            .update({ stock: newStock })
-            .eq('id', variantId)
-        }
-      } else if (productId) {
-        const { data: product } = await supabase
-          .from('Product')
-          .select('stock')
-          .eq('id', productId)
-          .single()
-
-        if (product) {
-          const newStock = (product.stock || 0) + quantity
-          await supabase
-            .from('Product')
-            .update({ stock: newStock })
-            .eq('id', productId)
-        }
-      }
     }
 
     switch (action) {
@@ -265,7 +227,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       case 'mark_shipped': {
-        const isRefunded = existingReturn.Order?.paymentStatus === 'refunded'
+        const isRefunded = returnOrder?.paymentStatus === 'refunded'
         const canShipFromApproved = !requiresRefund || isRefunded
         
         const allowedStatuses = ['shipped']
@@ -310,7 +272,7 @@ export async function PATCH(request: NextRequest) {
           return NextResponse.json({ error: 'Only received returns can be restocked' }, { status: 400 })
         }
         baseUpdate.status = 'restocked'
-        await restockIfNeeded()
+        // Stock is restored atomically by the database status trigger.
         break
       }
 
@@ -324,14 +286,18 @@ export async function PATCH(request: NextRequest) {
           return NextResponse.json({ error: 'Return must be approved before confirming refund' }, { status: 400 })
         }
 
-        if (existingReturn.Order?.paymentStatus !== 'refunded') {
-          await supabase
+        if (returnOrder?.paymentStatus !== 'refunded') {
+          const { error: refundError } = await supabase
             .from('Order')
             .update({ paymentStatus: 'refunded' })
             .eq('id', existingReturn.orderId)
+            .eq('vendorId', auth.vendorId!)
+          if (refundError) return NextResponse.json({ error: refundError.message }, { status: 400 })
         }
 
-        baseUpdate.status = 'refund_confirmed'
+        // Do not rewind shipping/restocking progress when recording a late refund.
+        baseUpdate.status = ['approved', 'refund_confirmed'].includes(existingReturn.status)
+          ? 'refund_confirmed' : existingReturn.status
         break
       }
 
@@ -341,9 +307,6 @@ export async function PATCH(request: NextRequest) {
           return NextResponse.json({ error: 'Return cannot be completed yet' }, { status: 400 })
         }
 
-        if (!requiresRefund) {
-          await restockIfNeeded()
-        }
 
         baseUpdate.status = 'completed'
         if (existingReturn.status !== 'completed') {
@@ -365,14 +328,17 @@ export async function PATCH(request: NextRequest) {
     const { data, error } = await supabase
       .from('Return')
       .update(baseUpdate)
+      .eq('status', existingReturn.status)
       .eq('id', returnIdNumber)
+      .eq('vendorId', auth.vendorId!)
       .select()
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json(data?.[0])
+    if (!data?.length) return NextResponse.json({ error: 'Return status changed. Please refresh.' }, { status: 409 })
+    return NextResponse.json(data[0])
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
