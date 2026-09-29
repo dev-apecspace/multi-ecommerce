@@ -42,14 +42,20 @@ export function ChatWindow({
       if (notificationsEnabled) {
         showNotification(message.content, otherPartyName)
       }
+      if (document.visibilityState !== 'visible') return
       
       fetch('/api/chat/messages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversationId }),
+      }).then(response => {
+        if (response.ok) {
+          window.dispatchEvent(new Event('chat:messages-read'))
+          onMessagesRead?.()
+        }
       }).catch(err => console.error('Failed to mark as read:', err))
     }
-  }, [currentUserId, notificationsEnabled, showNotification, otherPartyName, conversationId])
+  }, [currentUserId, notificationsEnabled, showNotification, otherPartyName, conversationId, onMessagesRead])
 
   const { messages, loading, sendMessage } = useChat(conversationId, { 
     onNewMessage: handleNewMessage,

@@ -1,9 +1,10 @@
+import { isRevenueEligible, getOrderRevenue } from '@/lib/order-revenue'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthFromRequest, isVendor, unauthorizedResponse } from '@/lib/api-auth'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-const eligible = (order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')
+const eligible = isRevenueEligible
 
 export async function GET(request: NextRequest) {
   const auth = await getAuthFromRequest(request)
@@ -13,12 +14,12 @@ export async function GET(request: NextRequest) {
   const billingMonth = `${month}-01`; const end = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)).toISOString()
   const [configRes, ordersRes, recordsRes] = await Promise.all([
     supabase.from('VendorMonthlyFeeConfig').select('*').eq('vendorId', auth.vendorId).maybeSingle(),
-    supabase.from('Order').select('total,status,paymentMethod,paymentStatus').eq('vendorId', auth.vendorId).gte('createdAt', billingMonth).lt('createdAt', end),
+    supabase.from('Order').select('total,status,paymentMethod,paymentStatus, Return(status,returnType,refundAmount,orderItemId,quantity)').eq('vendorId', auth.vendorId).gte('createdAt', billingMonth).lt('createdAt', end),
     supabase.from('VendorMonthlyFee').select('billingMonth,totalFee,collectedAmount,status').eq('vendorId', auth.vendorId).order('billingMonth', { ascending: false }),
   ])
   const error = configRes.error || ordersRes.error || recordsRes.error; if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   const config = configRes.data || { feeType: 'fixed', fixedMonthlyFee: 0, revenueFeePercent: 0 }
-  const revenue = (ordersRes.data || []).filter(eligible).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
+  const revenue = (ordersRes.data || []).filter(eligible).reduce((sum: number, order: any) => sum + getOrderRevenue(order), 0)
   const due = config.feeType === 'percentage' ? revenue * Number(config.revenueFeePercent || 0) / 100 : Number(config.fixedMonthlyFee || 0)
   const savedCurrent = (recordsRes.data || []).find((record: any) => record.billingMonth === billingMonth)
   const collectedAmount = Number(savedCurrent?.collectedAmount || 0); const remainingAmount = Math.max(0, due - collectedAmount)

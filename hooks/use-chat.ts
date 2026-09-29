@@ -37,11 +37,12 @@ export function useChat(conversationId: number | null, options: UseChatOptions =
         setMessages(data.messages)
 
         // Mark messages as read
-        await fetch('/api/chat/messages', {
+        const readResponse = await fetch('/api/chat/messages', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId }),
         })
+        if (readResponse.ok) window.dispatchEvent(new Event('chat:messages-read'))
         
         onMessagesRead?.()
       } catch (err: any) {
@@ -67,6 +68,14 @@ export function useChat(conversationId: number | null, options: UseChatOptions =
         const data = await res.json()
         if (res.ok && Array.isArray(data.messages)) {
           setMessages(data.messages)
+          if (document.visibilityState === 'visible' && data.messages.some((message: Message) => !message.isRead)) {
+            const readResponse = await fetch('/api/chat/messages', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ conversationId }),
+            })
+            if (readResponse.ok) window.dispatchEvent(new Event('chat:messages-read'))
+          }
         }
       } catch {
         // Keep the currently visible messages when the connection is briefly unavailable.

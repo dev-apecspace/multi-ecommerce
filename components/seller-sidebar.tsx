@@ -26,6 +26,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { UnreadBadge } from "@/components/chat/unread-badge"
 import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -60,6 +62,7 @@ const sellerLinks = [
 export function SellerSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const unreadMessages = useUnreadMessages("seller", user?.role === "vendor" ? user.id : null)
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [mobileOpen, setMobileOpen] = useState(false)
   
@@ -111,6 +114,7 @@ export function SellerSidebar() {
                           <span className="flex items-center gap-3 flex-1">
                             <Icon className="h-4 w-4 flex-shrink-0" />
                             <span className="text-sm">{link.label}</span>
+                        {link.href === "/seller/chat" && <UnreadBadge count={unreadMessages} />}
                           </span>
                           <Lock className="h-3 w-3 flex-shrink-0 text-yellow-600" />
                         </Button>
@@ -133,6 +137,7 @@ export function SellerSidebar() {
                       <span className="flex items-center gap-3 flex-1">
                         <Icon className="h-4 w-4 flex-shrink-0" />
                         <span className="text-sm">{link.label}</span>
+                        {link.href === "/seller/chat" && <UnreadBadge count={unreadMessages} />}
                       </span>
                     </Button>
                   </Link>
@@ -149,6 +154,7 @@ export function SellerSidebar() {
                     <span className="flex items-center gap-3 flex-1">
                       <Icon className="h-4 w-4 flex-shrink-0" />
                       <span className="text-sm">{link.label}</span>
+                        {link.href === "/seller/chat" && <UnreadBadge count={unreadMessages} />}
                     </span>
                     <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
                   </Button>
@@ -222,6 +228,7 @@ export function SellerSidebar() {
                             <span className="flex items-center gap-3 flex-1">
                               <Icon className="h-4 w-4 flex-shrink-0" />
                               <span className="text-sm">{link.label}</span>
+                        {link.href === "/seller/chat" && <UnreadBadge count={unreadMessages} />}
                             </span>
                             <Lock className="h-3 w-3 flex-shrink-0 text-yellow-600" />
                           </Button>
@@ -244,6 +251,7 @@ export function SellerSidebar() {
                         <span className="flex items-center gap-3 flex-1">
                           <Icon className="h-4 w-4 flex-shrink-0" />
                           <span className="text-sm">{link.label}</span>
+                        {link.href === "/seller/chat" && <UnreadBadge count={unreadMessages} />}
                         </span>
                       </Button>
                     </Link>
@@ -260,6 +268,7 @@ export function SellerSidebar() {
                       <span className="flex items-center gap-3 flex-1">
                         <Icon className="h-4 w-4 flex-shrink-0" />
                         <span className="text-sm">{link.label}</span>
+                        {link.href === "/seller/chat" && <UnreadBadge count={unreadMessages} />}
                       </span>
                       <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
                     </Button>

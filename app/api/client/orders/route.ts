@@ -447,6 +447,7 @@ export async function PATCH(request: NextRequest) {
     // Allow specific status transitions
     const validTransitions: Record<string, string[]> = {
       'pending': ['cancelled'],
+      'processing': ['cancelled'],
       'delivered': ['completed']
     }
 

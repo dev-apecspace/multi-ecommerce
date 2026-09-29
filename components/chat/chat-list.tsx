@@ -43,8 +43,8 @@ interface ChatListProps {
 
 export function ChatList({ conversations, selectedId, onSelect, mode, className }: ChatListProps) {
   return (
-    <ScrollArea className={cn("h-full", className)}>
-      <div className="flex flex-col gap-1 p-2">
+    <ScrollArea className={cn("h-full w-full min-w-0 [&_[data-radix-scroll-area-viewport]>div]:!block", className)}>
+      <div className="flex min-w-0 flex-col gap-1 p-2">
         {conversations.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 text-sm">
             Không có cuộc trò chuyện nào
@@ -69,7 +69,7 @@ export function ChatList({ conversations, selectedId, onSelect, mode, className 
                 key={conv.id}
                 onClick={() => onSelect(conv.id)}
                 className={cn(
-                  "flex items-start gap-3 p-3 rounded-lg text-left transition-colors relative w-full",
+                  "flex min-w-0 items-start gap-3 p-3 rounded-lg text-left transition-colors relative w-full overflow-hidden",
                   isSelected 
                     ? "bg-accent text-accent-foreground" 
                     : conv.lastMessage && !conv.lastMessage.isRead

@@ -124,6 +124,9 @@ export default function SellerTransactionsPage() {
     if (tx.status === 'cancelled') {
       return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200"><XCircle className="h-3.5 w-3.5 mr-1" /> Đã hủy</Badge>
     }
+    if (tx.status === 'returned' || tx.paymentStatus === 'refunded') {
+      return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{tx.status === 'returned' ? 'Đã trả hàng' : 'Đã hoàn tiền'}</Badge>
+    }
     if (tx.isEligibleRevenue) {
       return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200"><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Ghi nhận doanh thu</Badge>
     }
@@ -145,6 +148,8 @@ export default function SellerTransactionsPage() {
         return 'Đã hoàn tất'
       case 'cancelled':
         return 'Đã hủy'
+      case 'returned':
+        return 'Đã trả hàng'
       case 'refunded':
         return 'Đã hoàn tiền'
       default:
@@ -294,6 +299,8 @@ export default function SellerTransactionsPage() {
               <option value="all">Tất cả giao dịch</option>
               <option value="paid">Đã ghi nhận doanh thu</option>
               <option value="pending">Chờ ghi nhận (Đang giao/Xử lý)</option>
+              <option value="returned">Đã trả hàng</option>
+              <option value="refunded">Đã hoàn tiền</option>
               <option value="cancelled">Đã hủy</option>
             </select>
           </div>

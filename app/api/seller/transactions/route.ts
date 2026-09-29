@@ -1,3 +1,4 @@
+import { isRevenueEligible, getOrderRevenue, isPendingRevenue, getRetainedOrderValue } from '@/lib/order-revenue'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest, isVendor, unauthorizedResponse } from '@/lib/api-auth'
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const { data: vendorOrdersData, error: vendorOrdersErr } = await supabase
       .from('Order')
-      .select('id, total, status, paymentMethod, paymentStatus, createdAt')
+      .select('id, total, status, paymentMethod, paymentStatus, createdAt, Return(status,returnType,refundAmount,orderItemId,quantity)')
       .eq('vendorId', vendorId)
 
     if (vendorOrdersErr) {
@@ -49,14 +50,12 @@ export async function GET(request: NextRequest) {
       return true
     })
 
-    const isEligible = (o: any) =>
-      ['delivered', 'completed'].includes(o.status) ||
-      (['bank', 'wallet'].includes(o.paymentMethod) && o.paymentStatus === 'paid')
+    const isEligible = isRevenueEligible
 
     const paidOrders = filteredSummaryOrders.filter(isEligible)
-    const totalShopRevenue = paidOrders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
-    const pendingOrders = filteredSummaryOrders.filter((o: any) => o.status !== 'cancelled' && !isEligible(o))
-    const pendingRevenue = pendingOrders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
+    const totalShopRevenue = paidOrders.reduce((sum: number, o: any) => sum + getOrderRevenue(o), 0)
+    const pendingOrders = filteredSummaryOrders.filter(isPendingRevenue)
+    const pendingRevenue = pendingOrders.reduce((sum: number, o: any) => sum + getRetainedOrderValue(o), 0)
     const cancelledOrders = filteredSummaryOrders.filter((o: any) => o.status === 'cancelled')
     const cancelledRevenue = cancelledOrders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
 
@@ -72,6 +71,7 @@ export async function GET(request: NextRequest) {
         createdAt,
         paymentMethod,
         paymentStatus,
+        Return(status,returnType,refundAmount,orderItemId,quantity),
         paymentProofUrl,
         paymentSubmittedAt,
         paymentVerificationStatus,
@@ -91,9 +91,13 @@ export async function GET(request: NextRequest) {
       .order('createdAt', { ascending: false })
 
     if (paymentStatus === 'paid') {
-      query = query.or('status.in.(delivered,completed),and(paymentMethod.in.(bank,wallet),paymentStatus.eq.paid)')
+      query = query.in('id', paidOrders.map((order: any) => order.id))
     } else if (paymentStatus === 'pending') {
-      query = query.neq('status', 'cancelled').not('status', 'in', '(delivered,completed)').not('and(paymentMethod.in.(bank,wallet),paymentStatus.eq.paid)', 'is', true)
+      query = query.in('id', pendingOrders.map((order: any) => order.id))
+    } else if (paymentStatus === 'returned') {
+      query = query.eq('status', 'returned')
+    } else if (paymentStatus === 'refunded') {
+      query = query.eq('paymentStatus', 'refunded')
     } else if (paymentStatus === 'cancelled') {
       query = query.eq('status', 'cancelled')
     }
@@ -130,6 +134,7 @@ export async function GET(request: NextRequest) {
       return {
         ...order,
         isEligibleRevenue: isOrderPaid,
+        netRevenue: getOrderRevenue(order),
       }
     }) || []
 

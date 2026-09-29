@@ -64,7 +64,7 @@ export default function SellerDashboardPage() {
     totalRevenue: dashboardData?.stats?.totalRevenue ?? 0,
     averageRating: dashboardData?.stats?.averageRating ?? 0,
     followers: dashboardData?.stats?.followers ?? 0,
-    orderStatus: dashboardData?.stats?.orderStatus ?? { pending: 0, processing: 0, shipped: 0, delivered: 0, completed: 0, cancelled: 0 },
+    orderStatus: dashboardData?.stats?.orderStatus ?? { pending: 0, processing: 0, shipped: 0, delivered: 0, completed: 0, cancelled: 0, returned: 0 },
   }
 
   return (
@@ -177,7 +177,7 @@ export default function SellerDashboardPage() {
               <div>
                 <p className="text-xs md:text-xs text-muted-foreground font-medium">ĐƠN HÀNG THÁNG NÀY</p>
                 <p className="text-lg md:text-2xl font-bold mt-1">{stats.completedOrders}</p>
-                <p className="text-xs font-semibold text-muted-foreground mt-1 md:mt-2">Chờ: {stats.orderStatus.pending + stats.orderStatus.processing} · Giao: {stats.orderStatus.shipped + stats.orderStatus.delivered} · Hoàn tất: {stats.orderStatus.completed} · Hủy: {stats.orderStatus.cancelled}</p>
+                <p className="text-xs font-semibold text-muted-foreground mt-1 md:mt-2">Chờ: {stats.orderStatus.pending + stats.orderStatus.processing} · Giao: {stats.orderStatus.shipped + stats.orderStatus.delivered} · Hoàn tất: {stats.orderStatus.completed} · Hủy: {stats.orderStatus.cancelled} · Trả: {stats.orderStatus.returned || 0}</p>
               </div>
             </CardContent>
           </Card>

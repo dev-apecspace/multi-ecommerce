@@ -472,7 +472,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -595,7 +595,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
                       <div className="flex gap-2">
                         <Button 
@@ -728,16 +728,26 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
-                      >
-                        Chi tiết
-                        <ChevronRight className="h-4 w-4 ml-2" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={cancellingOrderId === order.id}
+                          onClick={() => handleCancelOrder(order.id)}
+                        >
+                          {cancellingOrderId === order.id ? 'Đang hủy...' : 'Hủy đơn'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/client/orders/${encodeURIComponent(order.orderNumber)}`)}
+                        >
+                          Chi tiết
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -851,7 +861,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -949,7 +959,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -1072,7 +1082,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
                       <Button 
                         variant="outline" 
@@ -1195,7 +1205,7 @@ export default function OrderHistoryPage() {
                         <p className="text-sm font-semibold text-foreground">
                           {order.Vendor?.name || 'Đang tải...'}
                         </p>
-                        <RefundChatButton order={order} />
+                        <RefundChatButton order={order} returnStatuses={order.OrderItem.map(item => returnStatuses[item.id]).filter(Boolean)} />
                       </div>
                       <Button 
                         variant="outline" 

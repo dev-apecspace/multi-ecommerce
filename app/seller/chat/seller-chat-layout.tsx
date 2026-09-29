@@ -16,6 +16,10 @@ export function SellerChatLayout({ userId }: { userId: number }) {
   const [selectedId, setSelectedId] = useState<number | null>(initialConvId ? parseInt(initialConvId) : null)
   const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    setSelectedId(initialConvId ? Number(initialConvId) : null)
+  }, [initialConvId])
+
   const fetchConversations = useCallback(async () => {
     try {
       const res = await fetch('/api/seller/chat/conversations')
@@ -52,7 +56,7 @@ export function SellerChatLayout({ userId }: { userId: number }) {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
         {/* Sidebar List */}
-        <div className="border rounded-lg bg-background overflow-hidden flex flex-col">
+        <div className="min-w-0 border rounded-lg bg-background overflow-hidden flex flex-col">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold">Cuộc trò chuyện</h2>
           </div>

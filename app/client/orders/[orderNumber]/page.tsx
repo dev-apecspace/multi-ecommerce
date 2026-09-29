@@ -466,6 +466,10 @@ export default function OrderDetailPage({ params }: PageProps) {
   const hasActiveReturn = returnStatusValues.some((status) => status !== 'completed')
   const shouldDisableConfirm = returnStatusValues.length > 0
   const statusKey = getOrderStatusKey()
+  const showPaymentSection = ['pending', 'processing', 'shipped', 'delivered'].includes(order.status)
+    && returnStatusValues.length === 0
+    && order.paymentStatus !== 'refunded'
+    && ['bank', 'wallet'].includes(order.paymentMethod)
 
   return (
     <main className="container-viewport client-order-detail py-8">
@@ -508,7 +512,7 @@ export default function OrderDetailPage({ params }: PageProps) {
                         : order.paymentMethod}
                 </p>
               </div>
-              {['bank', 'wallet'].includes(order.paymentMethod) && (order.paymentStatus === 'paid' ? (
+              {showPaymentSection && (order.paymentStatus === 'paid' ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Đã được shop xác nhận thanh toán.</div>
               ) : (
                 <section className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/30">
@@ -733,12 +737,12 @@ export default function OrderDetailPage({ params }: PageProps) {
 
           {/* Actions */}
           <div className="space-y-2">
-            {order.status === 'pending' && (
+            {['pending', 'processing'].includes(order.status) && (
               <Button variant="outline" className="w-full" disabled={cancelling} onClick={handleCancelOrder}>
                 {cancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
               </Button>
             )}
-            <RefundChatButton order={order} />
+            <RefundChatButton order={order} returnStatuses={Object.values(returnStatuses)} fullWidth />
             <Button variant="outline" className="w-full">
               Liên hệ hỗ trợ
             </Button>
@@ -804,7 +808,7 @@ export default function OrderDetailPage({ params }: PageProps) {
           }
         }}
       />
-      <Dialog open={!!proofConfirmation} onOpenChange={(open) => !open && closeProofConfirmation()}>
+      <Dialog open={showPaymentSection && !!proofConfirmation} onOpenChange={(open) => !open && closeProofConfirmation()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Xác nhận gửi minh chứng</DialogTitle><DialogDescription>Hãy kiểm tra ảnh thuộc đúng đơn và hiển thị rõ số tiền, nội dung chuyển khoản cùng thời gian giao dịch.</DialogDescription></DialogHeader>
           {proofConfirmation && <div className="space-y-3">

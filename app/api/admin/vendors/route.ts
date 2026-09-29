@@ -1,3 +1,4 @@
+import { isRevenueEligible, getOrderRevenue } from '@/lib/order-revenue'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateSlug } from '@/lib/utils'
@@ -16,10 +17,10 @@ export async function GET(request: NextRequest) {
       const month = searchParams.get('month') || new Date().toISOString().slice(0, 7)
       if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Tháng không hợp lệ.' }, { status: 400 })
       const start = `${month}-01`; const end = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)).toISOString()
-      const { data, error } = await supabase.from('Order').select('id,orderNumber,total,status,paymentMethod,paymentStatus,paymentProofUrl,paymentSubmittedAt,paymentVerificationStatus,paymentVerificationData,paymentVerifiedAt,createdAt,User(id,name,email,phone),OrderItem(id,quantity,price,variantName,Product(id,name,media),ProductVariant(id,name,image))').eq('vendorId', vendorId).gte('createdAt', start).lt('createdAt', end).order('createdAt', { ascending: false })
+      const { data, error } = await supabase.from('Order').select('id,orderNumber,total,status,paymentMethod,paymentStatus,paymentProofUrl,paymentSubmittedAt,paymentVerificationStatus,paymentVerificationData,paymentVerifiedAt,createdAt,User(id,name,email,phone),OrderItem(id,quantity,price,variantName,Product(id,name,media),ProductVariant(id,name,image)), Return(status,returnType,refundAmount,orderItemId,quantity)').eq('vendorId', vendorId).gte('createdAt', start).lt('createdAt', end).order('createdAt', { ascending: false })
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
       const orders = data || []
-      const revenue = orders.filter((order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
+      const revenue = orders.filter(isRevenueEligible).reduce((sum: number, order: any) => sum + getOrderRevenue(order), 0)
       return NextResponse.json({ month, orders, orderCount: orders.length, revenue })
     }
     const page = parseInt(searchParams.get('page') || '1')
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
           
           const { data: orderRows, error: orderError } = await supabase
             .from('Order')
-            .select('total, status, paymentMethod, paymentStatus')
+            .select('total, status, paymentMethod, paymentStatus, Return(status,returnType,refundAmount,orderItemId,quantity)')
             .eq('vendorId', vendor.id)
           if (orderError) throw orderError
           const { data: monthlyFeeConfig, error: monthlyFeeConfigError } = await supabase
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
             .maybeSingle()
           if (monthlyFeeConfigError) throw monthlyFeeConfigError
           const orders = orderRows || []
-          const revenue = orders.filter((order: any) => ['delivered', 'completed'].includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
+          const revenue = orders.filter(isRevenueEligible).reduce((sum: number, order: any) => sum + getOrderRevenue(order), 0)
           return {
             ...vendor,
             products: productCount || 0,

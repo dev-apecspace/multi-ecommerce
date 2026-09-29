@@ -35,7 +35,7 @@ export default function AdminPage() {
     revenue: 0,
     temporaryRevenue: 0,
     cancelledValue: 0,
-    orderStatus: { pending: 0, processing: 0, shipped: 0, delivered: 0, completed: 0, cancelled: 0 },
+    orderStatus: { pending: 0, processing: 0, shipped: 0, delivered: 0, completed: 0, cancelled: 0, returned: 0 },
     productStatus: { pending: 0, approved: 0, rejected: 0 },
     activeUsers: 0,
   })
@@ -70,7 +70,7 @@ export default function AdminPage() {
           revenue: statsData.orders?.totalRevenue || 0,
           temporaryRevenue: statsData.orders?.temporaryRevenue || 0,
           cancelledValue: statsData.orders?.cancelledValue || 0,
-          orderStatus: { pending: statsData.orders?.pending || 0, processing: statsData.orders?.processing || 0, shipped: statsData.orders?.shipped || 0, delivered: statsData.orders?.delivered || 0, completed: statsData.orders?.completed || 0, cancelled: statsData.orders?.cancelled || 0 },
+          orderStatus: { pending: statsData.orders?.pending || 0, processing: statsData.orders?.processing || 0, shipped: statsData.orders?.shipped || 0, delivered: statsData.orders?.delivered || 0, completed: statsData.orders?.completed || 0, returned: statsData.orders?.returned || 0, cancelled: statsData.orders?.cancelled || 0 },
           productStatus: { pending: statsData.products?.pending || 0, approved: statsData.products?.approved || 0, rejected: statsData.products?.rejected || 0 },
           activeUsers: statsData.users?.active || 0,
         })
@@ -189,7 +189,7 @@ export default function AdminPage() {
                 <div>
                   <StatLabel label="ĐƠN HÀNG" detail={'Đếm tất cả đơn hàng, gồm cả đơn đã hủy.\n• Chờ: đơn mới hoặc đang được shop xử lý.\n• Giao: đang vận chuyển hoặc đã giao chờ hoàn tất.\n• Hoàn tất: giao dịch đã kết thúc thành công.\n• Hủy: đơn bị hủy, không tính vào doanh thu.'} />
                   <p className="text-3xl font-bold mt-1">{stats.orders}</p>
-                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Chờ: {(stats.orderStatus?.pending || 0) + (stats.orderStatus?.processing || 0)}</span><span className="text-blue-600">Giao: {(stats.orderStatus?.shipped || 0) + (stats.orderStatus?.delivered || 0)}</span><span className="text-emerald-600">Hoàn tất: {stats.orderStatus?.completed || 0}</span><span className="text-red-600">Hủy: {stats.orderStatus?.cancelled || 0}</span></div>
+                  <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Chờ: {(stats.orderStatus?.pending || 0) + (stats.orderStatus?.processing || 0)}</span><span className="text-blue-600">Giao: {(stats.orderStatus?.shipped || 0) + (stats.orderStatus?.delivered || 0)}</span><span className="text-emerald-600">Hoàn tất: {stats.orderStatus?.completed || 0}</span><span className="text-red-600">Hủy: {stats.orderStatus?.cancelled || 0}</span><span className="text-purple-600">Trả: {stats.orderStatus?.returned || 0}</span></div>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-purple-500" />
               </div>
@@ -200,7 +200,7 @@ export default function AdminPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <StatLabel label="TỔNG DOANH THU" detail={'Doanh thu ghi nhận:\n• Đơn đã giao hoặc hoàn tất.\n• Hoặc đơn chuyển khoản/ví đã xác nhận nhận tiền.\n\nTạm tính: đơn chưa hủy nhưng chưa đạt điều kiện ghi nhận.\nHủy: chỉ dùng đối soát, không cộng vào doanh thu.'} />
+                  <StatLabel label="TỔNG DOANH THU" detail={'Doanh thu từ đơn đã giao/hoàn tất hoặc chuyển khoản/ví đã xác nhận tiền.\nLoại đơn hủy, đã trả hàng, đã hoàn tiền; trừ giá trị yêu cầu trả hàng đã duyệt.\nTạm tính chỉ gồm đơn còn hiệu lực chưa đủ điều kiện ghi nhận.'} />
                   <p className="text-2xl font-bold mt-1">{Number(stats.revenue || 0).toLocaleString('vi-VN')} ₫</p>
                   <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-bold leading-none"><span className="text-amber-600">Tạm tính: {Number(stats.temporaryRevenue || 0).toLocaleString('vi-VN')} ₫</span><span className="text-red-600">Hủy: {Number(stats.cancelledValue || 0).toLocaleString('vi-VN')} ₫</span></div>
                 </div>

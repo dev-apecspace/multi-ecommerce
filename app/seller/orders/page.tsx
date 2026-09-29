@@ -85,6 +85,26 @@ export default function SellerOrdersPage() {
   const [returnsMap, setReturnsMap] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [openingRefundChat, setOpeningRefundChat] = useState(false)
+
+  const contactCustomerForRefund = async () => {
+    if (!selectedOrder || openingRefundChat) return
+    setOpeningRefundChat(true)
+    try {
+      const response = await fetch('/api/seller/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: selectedOrder.id }),
+      })
+      const result = await response.json()
+      if (!response.ok || !result.conversation?.id) throw new Error(result.error || 'Không thể mở chat với khách.')
+      router.push(`/seller/chat?conversationId=${result.conversation.id}`)
+    } catch (error) {
+      toast({ title: 'Không thể liên hệ khách', description: error instanceof Error ? error.message : 'Vui lòng thử lại.', variant: 'destructive' })
+    } finally {
+      setOpeningRefundChat(false)
+    }
+  }
   const [newStatus, setNewStatus] = useState<string>("")
   const [trackingNumber, setTrackingNumber] = useState<string>("")
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -722,6 +742,11 @@ export default function SellerOrdersPage() {
           )}
 
           <DialogFooter>
+            {selectedOrder?.status === 'cancelled' && selectedOrder.paymentStatus === 'paid' && (
+              <Button onClick={contactCustomerForRefund} disabled={openingRefundChat}>
+                {openingRefundChat ? 'Đang mở chat...' : 'Liên hệ khách để hoàn tiền'}
+              </Button>
+            )}
             <Button 
               variant="outline" 
               onClick={() => {

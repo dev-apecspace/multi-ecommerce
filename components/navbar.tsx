@@ -3,13 +3,15 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ShoppingCart, Search, User, Heart, Menu, X, ChevronDown, LogOut, Settings } from "lucide-react"
+import { MessageSquare, ShoppingCart, Search, User, Heart, Menu, X, ChevronDown, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MobileMenu } from "@/components/mobile-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
 import { useAuth } from "@/lib/auth-context"
+import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { UnreadBadge } from "@/components/chat/unread-badge"
 import { useCart } from "@/lib/cart-context"
 import { useFavoritesContext } from "@/lib/favorites-context"
 import { generateSlug } from "@/lib/utils"
@@ -37,6 +39,7 @@ export function Navbar() {
   const router = useRouter()
   const pathname = usePathname()
   const { user, logout } = useAuth()
+  const unreadMessages = useUnreadMessages("client", user?.id)
   const { cartCount } = useCart()
   const { favoritesCount } = useFavoritesContext()
   const [searchQuery, setSearchQuery] = useState("")
@@ -230,6 +233,12 @@ export function Navbar() {
             <div className="hidden md:flex items-center gap-1">
               <ThemeToggle />
               <Button variant="ghost" size="icon" asChild className="relative">
+                <Link href={user ? '/client/chat' : '/auth/login?callback=%2Fclient%2Fchat'} aria-label="Tin nhắn" title="Tin nhắn">
+                  <MessageSquare className="h-5 w-5" />
+                  <span className="absolute -right-1 -top-1"><UnreadBadge count={unreadMessages} /></span>
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" asChild className="relative">
                 <Link href="/client/favorites">
                   <Heart className="h-5 w-5" />
                   {favoritesCount > 0 && (
@@ -305,6 +314,12 @@ export function Navbar() {
             {/* Mobile Menu Toggle */}
             <div className="md:hidden flex items-center gap-2">
               <ThemeToggle />
+              <Button variant="ghost" size="icon" asChild className="relative">
+                <Link href={user ? '/client/chat' : '/auth/login?callback=%2Fclient%2Fchat'} aria-label="Tin nhắn" title="Tin nhắn">
+                  <MessageSquare className="h-5 w-5" />
+                  <span className="absolute -right-1 -top-1"><UnreadBadge count={unreadMessages} /></span>
+                </Link>
+              </Button>
               <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>

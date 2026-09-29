@@ -1,21 +1,21 @@
+import { isRevenueEligible, getOrderRevenue } from '@/lib/order-revenue'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthFromRequest, isAdmin, unauthorizedResponse } from '@/lib/api-auth'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-const settledStatuses = ['delivered', 'completed']
 const validMonth = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-01$/.test(value)
-const isFeeEligible = (order: any) => settledStatuses.includes(order.status) || (['bank', 'wallet'].includes(order.paymentMethod) && order.paymentStatus === 'paid')
+const isFeeEligible = isRevenueEligible
 
 async function currentFee(vendorId: number, billingMonth: string) {
   const end = new Date(Date.UTC(+billingMonth.slice(0, 4), +billingMonth.slice(5, 7), 1)).toISOString().slice(0, 10)
   const [configRes, ordersRes] = await Promise.all([
     supabase.from('VendorMonthlyFeeConfig').select('*').eq('vendorId', vendorId).maybeSingle(),
-    supabase.from('Order').select('total,status,paymentMethod,paymentStatus').eq('vendorId', vendorId).gte('createdAt', billingMonth).lt('createdAt', end),
+    supabase.from('Order').select('total,status,paymentMethod,paymentStatus, Return(status,returnType,refundAmount,orderItemId,quantity)').eq('vendorId', vendorId).gte('createdAt', billingMonth).lt('createdAt', end),
   ])
   if (configRes.error || ordersRes.error) throw new Error(configRes.error?.message || ordersRes.error?.message)
   const config = configRes.data || { feeType: 'fixed', fixedMonthlyFee: 0, revenueFeePercent: 0 }
-  const settledRevenue = (ordersRes.data || []).filter(isFeeEligible).reduce((sum: number, order: any) => sum + Number(order.total || 0), 0)
+  const settledRevenue = (ordersRes.data || []).filter(isFeeEligible).reduce((sum: number, order: any) => sum + getOrderRevenue(order), 0)
   const fixedFee = Number(config.fixedMonthlyFee || 0)
   const revenueFeePercent = Number(config.revenueFeePercent || 0)
   const percentageFee = config.feeType === 'percentage' ? settledRevenue * revenueFeePercent / 100 : 0
@@ -57,11 +57,11 @@ export async function GET(request: NextRequest) {
   const end = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)).toISOString().slice(0, 10)
   const [vendors, configs, orders, records] = await Promise.all([
     supabase.from('Vendor').select('id,name').eq('status', 'approved').order('name'), supabase.from('VendorMonthlyFeeConfig').select('*'),
-    supabase.from('Order').select('vendorId,total,status,paymentMethod,paymentStatus').gte('createdAt', start).lt('createdAt', end), supabase.from('VendorMonthlyFee').select('vendorId,collectedAmount').eq('billingMonth', start),
+    supabase.from('Order').select('vendorId,total,status,paymentMethod,paymentStatus, Return(status,returnType,refundAmount,orderItemId,quantity)').gte('createdAt', start).lt('createdAt', end), supabase.from('VendorMonthlyFee').select('vendorId,collectedAmount').eq('billingMonth', start),
   ])
   const error = vendors.error || configs.error || orders.error || records.error; if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   const configByVendor = new Map((configs.data || []).map((x: any) => [x.vendorId, x])); const recordByVendor = new Map((records.data || []).map((x: any) => [x.vendorId, x]))
-  const revenue = new Map<number, number>(); for (const order of (orders.data || []).filter(isFeeEligible)) revenue.set(order.vendorId, (revenue.get(order.vendorId) || 0) + Number(order.total || 0))
+  const revenue = new Map<number, number>(); for (const order of (orders.data || []).filter(isFeeEligible)) revenue.set(order.vendorId, (revenue.get(order.vendorId) || 0) + getOrderRevenue(order))
   const items = (vendors.data || []).map((vendor: any) => { const config = configByVendor.get(vendor.id) || { feeType: 'fixed', fixedMonthlyFee: 0, revenueFeePercent: 0 }; const settledRevenue = revenue.get(vendor.id) || 0; const fixedFee = Number(config.fixedMonthlyFee || 0); const revenueFeePercent = Number(config.revenueFeePercent || 0); const percentageFee = config.feeType === 'percentage' ? settledRevenue * revenueFeePercent / 100 : 0; const totalFee = config.feeType === 'fixed' ? fixedFee : percentageFee; const collectedAmount = Number(recordByVendor.get(vendor.id)?.collectedAmount || 0); const remainingAmount = Math.max(0, totalFee - collectedAmount); const collectionStatus = remainingAmount === 0 ? 'collected' : collectedAmount > 0 ? 'partially_collected' : 'uncollected'; return { vendorId: vendor.id, vendorName: vendor.name, settledRevenue, feeType: config.feeType, fixedFee, revenueFeePercent, percentageFee, totalFee, collectedAmount, remainingAmount, collectionStatus } })
   return NextResponse.json({ month, items })
 }

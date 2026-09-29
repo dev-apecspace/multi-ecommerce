@@ -13,19 +13,22 @@ interface RefundOrder {
   Vendor: { id: number } | null
 }
 
-export function RefundChatButton({ order }: { order: RefundOrder }) {
+export function RefundChatButton({ order, returnStatuses = [], fullWidth = false }: { order: RefundOrder; returnStatuses?: string[]; fullWidth?: boolean }) {
   const router = useRouter()
   const { toast } = useToast()
   const sending = useRef(false)
   const [loading, setLoading] = useState(false)
   const [sentConversationId, setSentConversationId] = useState<number | null>(null)
 
-  // A transfer may have been made even before the shop reconciles it.
+  const hasReturnAwaitingRefund = returnStatuses.some(status =>
+    ['pending', 'approved', 'shipped', 'received', 'restocked'].includes(status)
+  )
+  // Delivery alone does not qualify: a paid order must have an open return request.
+  // Cancelled orders retain the separate paid/submitted-proof refund flow.
   const eligible = order.paymentStatus !== 'refunded' && (
-    ['delivered', 'completed', 'returned'].includes(order.status) ||
+    (order.status === 'delivered' && order.paymentStatus === 'paid' && hasReturnAwaitingRefund) ||
     (order.status === 'cancelled' && (
-      ['paid', 'submitted'].includes(order.paymentStatus || '') ||
-      ['bank', 'wallet'].includes(order.paymentMethod || '')
+      ['paid', 'submitted'].includes(order.paymentStatus || '')
     ))
   )
   if (!eligible || !order.Vendor?.id) return null
@@ -70,7 +73,7 @@ export function RefundChatButton({ order }: { order: RefundOrder }) {
     }
   }
 
-  return <Button variant="outline" size="sm" disabled={loading} onClick={requestRefund}>
+  return <Button variant="outline" size={fullWidth ? 'default' : 'sm'} className={fullWidth ? 'w-full' : undefined} disabled={loading} onClick={requestRefund}>
     {loading ? 'Đang gửi...' : sentConversationId ? 'Mở chat với shop' : 'Yêu cầu hoàn tiền'}
   </Button>
 }

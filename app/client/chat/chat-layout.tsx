@@ -56,7 +56,7 @@ export function ChatLayout({ userId }: { userId: number }) {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
         {/* Sidebar List */}
-        <div className="border rounded-lg bg-background overflow-hidden flex flex-col">
+        <div className="min-w-0 border rounded-lg bg-background overflow-hidden flex flex-col">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold">Cuộc trò chuyện</h2>
           </div>
