@@ -53,6 +53,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [isFavorite, setIsFavorite] = useState(false)
   const [isFollowingShop, setIsFollowingShop] = useState(false)
   const [product, setProduct] = useState<any>(null)
+  const isUnavailable = !!product && (product.status !== 'approved' || product.sellerHidden || product.adminHidden || product.adminLocked)
   const [loading, setLoading] = useState(true)
   const [variantModalOpen, setVariantModalOpen] = useState(false)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
@@ -62,25 +63,27 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true)
+      setProduct(null)
+      setSelectedImage(0)
+      setVariantModalOpen(false)
       setIsLoading(true)
       try {
-        const response = await fetch(`/api/products?slug=${encodeURIComponent(productSlug)}&limit=1&offset=0`)
+        const response = await fetch(`/api/products?slug=${encodeURIComponent(productSlug)}&detail=true&limit=1&offset=0`)
+        if (!response.ok) throw new Error('Không thể tải sản phẩm')
         const result = await response.json()
         const prod = result.data?.[0]
         if (prod) {
-          const variantPrices: Array<{ campaignPrice: number | null; basePrice: number; originalPrice: number | undefined }> = (prod.ProductVariant || []).map((v: any) => ({
-            campaignPrice: v.salePrice ?? null,
-            basePrice: v.price ?? prod.price,
-            originalPrice: v.originalPrice ?? prod.originalPrice,
-          }))
+          const images = Array.isArray(prod.media) ? prod.media.filter((img: any) => img?.type !== 'video' && typeof img?.url === 'string' && img.url.trim()).map((img: any) => img.url) : []
+          const originalPriceValue = prod.originalPrice ?? prod.price
 
           const productData = {
             ...prod,
-            images: prod.media?.map((img: any) => img.url) || [prod.image || "/placeholder.svg"],
+            images: images.length ? images : [prod.image || "/placeholder.svg"],
             specifications: {
               "Thương hiệu": prod.Category?.name || "N/A",
               "Danh mục": prod.SubCategory?.name || "N/A",
-              "Giá gốc": prod.originalPrice?.toLocaleString("vi-VN") + "₫" || "N/A",
+              "Giá gốc": originalPriceValue != null && originalPriceValue !== '' && Number.isFinite(Number(originalPriceValue))
+                ? Number(originalPriceValue).toLocaleString("vi-VN") + "₫" : "Chưa cập nhật",
             },
             seller: {
               name: prod.Vendor?.name || "Shop",
@@ -120,9 +123,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           productData.taxRate = prod.taxRate || 0
 
           setProduct(productData)
-          if (prod.id) {
-            fetchReviews()
-          }
         }
       } catch (error) {
         console.error('Failed to fetch product:', error)
@@ -135,7 +135,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     if (productSlug) {
       fetchProduct()
     }
-  }, [productSlug, fetchReviews])
+  }, [productSlug])
+
+  useEffect(() => {
+    fetchReviews()
+  }, [fetchReviews])
 
   useEffect(() => {
     const checkIfFavorited = async () => {
@@ -187,7 +191,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           ).toFixed(1)
         )
       : Number(product?.rating) || 0
-  const formattedReviews = reviews.map((review: any) => ({
+  const formattedReviews: Array<{ id: number; author: string; date: string; rating: number; comment: string }> = reviews.map((review: any) => ({
     id: review.id,
     author: review.User?.name || 'Khách hàng ẩn danh',
     date: review.createdAt ? new Date(review.createdAt).toLocaleDateString('vi-VN') : '',
@@ -245,6 +249,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   }
 
   const handleBuyNow = () => {
+    if (!product || isUnavailable) return
     if (!user) {
       router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
       return
@@ -277,6 +282,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   }
 
   const handleAddToCart = async () => {
+    if (!product || isUnavailable) return
     if (!user) {
       router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
       return
@@ -439,6 +445,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   }
 
   const handleVariantConfirm = async (variantId: number, qty: number) => {
+    if (!product || isUnavailable) return
     if (!user) {
       router.push(`/auth/login?callback=${encodeURIComponent(pathname)}`)
       return
@@ -572,13 +579,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     price: Math.max(0, priceData.displayPrice),
     originalPrice: Math.max(0, priceData.displayOriginalPrice),
     taxApplied: product.taxApplied || false,
-    taxIncluded: product.taxIncluded || true,
+    taxIncluded: product.taxIncluded !== false,
     taxRate: product.taxRate || 0,
-    rating: averageRating || 4.8,
+    rating: averageRating,
     reviews: reviewCount || 0,
     sold: product.sold || 0,
     images: product.images || ["/placeholder.svg"],
-    description: product.description || `${product.name}`,
+    description: product.description || "Chưa cập nhật mô tả sản phẩm.",
     specifications: product.specifications || {
       "Thương hiệu": product.Category?.name || "N/A",
       "Danh mục": product.SubCategory?.name || "N/A",
@@ -759,11 +766,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
                 {/* Quantity & Actions */}
                 <div className="space-y-3">
+                  {isUnavailable && (
+                    <p role="status" className="rounded-lg border-2 border-red-500 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                      Sản phẩm ngừng sản xuất
+                    </p>
+                  )}
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-medium">Số lượng:</span>
                     <div className="flex items-center border border-border rounded-lg">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={isUnavailable}
                         className="px-3 py-2 hover:bg-surface transition-colors"
                       >
                         −
@@ -771,12 +784,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       <input
                         type="number"
                         value={quantity}
+                        disabled={isUnavailable}
                         onChange={(e) => setQuantity(Math.max(1, Number.parseInt(e.target.value) || 1))}
                         className="w-12 text-center border-l border-r border-border py-2 bg-transparent"
                         min="1"
                       />
                       <button
                         onClick={() => setQuantity(quantity + 1)}
+                        disabled={isUnavailable}
                         className="px-3 py-2 hover:bg-surface transition-colors"
                       >
                         +
@@ -785,7 +800,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button className="flex-1 h-12 text-base" onClick={handleBuyNow}>
+                    <Button className="flex-1 h-12 text-base" onClick={handleBuyNow} disabled={isUnavailable}>
                       Mua ngay
                     </Button>
                     <Button
@@ -798,7 +813,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     </Button>
                   </div>
 
-                  <Button variant="outline" className="w-full bg-transparent h-10" onClick={handleAddToCart} disabled={isAddingToCart}>
+                  <Button variant="outline" className="w-full bg-transparent h-10" onClick={handleAddToCart} disabled={isAddingToCart || isUnavailable}>
                     {isAddingToCart ? 'Đang xử lý...' : 'Thêm vào giỏ hàng'}
                   </Button>
 
@@ -920,7 +935,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         </div>
 
         {/* Variant Selection Modal */}
-        {product && (
+        {product && !isUnavailable && (
           <VariantSelectionModal
             open={variantModalOpen}
             onOpenChange={setVariantModalOpen}

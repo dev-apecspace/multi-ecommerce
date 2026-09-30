@@ -12,7 +12,6 @@ export async function getAuthFromRequest(request: NextRequest): Promise<AuthPayl
   const token = request.cookies.get('token')?.value
 
   if (!token) {
-    console.log('No token in cookies. Available cookies:', Array.from(request.cookies.getSetCookie()).map(c => c.split('=')[0]))
     return null
   }
 

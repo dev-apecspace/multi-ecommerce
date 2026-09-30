@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useLoading } from "@/hooks/use-loading"
 import Image from "next/image"
 import { formatPrice } from "@/lib/utils"
+import { ProductVisibilityBadge, ProductVisibilityControls, type ProductVisibility } from "@/components/product-visibility-controls"
 
 interface ProductVariant {
   id: number
@@ -32,7 +33,7 @@ interface ProductImage {
   updatedAt: string
 }
 
-interface Product {
+interface Product extends ProductVisibility {
   id: number
   name: string
   description: string
@@ -232,8 +233,15 @@ export default function ProductDetailPage() {
                   <CardTitle className="text-2xl">{product.name}</CardTitle>
                   <p className="text-sm text-muted-foreground mt-2">{product.Category?.name} / {product.SubCategory?.name}</p>
                 </div>
-                {getStatusBadge(product.status)}
+                <div className="space-y-2 text-right">
+                  {getStatusBadge(product.status)}
+                  <ProductVisibilityBadge product={product} />
+                </div>
               </div>
+              <ProductVisibilityControls
+                product={product}
+                onUpdated={updated => setProduct(current => current ? { ...current, ...updated } : current)}
+              />
             </CardHeader>
             <CardContent className="space-y-6">
               {selectedImage && (

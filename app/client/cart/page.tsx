@@ -17,6 +17,7 @@ interface CartLine {
   variantId?: number | null
   variantName?: string
   productName: string
+  isUnavailable: boolean
   image?: string
   quantity: number
   // Stored prices come from backend. Conventions: stored values follow product.taxIncluded flag.
@@ -128,7 +129,7 @@ export default function CartPage() {
   }
 
   const handleUpdateQty = async (lineId: number, newQty: number) => {
-    if (newQty < 1) return
+    if (newQty < 1 || lines?.find(line => line.id === lineId)?.isUnavailable) return
     
     setLines((prev) => {
       if (!prev) return prev
@@ -189,7 +190,7 @@ export default function CartPage() {
     }
 
     // only checkout selected items
-    const selectedLinesForCheckout = lines.filter(l => selectedIds.has(l.id))
+    const selectedLinesForCheckout = lines.filter(l => !l.isUnavailable && selectedIds.has(l.id))
     if (selectedLinesForCheckout.length === 0) {
       toast({ title: 'Lỗi', description: 'Vui lòng chọn ít nhất 1 sản phẩm để thanh toán', variant: 'destructive' })
       return
@@ -275,7 +276,7 @@ export default function CartPage() {
     return Array.from(map.values())
   })()
   // compute totals only for selected lines
-  const selectedItems = computedAll.lines.filter((l: any) => selectedIds.has(l.id))
+  const selectedItems = computedAll.lines.filter((l: any) => !l.isUnavailable && selectedIds.has(l.id))
   const selectedTotals = computeTotals(selectedItems)
 
   return (
@@ -292,8 +293,9 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {vendorGroups.map((group) => {
-              const allVendorSelected = group.items.every((i) => selectedIds.has(i.id))
-              const vendorTotals = computeTotals(group.items)
+              const availableItems = group.items.filter(i => !i.isUnavailable)
+              const allVendorSelected = availableItems.length > 0 && availableItems.every((i) => selectedIds.has(i.id))
+              const vendorTotals = computeTotals(availableItems)
               return (
                 <Card key={`vendor-${group.vendorId}`} className="overflow-hidden border border-gray-200 shadow-sm">
                   <div className="bg-blue-50 border-b border-blue-200 p-4">
@@ -302,11 +304,12 @@ export default function CartPage() {
                         <input
                           type="checkbox"
                           checked={allVendorSelected}
+                          disabled={availableItems.length === 0}
                           onChange={(e) => {
                             const checked = e.target.checked
                             setSelectedIds((prev) => {
                               const copy = new Set(prev)
-                              for (const id of group.items.map((i) => i.id)) {
+                              for (const id of availableItems.map((i) => i.id)) {
                                 if (checked) copy.add(id)
                                 else copy.delete(id)
                               }
@@ -333,12 +336,15 @@ export default function CartPage() {
                       {group.items.map((line: any) => (
                         <div
                           key={line.id}
-                          className="border-b border-gray-100 p-4 hover:bg-gray-50 transition-colors last:border-b-0"
+                          className={line.isUnavailable
+                            ? "border-2 border-red-500 bg-red-50 p-4 transition-colors"
+                            : "border-b border-gray-100 p-4 hover:bg-gray-50 transition-colors last:border-b-0"}
                         >
                           <div className="flex gap-4">
                             <input
                               type="checkbox"
-                              checked={selectedIds.has(line.id)}
+                              checked={!line.isUnavailable && selectedIds.has(line.id)}
+                              disabled={line.isUnavailable}
                               onChange={(e) => {
                                 const checked = e.target.checked
                                 setSelectedIds((prev) => {
@@ -366,6 +372,11 @@ export default function CartPage() {
 
                             <div className="flex-grow">
                               <h3 className="font-medium text-gray-900 text-sm">{line.productName}</h3>
+                              {line.isUnavailable && (
+                                <span className="mt-2 inline-flex rounded border border-red-300 bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                                  Sản phẩm ngừng sản xuất
+                                </span>
+                              )}
                               {line.variantName && (
                                 <p className="text-xs text-gray-500 mt-1">Phân loại: {line.variantName}</p>
                               )}
@@ -391,6 +402,7 @@ export default function CartPage() {
 
                               <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1 bg-white">
                                 <button
+                                  disabled={line.isUnavailable}
                                   onClick={() =>
                                     handleUpdateQty(line.id, Math.max(1, line.quantity - 1))
                                   }
@@ -400,6 +412,7 @@ export default function CartPage() {
                                 </button>
                                 <input
                                   type="number"
+                                  disabled={line.isUnavailable}
                                   value={line.quantity}
                                   onChange={(e) => {
                                     const v = Math.max(1, Number.parseInt(e.target.value) || 1)
@@ -409,6 +422,7 @@ export default function CartPage() {
                                   min={1}
                                 />
                                 <button
+                                  disabled={line.isUnavailable}
                                   onClick={() => handleUpdateQty(line.id, line.quantity + 1)}
                                   className="px-2 py-1 text-gray-600 hover:text-gray-900 transition-colors"
                                 >
@@ -469,6 +483,7 @@ export default function CartPage() {
 
                   <Button
                     onClick={handleCheckout}
+                    disabled={selectedItems.length === 0}
                     size="lg"
                     className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors"
                   >

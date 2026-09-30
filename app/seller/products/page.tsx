@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react"
 import { Plus, Edit, Trash2, Eye, Copy, ChevronDown, ChevronRight, RotateCw } from "lucide-react"
+import { ProductVisibilityBadge, ProductVisibilityControls, type ProductVisibility } from "@/components/product-visibility-controls"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
@@ -19,7 +20,7 @@ interface ProductVariant {
   stock: number
 }
 
-interface Product {
+interface Product extends ProductVisibility {
   id: number
   name: string
   price: number
@@ -318,9 +319,10 @@ export default function SellerProductsPage() {
                         <td className="py-3 px-4">{calculateTotalStock(product)}</td>
                         <td className="py-3 px-4">{product.sold}</td>
                         <td className="py-3 px-4">⭐ {(product.rating || 0).toFixed(1)}</td>
-                        <td className="py-3 px-4">{getStatusBadge(product.status)}</td>
+                        <td className="py-3 px-4">{getStatusBadge(product.status)}<ProductVisibilityBadge product={product} /></td>
                         <td className="py-3 px-4">
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <ProductVisibilityControls product={product} onUpdated={updated => setProducts(current => current.map(item => item.id === updated.id ? { ...item, ...updated } : item))} />
                             <Button 
                               size="sm" 
                               variant="outline"
@@ -408,7 +410,7 @@ export default function SellerProductsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-sm truncate">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">{getStatusBadge(product.status)}</p>
+                        <p className="text-xs text-muted-foreground">{getStatusBadge(product.status)}<ProductVisibilityBadge product={product} /></p>
                       </div>
                       <button
                         onClick={() => toggleExpandProduct(product.id)}
@@ -439,7 +441,7 @@ export default function SellerProductsPage() {
                         <span>⭐ {(product.rating || 0).toFixed(1)}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex flex-wrap gap-2 pt-2"><ProductVisibilityControls product={product} onUpdated={updated => setProducts(current => current.map(item => item.id === updated.id ? { ...item, ...updated } : item))} />
                       <Button 
                         size="sm" 
                         variant="outline"

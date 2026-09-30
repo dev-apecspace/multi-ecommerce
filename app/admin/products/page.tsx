@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Clock, Eye } from "lucide-react"
+import { ProductVisibilityBadge, ProductVisibilityControls, type ProductVisibility } from "@/components/product-visibility-controls"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -19,7 +20,7 @@ interface ProductVariant {
   stock: number
 }
 
-interface Product {
+interface Product extends ProductVisibility {
   id: number
   name: string
   price: number
@@ -176,7 +177,7 @@ export default function AdminProductsPage() {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
                           Trạng thái duyệt
                         </p>
-                        {getStatusBadge(product.status)}
+                        {getStatusBadge(product.status)}<ProductVisibilityBadge product={product} />
                       </div>
 
                       <div className="py-3">
@@ -204,6 +205,7 @@ export default function AdminProductsPage() {
                         <Eye className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
                         Xem chi tiết
                       </Button>
+                      <div className="mt-2"><ProductVisibilityControls product={product} admin onUpdated={updated => setProducts(current => current.map(item => item.id === updated.id ? { ...item, ...updated } : item))} /></div>
                     </section>
                   </div>
                 </div>

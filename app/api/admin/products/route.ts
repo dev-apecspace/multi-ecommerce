@@ -1,3 +1,4 @@
+import { getAuthFromRequest, isAdmin, unauthorizedResponse } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -8,6 +9,8 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!isAdmin(auth)) return unauthorizedResponse()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'pending'
     const page = parseInt(searchParams.get('page') || '1')
@@ -48,19 +51,25 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!isAdmin(auth)) return unauthorizedResponse()
     const body = await request.json()
-    const { productId, status, reviewNotes } = body
+    const { productId, status, reviewNotes, adminHidden, adminLocked } = body
 
-    if (!productId || !status) {
+    if (!Number.isSafeInteger(productId) || productId <= 0 || (status === undefined && adminHidden === undefined && adminLocked === undefined)) {
       return NextResponse.json({ error: 'Product ID and status are required' }, { status: 400 })
     }
 
-    if (!['approved', 'rejected', 'pending'].includes(status)) {
+    if ((status !== undefined && !['approved', 'rejected', 'pending'].includes(status)) ||
+        (adminHidden !== undefined && typeof adminHidden !== 'boolean') ||
+        (adminLocked !== undefined && typeof adminLocked !== 'boolean')) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
     const updateData: any = {
-      status,
+      ...(status !== undefined ? { status } : {}),
+      ...(adminHidden !== undefined ? { adminHidden } : {}),
+      ...(adminLocked !== undefined ? { adminLocked } : {}),
       updatedAt: new Date().toISOString(),
     }
 

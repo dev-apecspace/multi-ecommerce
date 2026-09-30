@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
           price,
           originalPrice,
           stock,
+          status,
+          sellerHidden,
+          adminHidden,
+          adminLocked,
           vendorId,
           media,
           Vendor!inner(id, name)
@@ -119,6 +123,7 @@ export async function GET(request: NextRequest) {
         variantId: item.variantId,
         variantName: variant?.name,
         productName: product.name,
+        isUnavailable: product.status !== 'approved' || product.sellerHidden || product.adminHidden || product.adminLocked,
         image: variant?.image || productImage,
         quantity: item.quantity,
         basePrice: baseUnit,
@@ -145,6 +150,12 @@ export async function POST(request: NextRequest) {
     if (!userId || !productId || !quantity) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    const { data: product, error: productError } = await supabase.from('Product')
+      .select('id').eq('id', Number(productId)).eq('status', 'approved')
+      .eq('sellerHidden', false).eq('adminHidden', false).eq('adminLocked', false).maybeSingle()
+    if (productError) return NextResponse.json({ error: productError.message }, { status: 400 })
+    if (!product) return NextResponse.json({ error: 'Sản phẩm hiện không bán.' }, { status: 409 })
 
     const { data, error } = await supabase
       .from('CartItem')

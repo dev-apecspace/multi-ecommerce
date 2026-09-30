@@ -1,3 +1,4 @@
+import { getAuthFromRequest, isAdmin, unauthorizedResponse } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -11,6 +12,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!isAdmin(auth)) return unauthorizedResponse()
     const { id } = await params
     const productId = parseInt(id)
 
@@ -81,6 +84,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!isAdmin(auth)) return unauthorizedResponse()
     const { id } = await params
     const productId = parseInt(id)
     const body = await request.json()

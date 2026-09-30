@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthFromRequest, isAdmin, unauthorizedResponse } from '@/lib/api-auth'
 import { isCampaignActive } from '@/lib/price-utils'
 
 const supabase = createClient(
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get('vendorId')
     const search = searchParams.get('search')
     const slug = searchParams.get('slug')
-    const showPending = searchParams.get('showPending') === 'true'
+    const showPending = searchParams.get('showPending') === 'true' && isAdmin(await getAuthFromRequest(request))
     const isFlashSale = searchParams.get('isFlashSale') === 'true'
     const subcategory = searchParams.get('subcategory')
     const includeSubcategories = searchParams.get('includeSubcategories') === 'true'
@@ -74,6 +75,10 @@ export async function GET(request: NextRequest) {
 
     if (!showPending) {
       query = query.eq('status', 'approved')
+      // A direct detail link may display discontinued products, never pending ones.
+      if (!(slug && searchParams.get('detail') === 'true')) {
+        query = query.eq('sellerHidden', false).eq('adminHidden', false).eq('adminLocked', false)
+      }
       query = query.eq('Vendor.status', 'approved')
     }
 
@@ -370,6 +375,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!isAdmin(await getAuthFromRequest(request))) return unauthorizedResponse()
     const body = await request.json()
 
     const { data, error } = await supabase

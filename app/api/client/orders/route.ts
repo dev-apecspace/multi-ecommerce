@@ -108,6 +108,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return NextResponse.json({ error: 'Giỏ hàng trống hoặc không hợp lệ.' }, { status: 400 })
+    }
+    const productIds = [...new Set(cartItems.map((item: any) => Number(item.productId)))]
+    if (productIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+      return NextResponse.json({ error: 'Sản phẩm không hợp lệ.' }, { status: 400 })
+    }
+    const { data: availableProducts, error: availabilityError } = await supabase.from('Product')
+      .select('id, vendorId').in('id', productIds).eq('status', 'approved')
+      .eq('sellerHidden', false).eq('adminHidden', false).eq('adminLocked', false)
+    if (availabilityError) return NextResponse.json({ error: availabilityError.message }, { status: 400 })
+    if (cartItems.some((item: any) => !availableProducts?.some(product =>
+      product.id === Number(item.productId) && product.vendorId === Number(item.vendorId)))) {
+      return NextResponse.json({ error: 'Có sản phẩm đã bị ẩn, khóa hoặc không còn được bán. Vui lòng cập nhật giỏ hàng.' }, { status: 409 })
+    }
+
     const parsedUserId = parseInt(userId)
 
     const { data: settingsRecord, error: settingsError } = await supabase

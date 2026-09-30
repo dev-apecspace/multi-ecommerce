@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('Favorite')
-      .select('*, Product(id, name, slug, price, originalPrice, media, rating, sold, stock, status, Vendor(id, name, slug, logo, rating), Category(id, name, slug))')
+      .select('*, Product!inner(id, name, slug, price, originalPrice, media, rating, sold, stock, status, Vendor(id, name, slug, logo, rating), Category(id, name, slug))')
+      .eq('Product.status', 'approved')
+      .eq('Product.sellerHidden', false).eq('Product.adminHidden', false).eq('Product.adminLocked', false)
       .eq('userId', userId)
       .order('createdAt', { ascending: false })
 
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('Favorite')
       .insert([{ userId, productId }])
-      .select('*, Product(id, name, slug, price, originalPrice, media, rating, sold, stock, status, Vendor(id, name, slug, logo, rating), Category(id, name, slug))')
+      .select('*, Product!inner(id, name, slug, price, originalPrice, media, rating, sold, stock, status, Vendor(id, name, slug, logo, rating), Category(id, name, slug))')
 
     if (error) {
       if (error.message.includes('duplicate')) {

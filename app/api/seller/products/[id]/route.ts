@@ -56,7 +56,14 @@ export async function PATCH(
       )
     }
 
+    if (body.adminHidden !== undefined || body.adminLocked !== undefined || body.status !== undefined) {
+      return NextResponse.json({ error: 'Bạn không có quyền thay đổi trạng thái quản trị.' }, { status: 403 })
+    }
+    if (body.sellerHidden !== undefined && typeof body.sellerHidden !== 'boolean') {
+      return NextResponse.json({ error: 'Trạng thái ẩn không hợp lệ.' }, { status: 400 })
+    }
     const updateData: Record<string, any> = {}
+    if (body.sellerHidden !== undefined) updateData.sellerHidden = body.sellerHidden
 
     if (body.name !== undefined) updateData.name = body.name
     if (body.description !== undefined) updateData.description = body.description
@@ -88,6 +95,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('Product')
       .update(updateData)
+      .eq('vendorId', auth.vendorId)
       .eq('id', productId)
       .select()
 

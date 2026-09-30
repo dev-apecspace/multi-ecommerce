@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { formatPrice } from "@/lib/utils"
+import { ProductVisibilityBadge, ProductVisibilityControls, type ProductVisibility } from "@/components/product-visibility-controls"
 import Image from "next/image"
 
 interface ProductImage {
@@ -36,7 +37,7 @@ interface ProductVariant {
   barcode?: string
 }
 
-interface Product {
+interface Product extends ProductVisibility {
   id: number
   name: string
   description?: string
@@ -184,7 +185,7 @@ export default function AdminProductDetailPage() {
 
   return (
     <main className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
@@ -203,8 +204,14 @@ export default function AdminProductDetailPage() {
                 Ngày gửi: {new Date(product.createdAt).toLocaleDateString("vi-VN")}
               </span>
             </div>
+            <div className="mt-2"><ProductVisibilityBadge product={product} /></div>
           </div>
         </div>
+        <ProductVisibilityControls
+          product={product}
+          admin
+          onUpdated={updated => setProduct(current => current ? { ...current, ...updated } : current)}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
