@@ -44,15 +44,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { data: existingVendor, error: existingVendorError } = await supabase
+      .from('Vendor')
+      .select('id, status')
+      .eq('userId', vendorUserId)
+      .order('createdAt', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existingVendorError || !existingVendor) return NextResponse.json({ error: 'Không tìm thấy hồ sơ shop.' }, { status: 404 })
+    if (existingVendor.status === 'rejected' && approved) {
+      return NextResponse.json({ error: 'Shop đã bị từ chối. Không thể phê duyệt lại.' }, { status: 409 })
+    }
+
     if (approved) {
-      const { data: vendor, error: vendorLookupError } = await supabase
-        .from('Vendor')
-        .select('id')
-        .eq('userId', vendorUserId)
-        .maybeSingle()
-      if (vendorLookupError || !vendor) {
-        return NextResponse.json({ error: 'Không tìm thấy hồ sơ shop.' }, { status: 404 })
-      }
+      const vendor = existingVendor
 
       const [{ data: documents, error: documentsError }, { data: monthlyFeeConfig, error: feeError }] = await Promise.all([
         supabase.from('VendorDocument').select('id, status').eq('vendorId', vendor.id),
@@ -77,7 +83,7 @@ export async function POST(request: NextRequest) {
       const { error: vendorError } = await supabase
         .from('Vendor')
         .update({ status: 'approved' })
-        .eq('userId', vendorUserId)
+        .eq('id', existingVendor.id)
 
       if (userError || vendorError) {
         return NextResponse.json(
@@ -91,19 +97,16 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       )
     } else {
-      const { error: userError } = await supabase
-        .from('User')
-        .update({ status: 'rejected' })
-        .eq('id', vendorUserId)
+      const [userResult, vendorResult, documentsResult, shopResult] = await Promise.all([
+        supabase.from('User').update({ status: 'inactive' }).eq('id', vendorUserId),
+        supabase.from('Vendor').update({ status: 'rejected' }).eq('id', existingVendor.id),
+        supabase.from('VendorDocument').update({ status: 'rejected', reviewNotes: rejectionReason || 'Hồ sơ shop bị từ chối; toàn bộ tài liệu bị từ chối cùng shop.' }).eq('vendorId', existingVendor.id),
+        supabase.from('Shop').update({ locked: false, lockedReason: null, lockedAt: null }).eq('vendorId', existingVendor.id),
+      ])
 
-      const { error: vendorError } = await supabase
-        .from('Vendor')
-        .update({ status: 'rejected' })
-        .eq('userId', vendorUserId)
-
-      if (userError || vendorError) {
+      if (userResult.error || vendorResult.error || documentsResult.error || shopResult.error) {
         return NextResponse.json(
-          { error: 'Failed to reject vendor' },
+          { error: userResult.error?.message || vendorResult.error?.message || documentsResult.error?.message || shopResult.error?.message || 'Failed to reject vendor' },
           { status: 400 }
         )
       }

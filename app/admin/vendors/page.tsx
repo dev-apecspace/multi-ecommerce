@@ -127,7 +127,7 @@ function AdminVendorsContent() {
 
   const fetchDocuments = async (vendorId: number) => {
     try {
-      const response = await fetch(`/api/admin/vendor-documents?vendorId=${vendorId}`)
+      const response = await fetch(`/api/admin/vendor-documents?vendorId=${vendorId}`, { cache: 'no-store' })
       const data = await response.json()
       setDocuments(data.data || [])
     } catch (err) {
@@ -227,16 +227,15 @@ function AdminVendorsContent() {
         }),
       })
 
+      const updatedDocument = await response.json()
       if (response.ok) {
+        setDocuments((current) => current.map((document) => document.id === documentId ? { ...document, ...updatedDocument, status: 'approved', reviewNotes: notes } : document))
         toast({
           title: "Thành công",
           description: "Phê duyệt tài liệu thành công",
         })
-        if (selectedVendor) {
-          fetchDocuments(selectedVendor.id)
-        }
       } else {
-        throw new Error("Failed to approve document")
+        throw new Error(updatedDocument.error || "Failed to approve document")
       }
     } catch (err) {
       toast({
@@ -262,16 +261,15 @@ function AdminVendorsContent() {
         }),
       })
 
+      const updatedDocument = await response.json()
       if (response.ok) {
+        setDocuments((current) => current.map((document) => document.id === documentId ? { ...document, ...updatedDocument, status: 'rejected', reviewNotes: notes } : document))
         toast({
           title: "Thành công",
           description: "Từ chối tài liệu thành công",
         })
-        if (selectedVendor) {
-          fetchDocuments(selectedVendor.id)
-        }
       } else {
-        throw new Error("Failed to reject document")
+        throw new Error(updatedDocument.error || "Failed to reject document")
       }
     } catch (err) {
       toast({

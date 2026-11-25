@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/lib/auth-context'
+import { accountLandingPath } from '@/lib/account-permissions'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -34,12 +35,12 @@ export default function LoginForm() {
       
       let redirectUrl: string
       
-      if (userData.role === 'vendor') {
-        redirectUrl = '/seller'
-      } else if (userData.role === 'admin') {
-        redirectUrl = '/admin'
-      } else if (callback) {
+      if (callback && userData.role !== 'admin') {
         redirectUrl = callback
+      } else if (userData.role === 'admin') {
+        redirectUrl = accountLandingPath('admin', userData.permissions)
+      } else if (userData.role === 'vendor' && accountType === 'vendor') {
+        redirectUrl = accountLandingPath('seller', userData.permissions)
       } else {
         redirectUrl = '/client'
       }

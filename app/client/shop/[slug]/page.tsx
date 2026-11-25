@@ -106,6 +106,9 @@ export default function ShopPage({ params }: ShopPageProps) {
               phone: vendor.phone || "N/A",
               email: vendor.email || "N/A",
               address: vendor.address || "N/A",
+              taxId: vendor.taxId || "N/A",
+              businessLicense: vendor.businessLicense || "N/A",
+              legalDocuments: vendor.publicLegalDocuments || [],
             },
           })
 
@@ -389,6 +392,36 @@ export default function ShopPage({ params }: ShopPageProps) {
         </Card>
       </div>
 
+      <div className="container-viewport mb-8">
+        <Card className="border-orange-200/80">
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <Shield className="h-5 w-5 text-emerald-600" />
+              <div>
+                <h2 className="font-bold">Thông tin pháp lý cửa hàng</h2>
+                <p className="text-xs text-muted-foreground">Thông tin công khai để người mua nhận diện nhà bán.</p>
+              </div>
+            </div>
+            <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div><p className="text-muted-foreground">Tên cửa hàng</p><p className="font-semibold">{shop.name}</p></div>
+              <div><p className="text-muted-foreground">Địa chỉ</p><p className="font-semibold">{shop.contact.address}</p></div>
+              <div><p className="text-muted-foreground">Mã số thuế</p><p className="font-semibold">{shop.contact.taxId}</p></div>
+              <div>
+                <p className="text-muted-foreground">Giấy tờ pháp lý</p>
+                <p className="font-semibold">{shop.contact.businessLicense}</p>
+                {shop.contact.legalDocuments.length > 0 ? (
+                  <ul className="mt-1 space-y-1">
+                    {shop.contact.legalDocuments.map((document: { name: string; type: string; url: string }, index: number) => (
+                      <li key={`${document.url}-${index}`}><a href={document.url} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">{document.type}: {document.name}</a></li>
+                    ))}
+                  </ul>
+                ) : <p className="mt-1 text-xs text-muted-foreground">Chưa có tài liệu được duyệt để công khai.</p>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="container-viewport">
         {/* Tabs */}
         <Tabs defaultValue="products" className="mb-12">
@@ -546,6 +579,25 @@ export default function ShopPage({ params }: ShopPageProps) {
                             <p className="text-muted-foreground">Địa chỉ</p>
                             <p className="font-semibold text-xs">{shop.contact.address}</p>
                           </div>
+                        </div>
+                        <div className="border-t pt-3">
+                          <p className="text-muted-foreground">Mã số thuế</p>
+                          <p className="font-semibold">{shop.contact.taxId}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Giấy tờ pháp lý</p>
+                          <p className="font-semibold">{shop.contact.businessLicense}</p>
+                          {shop.contact.legalDocuments.length > 0 ? (
+                            <ul className="mt-2 space-y-1">
+                              {shop.contact.legalDocuments.map((document: { name: string; type: string; url: string }, index: number) => (
+                                <li key={`${document.url}-${index}`}>
+                                  <a href={document.url} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">
+                                    {document.type}: {document.name}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : <p className="mt-1 text-xs text-muted-foreground">Chưa có hồ sơ pháp lý được duyệt để công khai.</p>}
                         </div>
                       </div>
                     </section>

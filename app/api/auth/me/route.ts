@@ -42,20 +42,29 @@ export async function GET(request: NextRequest) {
     }
 
     let vendorId: number | undefined
+    const { data: accessGrant } = await supabase.from('AccountAccess').select('scope, vendorId, permissions').eq('userId', userData.id).maybeSingle()
 
     if (userData.role === 'vendor') {
-      const { data: vendorData } = await supabase
-        .from('Vendor')
-        .select('id')
-        .eq('userId', userData.id)
-        .single()
-
-      vendorId = vendorData?.id
+      if (accessGrant?.scope === 'seller' && accessGrant.vendorId) {
+        vendorId = accessGrant.vendorId
+      } else {
+        const { data: vendorData } = await supabase
+          .from('Vendor')
+          .select('id')
+          .eq('userId', userData.id)
+          .order('createdAt', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        vendorId = vendorData?.id
+      }
     }
 
     const updatedUserData = {
       ...userData,
       vendorId,
+      permissions: accessGrant?.permissions,
+      accountScope: accessGrant?.scope,
     }
 
     const jwtToken = await generateToken({
@@ -66,6 +75,8 @@ export async function GET(request: NextRequest) {
       role: userData.role,
       status: userData.status,
       vendorId,
+      permissions: accessGrant?.permissions,
+      accountScope: accessGrant?.scope,
     })
 
     const response = NextResponse.json({
@@ -76,6 +87,7 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60,
     })
 
@@ -83,6 +95,7 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60,
     })
 

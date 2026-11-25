@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Heart, User, ShoppingCart, LogOut, Settings } from "lucide-react"
+import { Heart, User, Store, ShoppingCart, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter, usePathname } from "next/navigation"
@@ -63,6 +63,7 @@ export function MobileMenu({ onClose, onLogin }: MobileMenuProps) {
                   Cài đặt
                 </Button>
               </Link>
+              {user.role === 'vendor' && <Link href="/seller/dashboard" onClick={onClose}><Button variant="outline" size="sm" className="w-full justify-start gap-2"><Store className="h-4 w-4" />Hồ sơ cửa hàng</Button></Link>}
               <Button 
                 variant="outline" 
                 size="sm" 

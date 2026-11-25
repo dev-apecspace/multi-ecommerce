@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { File, Upload, Trash2, Clock, CheckCircle, XCircle, Download } from 'lucide-react'
+import { File, Upload, Trash2, Clock, CheckCircle, XCircle, Download, Eye } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useLoading } from '@/hooks/use-loading'
@@ -36,7 +36,8 @@ export default function SellerDocumentsPage() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState({
-    documentName: '',
+    documentType: 'Giấy phép kinh doanh',
+    customDocumentType: '',
     file: null as File | null,
   })
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 })
@@ -83,11 +84,6 @@ export default function SellerDocumentsPage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     setFormData(prev => ({ ...prev, file }))
@@ -107,7 +103,8 @@ export default function SellerDocumentsPage() {
       return
     }
 
-    if (!formData.documentName || !formData.file) {
+    const selectedDocumentType = formData.documentType === 'other' ? formData.customDocumentType.trim() : formData.documentType
+    if (!selectedDocumentType || !formData.file) {
       toast({
         title: 'Lỗi',
         description: 'Vui lòng nhập tên tài liệu và chọn file',
@@ -138,7 +135,8 @@ export default function SellerDocumentsPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          documentName: formData.documentName,
+          documentType: selectedDocumentType,
+          documentName: formData.file.name,
           documentUrl: uploadedFile.url,
         }),
       })
@@ -149,7 +147,8 @@ export default function SellerDocumentsPage() {
           description: 'Tài liệu đã được tải lên thành công',
         })
         setFormData({
-          documentName: '',
+          documentType: 'Giấy phép kinh doanh',
+          customDocumentType: '',
           file: null,
         })
         const fileInput = document.getElementById('documentFile') as HTMLInputElement
@@ -279,16 +278,15 @@ export default function SellerDocumentsPage() {
           <CardContent className="space-y-4">
             {hasApprovedDocument && <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Hồ sơ shop đã được duyệt. Chức năng tải lên đã được khóa để bảo toàn hồ sơ đã xác nhận.</p>}
             <div>
-              <Label htmlFor="documentName">Tên tài liệu</Label>
-              <Input
-                id="documentName"
-                name="documentName"
-                placeholder="Ví dụ: Giấy phép kinh doanh 2024"
-                value={formData.documentName}
-                onChange={handleInputChange}
-                className="mt-2"
-                disabled={hasApprovedDocument}
-              />
+              <Label htmlFor="documentType">Loại tài liệu</Label>
+              <select id="documentType" value={formData.documentType} onChange={(event) => setFormData((current) => ({ ...current, documentType: event.target.value }))} className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" disabled={hasApprovedDocument}>
+                <option value="Giấy phép kinh doanh">Giấy phép kinh doanh</option>
+                <option value="Chứng minh tài khoản ngân hàng chính chủ">Chứng minh tài khoản ngân hàng chính chủ</option>
+                <option value="Giấy phép/chứng nhận ngành nghề kinh doanh có điều kiện">Giấy phép/chứng nhận ngành nghề kinh doanh có điều kiện</option>
+                <option value="other">Tài liệu bổ sung (tự đặt tên)</option>
+              </select>
+              {formData.documentType === 'other' && <Input className="mt-2" value={formData.customDocumentType} onChange={(event) => setFormData((current) => ({ ...current, customDocumentType: event.target.value }))} placeholder="Nhập tên tài liệu" disabled={hasApprovedDocument} />}
+              {documents.some((doc) => doc.documentType === (formData.documentType === 'other' ? formData.customDocumentType : formData.documentType)) && <p className="mt-1 text-xs text-blue-700">Tải lên loại này sẽ thay thế hồ sơ cũ đang chờ duyệt/bị từ chối.</p>}
             </div>
 
             <div>
@@ -312,7 +310,7 @@ export default function SellerDocumentsPage() {
               className="w-full"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {uploading ? 'Đang tải lên...' : 'Tải lên'}
+              {uploading ? 'Đang tải lên...' : 'Tải lên / thay thế hồ sơ'}
             </Button>
           </CardContent>
         </Card>
@@ -344,7 +342,8 @@ export default function SellerDocumentsPage() {
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <File className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm break-words">{doc.documentName}</h4>
+                          <h4 className="font-semibold text-sm break-words">{doc.documentType || doc.documentName}</h4>
+                          {doc.documentType && doc.documentName && doc.documentType !== doc.documentName && <p className="text-xs text-muted-foreground break-all">Tệp: {doc.documentName}</p>}
                           <p className="text-xs text-muted-foreground">
                             Tải lên: {new Date(doc.uploadedAt).toLocaleDateString('vi-VN')}
                           </p>
@@ -368,13 +367,23 @@ export default function SellerDocumentsPage() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          onClick={() => window.open(doc.documentUrl, '_blank', 'noopener,noreferrer')}
+                          title="Xem tài liệu trong tab mới"
+                          aria-label={`Xem ${doc.documentType || doc.documentName}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={() => window.open(doc.documentUrl, '_blank')}
-                          title="Xem tài liệu"
+                          title="Mở hoặc tải tệp"
                         >
                           <Download className="h-4 w-4" />
                         </Button>
 
-                        {doc.status === 'pending' && (
+                        {doc.status === 'pending' && !/giấy phép kinh doanh|gpkd|chứng minh tài khoản ngân hàng chính chủ/i.test(doc.documentType || '') && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
@@ -389,7 +398,7 @@ export default function SellerDocumentsPage() {
                             <AlertDialogContent>
                               <AlertDialogTitle>Xóa tài liệu</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Bạn có chắc muốn xóa tài liệu "{doc.documentName}"? Hành động này không thể hoàn tác.
+                                Bạn có chắc muốn xóa tài liệu "{doc.documentType || doc.documentName}"? Hành động này không thể hoàn tác.
                               </AlertDialogDescription>
                               <div className="flex gap-3 justify-end">
                                 <AlertDialogCancel>Hủy</AlertDialogCancel>

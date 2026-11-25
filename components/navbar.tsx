@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { MessageSquare, ShoppingCart, Search, User, Heart, Menu, X, ChevronDown, LogOut, Settings } from "lucide-react"
+import { MessageSquare, ShoppingCart, Search, User, Store, Heart, Menu, X, ChevronDown, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -163,6 +163,9 @@ export function Navbar() {
               <Link href="/client/help" className="hover:underline">
                 Trợ giúp
               </Link>
+              <Link href="/client/khieu-nai" className="hover:underline">
+                Phản ánh / Khiếu nại
+              </Link>
             </div>
           </div>
         </div>
@@ -278,6 +281,7 @@ export function Navbar() {
                         <Settings className="h-4 w-4" />
                         Cài đặt
                       </Link>
+                      {user.role === 'vendor' && <Link href="/seller/dashboard" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-800"><Store className="h-4 w-4" />Hồ sơ cửa hàng</Link>}
                     </div>
                     <div className="border-t border-border py-2">
                       <button

@@ -16,6 +16,7 @@ export default function SellerDashboardPage() {
   const { user } = useAuth()
   const { setIsLoading } = useLoading()
   const [activeTab, setActiveTab] = useState("overview")
+  const [publicShopProfile, setPublicShopProfile] = useState<any>(null)
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' })
   const { data: dashboardData, loading, error, fetchDashboard } = useSellerDashboard(user?.vendorId || null)
@@ -31,6 +32,14 @@ export default function SellerDashboardPage() {
       fetchDashboard(queryStr).finally(() => setIsLoading(false))
     }
   }, [user?.vendorId, fetchDashboard, month, dateRange.startDate, dateRange.endDate])
+
+  useEffect(() => {
+    if (!user?.vendorId) { setPublicShopProfile(null); return }
+    fetch(`/api/vendors?slug=${encodeURIComponent(String(user.vendorId))}&limit=1`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => setPublicShopProfile(result?.data?.[0] || null))
+      .catch(() => setPublicShopProfile(null))
+  }, [user?.vendorId])
 
   const seller = {
     shopName: dashboardData?.vendor?.shopName ?? "Shop của tôi",
@@ -156,6 +165,21 @@ export default function SellerDashboardPage() {
             </Button>
           </div>
         </div>
+
+        <Card className="mb-6 border-orange-200/80">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><CardTitle className="text-base">Thông tin cửa hàng công khai</CardTitle><p className="mt-1 text-sm text-muted-foreground">Người mua nhìn thấy các thông tin này trên sàn.</p></div>
+              <Link href="/seller/settings"><Button size="sm" variant="outline">Cập nhật hồ sơ</Button></Link>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div><p className="text-muted-foreground">Tên cửa hàng</p><p className="font-semibold">{publicShopProfile?.name || seller.shopName}</p></div>
+            <div><p className="text-muted-foreground">Địa chỉ</p><p className="font-semibold">{publicShopProfile?.address || 'Chưa công bố'}</p></div>
+            <div><p className="text-muted-foreground">Mã số thuế</p><p className="font-semibold">{publicShopProfile?.taxId || 'Chưa công bố'}</p></div>
+            <div><p className="text-muted-foreground">Giấy tờ pháp lý</p><p className="font-semibold">{publicShopProfile?.publicLegalDocuments?.length ? `${publicShopProfile.publicLegalDocuments.length} tài liệu đã xác minh` : publicShopProfile?.businessLicense || 'Chưa công bố'}</p></div>
+          </CardContent>
+        </Card>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-6 md:mb-8">

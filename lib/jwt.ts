@@ -12,6 +12,8 @@ interface TokenPayload extends JWTPayload {
   status: string
   vendorId?: number
   phone?: string
+  permissions?: string[]
+  accountScope?: 'admin' | 'seller'
 }
 
 export async function generateToken(payload: TokenPayload): Promise<string> {

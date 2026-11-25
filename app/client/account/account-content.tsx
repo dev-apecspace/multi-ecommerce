@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { User, ShoppingBag, Heart, MapPin, Settings, LogOut, Package, Award, ChevronRight, Trash2, Edit2, Camera } from "lucide-react"
+import { User, Store, ArrowRight, ShoppingBag, Heart, MapPin, Settings, LogOut, Package, Award, ChevronRight, Trash2, Edit2, Camera } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -15,6 +15,8 @@ import { useLoading } from "@/hooks/use-loading"
 import { useToast } from "@/hooks/use-toast"
 import { AddressManagement } from "@/components/client/address-management"
 import Image from "next/image"
+import { ComplaintHistory } from "@/components/client/complaint-history"
+import { ChangePasswordCard } from "@/components/auth/change-password-card"
 
 interface Order {
   id: number
@@ -61,9 +63,6 @@ export default function AccountContent() {
   const [editProfileOpen, setEditProfileOpen] = useState(false)
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", email: "" })
   
-  // Password Change State
-  const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" })
-  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     if (authUser) {
@@ -226,44 +225,6 @@ export default function AccountContent() {
     }
   }
 
-  const handleChangePassword = async () => {
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast({ title: "Lỗi", description: "Mật khẩu xác nhận không khớp", variant: "destructive" })
-      return
-    }
-    
-    if (passwordForm.newPassword.length < 6) {
-      toast({ title: "Lỗi", description: "Mật khẩu phải có ít nhất 6 ký tự", variant: "destructive" })
-      return
-    }
-
-    try {
-      setChangingPassword(true)
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          oldPassword: passwordForm.oldPassword,
-          newPassword: passwordForm.newPassword
-        })
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to change password")
-      }
-      
-      toast({ title: "Thành công", description: "Đổi mật khẩu thành công" })
-      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" })
-    } catch (error: any) {
-      toast({ title: "Lỗi", description: error.message, variant: "destructive" })
-    } finally {
-      setChangingPassword(false)
-    }
-  }
-
   const user = authUser ? {
     id: authUser.id,
     name: authUser.name || "Người dùng",
@@ -346,6 +307,8 @@ export default function AccountContent() {
           </CardContent>
         </Card>
 
+        {authUser?.role === 'vendor' && <section className="mb-6" aria-labelledby="profile-destination-title"><h2 id="profile-destination-title" className="mb-3 text-lg font-semibold">Chọn hồ sơ</h2><div className="grid gap-3 sm:grid-cols-2"><Link href="/client/account?tab=settings" className="group rounded-xl border border-orange-300 bg-orange-50/60 p-4 transition-colors hover:bg-orange-50"><div className="flex items-start justify-between gap-3"><div><span className="flex items-center gap-2 font-semibold text-slate-900"><User className="h-4 w-4 text-orange-700"/>Hồ sơ khách hàng</span><p className="mt-2 text-sm text-slate-600">Thông tin cá nhân, đơn mua, địa chỉ và các hoạt động mua sắm.</p></div><ArrowRight className="mt-1 h-4 w-4 shrink-0 text-orange-700 transition-transform group-hover:translate-x-1"/></div></Link><Link href="/seller/dashboard" className="group rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-orange-300 hover:bg-orange-50/40"><div className="flex items-start justify-between gap-3"><div><span className="flex items-center gap-2 font-semibold text-slate-900"><Store className="h-4 w-4 text-orange-700"/>Hồ sơ cửa hàng</span><p className="mt-2 text-sm text-slate-600">Mở trang quản lý shop và các hoạt động bán hàng.</p></div><ArrowRight className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-orange-700"/></div></Link></div></section>}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
@@ -385,6 +348,8 @@ export default function AccountContent() {
           </Card>
         </div>
 
+        {authUser?.role === 'customer' && <Card className="mb-6 border-orange-200 bg-orange-50/60"><CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold">Bạn muốn kinh doanh trên APECSPACE?</h2><p className="mt-1 text-sm text-muted-foreground">Đăng ký cửa hàng bằng tài khoản hiện tại của bạn.</p></div><Button asChild className="bg-orange-600 hover:bg-orange-700"><Link href="/auth/vendor-register">Đăng ký trở thành nhà bán hàng</Link></Button></CardContent></Card>}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList>
             <TabsTrigger value="orders">Đơn hàng</TabsTrigger>
@@ -393,6 +358,7 @@ export default function AccountContent() {
             <TabsTrigger value="addresses">Địa chỉ</TabsTrigger>
             <TabsTrigger value="favorites">Yêu thích</TabsTrigger>
             <TabsTrigger value="following">Đang theo dõi</TabsTrigger>
+            <TabsTrigger value="support">Hỗ trợ</TabsTrigger>
             <TabsTrigger value="settings">Cài đặt</TabsTrigger>
           </TabsList>
 
@@ -706,60 +672,10 @@ export default function AccountContent() {
             )}
           </TabsContent>
 
+          <TabsContent value="support" className="mt-4"><Card><CardContent className="p-5"><ComplaintHistory /></CardContent></Card></TabsContent>
+
           <TabsContent value="settings" className="mt-4 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cài đặt bảo mật</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Label htmlFor="old-password">Mật khẩu cũ</Label>
-                  <Input
-                    id="old-password"
-                    type="password"
-                    placeholder="Nhập mật khẩu cũ"
-                    value={passwordForm.oldPassword}
-                    onChange={(e) =>
-                      setPasswordForm({ ...passwordForm, oldPassword: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label htmlFor="new-password">Mật khẩu mới</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Nhập mật khẩu mới"
-                    value={passwordForm.newPassword}
-                    onChange={(e) =>
-                      setPasswordForm({ ...passwordForm, newPassword: e.target.value })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Mật khẩu phải có ít nhất 6 ký tự
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <Label htmlFor="confirm-password">Xác nhận mật khẩu</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Xác nhận mật khẩu mới"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) =>
-                      setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
-                    }
-                  />
-                </div>
-                <Button
-                  onClick={handleChangePassword}
-                  disabled={changingPassword}
-                  className="w-full"
-                >
-                  {changingPassword ? "Đang cập nhật..." : "Đổi mật khẩu"}
-                </Button>
-              </CardContent>
-            </Card>
+            <ChangePasswordCard />
 
             <Card>
               <CardHeader>

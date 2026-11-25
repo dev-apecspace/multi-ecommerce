@@ -43,25 +43,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let latestVendor: { id: number; status: string } | null = null
+    const { data: accessGrant } = await supabase.from('AccountAccess').select('scope, vendorId, permissions').eq('userId', user.id).maybeSingle()
+    if (user.role === 'vendor') {
+      if (accessGrant?.scope === 'seller' && accessGrant.vendorId) {
+        latestVendor = { id: accessGrant.vendorId, status: 'approved' }
+      } else {
+        const { data } = await supabase.from('Vendor').select('id, status').eq('userId', user.id)
+          .order('createdAt', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle()
+        latestVendor = data
+      }
+    }
+
     const allowedStatuses = ['active', 'approved', 'pending', 'pending_approval']
-    if (!allowedStatuses.includes(user.status)) {
+    const rejectedVendorCanReenter = user.role === 'vendor' && ['inactive', 'rejected'].includes(user.status) && latestVendor?.status === 'rejected'
+    if (!allowedStatuses.includes(user.status) && !rejectedVendorCanReenter) {
       return NextResponse.json(
         { error: 'Your account is not active', debug: `Status is ${user.status}` },
         { status: 403 }
       )
     }
 
-    let vendorId: number | undefined
-
-    if (user.role === 'vendor') {
-      const { data: vendorData } = await supabase
-        .from('Vendor')
-        .select('id')
-        .eq('userId', user.id)
-        .single()
-
-      vendorId = vendorData?.id
-    }
+    const vendorId = latestVendor?.id
 
     const tokenPayload = {
       id: user.id,
@@ -71,6 +74,8 @@ export async function POST(request: NextRequest) {
       role: user.role,
       status: user.status,
       vendorId,
+      permissions: accessGrant?.permissions,
+      accountScope: accessGrant?.scope,
     }
 
     const jwtToken = await generateToken(tokenPayload)
@@ -83,6 +88,8 @@ export async function POST(request: NextRequest) {
       role: user.role,
       status: user.status,
       vendorId,
+      permissions: accessGrant?.permissions,
+      accountScope: accessGrant?.scope,
     }
 
     const response = NextResponse.json(

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth-context"
+import { accountLandingPath } from "@/lib/account-permissions"
 import { toast } from "@/hooks/use-toast"
 
 interface AuthModalProps {
@@ -30,7 +31,7 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
     try {
       const userData = await login(email, password)
       onOpenChange(false)
-      const redirectPath = userData.role === 'admin' ? '/admin' : userData.role === 'vendor' ? '/seller' : '/client'
+      const redirectPath = userData.role === 'admin' ? accountLandingPath('admin', userData.permissions) : '/client'
       router.push(redirectPath)
     } catch {
       console.error("Login failed")
@@ -49,7 +50,7 @@ export function AuthModal({ open, onOpenChange, initialTab = "login" }: AuthModa
     try {
       const userData = await signup(email, password, name)
       onOpenChange(false)
-      const redirectPath = userData.role === 'admin' ? '/admin' : userData.role === 'vendor' ? '/seller' : '/client'
+      const redirectPath = userData.role === 'admin' ? accountLandingPath('admin', userData.permissions) : userData.role === 'vendor' ? accountLandingPath('seller', userData.permissions) : '/client'
       router.push(redirectPath)
     } catch {
       console.error("Registration failed")

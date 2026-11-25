@@ -9,8 +9,14 @@ import { useToast } from '@/components/ui/use-toast'
 const policies = [
   { code: 'privacy-policy', title: 'Chính sách bảo mật', audience: 'Client và Seller' },
   { code: 'terms-of-service', title: 'Điều khoản dịch vụ', audience: 'Client và Seller' },
-  { code: 'operating-regulations', title: 'Điều kiện hoạt động', audience: 'Client và Seller' },
-  { code: 'dispute-resolution', title: 'Cơ chế giải quyết tranh chấp', audience: 'Client và Seller' },
+  { code: 'operating-regulations', title: 'Quy chế hoạt động', audience: 'Client và Seller' },
+  { code: 'dispute-resolution', title: 'Phương thức tiếp nhận và giải quyết phản ánh, yêu cầu, khiếu nại', audience: 'Client và Seller' },
+  { code: 'pricing-policy', title: 'Chính sách về giá', audience: 'Client và Seller' },
+  { code: 'goods-restrictions', title: 'Các điều kiện hoặc hạn chế trong việc cung cấp hàng hóa', audience: 'Client và Seller' },
+  { code: 'payment-policy', title: 'Chính sách về thanh toán', audience: 'Client và Seller' },
+  { code: 'shipping-policy', title: 'Chính sách về giao hàng', audience: 'Client và Seller' },
+  { code: 'returns-refunds-policy', title: 'Chính sách về đổi trả hàng và hoàn tiền', audience: 'Client và Seller' },
+  { code: 'rights-and-obligations', title: 'Quyền và nghĩa vụ của các bên', audience: 'Client và Seller' },
   { code: 'intermediary-payment-agreement', title: 'Hợp đồng trung gian thanh toán', audience: 'Client (thanh toán ví điện tử)' },
 ]
 

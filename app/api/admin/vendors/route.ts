@@ -164,6 +164,9 @@ export async function PUT(request: NextRequest) {
       if (!vendorData) {
         return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
       }
+      if (vendorData.status === 'rejected') {
+        return NextResponse.json({ error: 'Shop đã bị từ chối; không thể khóa shop bằng thao tác quản lý thông thường.' }, { status: 409 })
+      }
 
       const { data: shopData } = await supabase
         .from('Shop')
@@ -186,6 +189,10 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === 'unlock') {
+      const { data: vendorData } = await supabase.from('Vendor').select('status').eq('id', vendorId).maybeSingle()
+      if (vendorData?.status === 'rejected') {
+        return NextResponse.json({ error: 'Hồ sơ shop đã bị từ chối và không thể thay đổi trạng thái.' }, { status: 409 })
+      }
       const { data: shopData } = await supabase
         .from('Shop')
         .select('*')
@@ -231,12 +238,28 @@ export async function PUT(request: NextRequest) {
 
     const { data: vendorData, error: vendorError } = await supabase
       .from('Vendor')
-      .select('userId')
+      .select('userId, status')
       .eq('id', vendorId)
       .maybeSingle()
 
     if (vendorError || !vendorData) {
       return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+    }
+
+    if (vendorData.status === 'rejected' && body.status && body.status !== 'rejected') {
+      return NextResponse.json({ error: 'Shop đã bị từ chối. Trạng thái này không thể khôi phục hoặc thay đổi.' }, { status: 409 })
+    }
+
+    if (body.status === 'rejected') {
+      const { error: documentsRejectError } = await supabase
+        .from('VendorDocument')
+        .update({ status: 'rejected', reviewNotes: body.rejectionReason || 'Hồ sơ shop bị từ chối; toàn bộ tài liệu bị từ chối cùng shop.' })
+        .eq('vendorId', vendorId)
+      if (documentsRejectError) return NextResponse.json({ error: documentsRejectError.message }, { status: 400 })
+      const { error: shopUnlockError } = await supabase.from('Shop')
+        .update({ locked: false, lockedReason: null, lockedAt: null })
+        .eq('vendorId', vendorId)
+      if (shopUnlockError) return NextResponse.json({ error: shopUnlockError.message }, { status: 400 })
     }
 
     if (body.status === 'approved') {
@@ -280,10 +303,11 @@ export async function PUT(request: NextRequest) {
         userStatus = 'pending'
       }
 
-      await supabase
-        .from('User')
-        .update({ status: userStatus })
-        .eq('id', vendorData.userId)
+      const { data: latestVendor } = await supabase.from('Vendor').select('id').eq('userId', vendorData.userId)
+        .order('createdAt', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle()
+      if (Number(latestVendor?.id) === Number(vendorId)) {
+        await supabase.from('User').update({ status: userStatus }).eq('id', vendorData.userId)
+      }
     }
 
     return NextResponse.json(data[0])

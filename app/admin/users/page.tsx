@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Search, Filter, Lock, LockOpen } from "lucide-react"
+import { Search, Filter, Lock, LockOpen, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,7 @@ export default function AdminUsersPage() {
   const [activeCount, setActiveCount] = useState(0)
   const [lockedCount, setLockedCount] = useState(0)
   const [updating, setUpdating] = useState<number | null>(null)
+  const [resettingPassword, setResettingPassword] = useState<number | null>(null)
   const pagination = usePagination({ initialPage: 1, initialLimit: 10 })
 
   useEffect(() => {
@@ -110,6 +111,26 @@ export default function AdminUsersPage() {
       setError(err instanceof Error ? err.message : 'Failed to update status')
     } finally {
       setUpdating(null)
+    }
+  }
+
+  const handleResetPassword = async (customer: Customer) => {
+    if (!window.confirm(`Đặt lại mật khẩu cho ${customer.name} theo mật khẩu mặc định trong Cài đặt hệ thống?`)) return
+    try {
+      setResettingPassword(customer.id)
+      setError(null)
+      const response = await fetch('/api/admin/customers/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: customer.id }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Không thể reset mật khẩu.')
+      window.alert(`Đã reset mật khẩu cho ${customer.name} theo mật khẩu mặc định trong cài đặt.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể reset mật khẩu.')
+    } finally {
+      setResettingPassword(null)
     }
   }
 
@@ -234,6 +255,13 @@ export default function AdminUsersPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
+                        <button
+                          onClick={() => void handleResetPassword(customer)}
+                          disabled={resettingPassword === customer.id}
+                          className="mr-2 rounded p-1 transition-colors hover:bg-muted disabled:opacity-50"
+                          title="Reset mật khẩu theo mặc định"
+                          aria-label={`Reset mật khẩu cho ${customer.name}`}
+                        ><KeyRound className="h-4 w-4 text-blue-600" /></button>
                         <button
                           onClick={() => handleToggleStatus(customer.id, customer.status)}
                           disabled={updating === customer.id}

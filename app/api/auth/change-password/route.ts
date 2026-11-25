@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import bcryptjs from 'bcryptjs'
+import { getAuthFromRequest } from '@/lib/api-auth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,20 +10,26 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, oldPassword, newPassword } = await request.json()
+    const auth = await getAuthFromRequest(request)
+    if (!auth) return NextResponse.json({ error: 'Vui lòng đăng nhập lại.' }, { status: 401 })
 
-    if (!userId || !oldPassword || !newPassword) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+    const { oldPassword, newPassword } = await request.json()
+
+    if (typeof oldPassword !== 'string' || !oldPassword || typeof newPassword !== 'string' || !newPassword) {
+      return NextResponse.json({ error: 'Vui lòng nhập mật khẩu hiện tại và mật khẩu mới.' }, { status: 400 })
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      return NextResponse.json({ error: 'Mật khẩu mới phải có từ 8 đến 128 ký tự.' }, { status: 400 })
+    }
+    if (oldPassword === newPassword) {
+      return NextResponse.json({ error: 'Mật khẩu mới phải khác mật khẩu hiện tại.' }, { status: 400 })
     }
 
-    // 1. Get user
+    // The account identity always comes from the verified session, never from the request body.
     const { data: user, error: fetchError } = await supabase
       .from('User')
       .select('password')
-      .eq('id', userId)
+      .eq('id', auth.userId)
       .single()
 
     if (fetchError || !user) {
@@ -49,7 +56,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('User')
       .update({ password: hashedPassword })
-      .eq('id', userId)
+      .eq('id', auth.userId)
 
     if (updateError) {
       return NextResponse.json(

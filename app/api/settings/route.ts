@@ -9,8 +9,10 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   try {
     const saved = data?.value ? JSON.parse(data.value) : {}
+    const publicSaved = { ...saved }
+    delete publicSaved.defaultCustomerPasswordHash
     const paymentMethods = Array.isArray(saved.paymentMethods) ? saved.paymentMethods : defaults.paymentMethods
     const shippingMethods = Array.isArray(saved.shippingMethods) ? saved.shippingMethods : defaults.shippingMethods
-    return NextResponse.json({ settings: { ...defaults, ...saved, accountEnabled: saved.accountEnabled ?? saved.bankTransferEnabled ?? defaults.accountEnabled, walletEnabled: saved.walletEnabled ?? saved.vnpayEnabled ?? defaults.walletEnabled, paymentMethods, shippingMethods } })
+    return NextResponse.json({ settings: { ...defaults, ...publicSaved, accountEnabled: saved.accountEnabled ?? saved.bankTransferEnabled ?? defaults.accountEnabled, walletEnabled: saved.walletEnabled ?? saved.vnpayEnabled ?? defaults.walletEnabled, paymentMethods, shippingMethods } })
   } catch { return NextResponse.json({ settings: defaults }) }
 }

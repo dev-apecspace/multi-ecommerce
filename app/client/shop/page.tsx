@@ -247,6 +247,12 @@ function ShopsContent() {
                       <p className="text-xs text-muted-foreground line-clamp-2">Cửa hàng đã được xác thực</p>
                     </div>
 
+                    <div className="space-y-1.5 border-t border-border pt-3 text-xs">
+                      <p><span className="font-semibold text-foreground">Địa chỉ:</span> <span className="text-muted-foreground">{shop.address || 'Chưa công bố'}</span></p>
+                      <p><span className="font-semibold text-foreground">Mã số thuế:</span> <span className="text-muted-foreground">{shop.taxId || 'Chưa công bố'}</span></p>
+                      <p><span className="font-semibold text-foreground">Giấy tờ pháp lý:</span> <span className="text-muted-foreground">{shop.publicLegalDocuments?.length ? `${shop.publicLegalDocuments.length} tài liệu đã xác minh` : shop.businessLicense || 'Chưa công bố'}</span></p>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div className="text-center">
                         <p className="text-muted-foreground">Đánh giá</p>

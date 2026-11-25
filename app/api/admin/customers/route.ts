@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthFromRequest, hasPermission, isAdmin, unauthorizedResponse } from '@/lib/api-auth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,9 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth || !isAdmin(auth)) return unauthorizedResponse()
+    if (!hasPermission(auth, 'users')) return NextResponse.json({ error: 'Bạn chưa được cấp quyền quản lý người dùng.' }, { status: 403 })
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const status = searchParams.get('status')
@@ -76,6 +80,9 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await getAuthFromRequest(request)
+    if (!auth || !isAdmin(auth)) return unauthorizedResponse()
+    if (!hasPermission(auth, 'users')) return NextResponse.json({ error: 'Bạn chưa được cấp quyền quản lý người dùng.' }, { status: 403 })
     const body = await request.json()
     const { userId, status } = body
 

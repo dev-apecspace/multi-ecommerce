@@ -51,12 +51,17 @@ export async function POST(request: NextRequest) {
       return unauthorizedResponse()
     }
 
-    const body = await request.json()
-    const { documentName, documentUrl, documentType } = body
+    const { data: vendor, error: vendorError } = await supabase.from('Vendor').select('status').eq('id', auth.vendorId).maybeSingle()
+    if (vendorError) return NextResponse.json({ error: vendorError.message }, { status: 400 })
+    if (vendor?.status === 'rejected') return NextResponse.json({ error: 'Shop đã bị từ chối; không thể nộp hoặc thay thế hồ sơ.' }, { status: 409 })
 
-    if (!documentName || !documentUrl) {
+    const body = await request.json()
+    const { documentName, documentUrl } = body
+    const documentType = String(body.documentType || '').trim()
+
+    if (!documentName || !documentUrl || !documentType) {
       return NextResponse.json(
-        { error: 'documentName and documentUrl are required' },
+        { error: 'documentType, documentName and documentUrl are required' },
         { status: 400 }
       )
     }
@@ -74,22 +79,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Hồ sơ của shop đã được duyệt, bạn không thể tải thêm hoặc thay thế hồ sơ.' }, { status: 409 })
     }
 
-    const { data: document, error: docError } = await supabase
+    const { data: existingDocuments, error: existingError } = await supabase
       .from('VendorDocument')
-      .insert([{
-        vendorId: auth.vendorId,
-        documentType: documentType || 'other',
-        documentName,
-        documentUrl,
-        status: 'pending',
-      }])
-      .select()
+      .select('id')
+      .eq('vendorId', auth.vendorId)
+      .eq('documentType', documentType)
+      .neq('status', 'approved')
+      .order('uploadedAt', { ascending: false })
+    if (existingError) return NextResponse.json({ error: existingError.message }, { status: 400 })
+
+    let document: any[] | null = null
+    let docError: any = null
+    const replacement = {
+      documentName,
+      documentUrl,
+      documentType,
+      status: 'pending',
+      reviewNotes: null,
+      uploadedAt: new Date().toISOString(),
+    }
+    if (existingDocuments?.length) {
+      const [latest, ...duplicates] = existingDocuments
+      const updated = await supabase.from('VendorDocument').update(replacement).eq('id', latest.id).eq('vendorId', auth.vendorId).select()
+      document = updated.data
+      docError = updated.error
+      if (!docError && duplicates.length) {
+        const cleanup = await supabase.from('VendorDocument').delete().in('id', duplicates.map((item: any) => item.id)).eq('vendorId', auth.vendorId).neq('status', 'approved')
+        if (cleanup.error) return NextResponse.json({ error: cleanup.error.message }, { status: 400 })
+      }
+    } else {
+      const inserted = await supabase.from('VendorDocument').insert([{ vendorId: auth.vendorId, ...replacement }]).select()
+      document = inserted.data
+      docError = inserted.error
+    }
 
     if (docError) {
       return NextResponse.json({ error: docError.message }, { status: 400 })
     }
 
-    return NextResponse.json(document[0], { status: 201 })
+    return NextResponse.json(document?.[0], { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
@@ -114,7 +142,7 @@ export async function DELETE(request: NextRequest) {
 
     const { data: document } = await supabase
       .from('VendorDocument')
-      .select('vendorId, status')
+      .select('vendorId, status, documentType')
       .eq('id', documentId)
       .maybeSingle()
 
@@ -125,8 +153,15 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    const { data: vendor, error: vendorError } = await supabase.from('Vendor').select('status').eq('id', auth.vendorId).maybeSingle()
+    if (vendorError) return NextResponse.json({ error: vendorError.message }, { status: 400 })
+    if (vendor?.status === 'rejected') return NextResponse.json({ error: 'Shop đã bị từ chối; không thể thay đổi hồ sơ.' }, { status: 409 })
+
     if (document.status === 'approved') {
       return NextResponse.json({ error: 'Không thể xóa hồ sơ đã được duyệt.' }, { status: 409 })
+    }
+    if (/giấy phép kinh doanh|gpkd|chứng minh tài khoản ngân hàng chính chủ/i.test(document.documentType || '')) {
+      return NextResponse.json({ error: 'Hai hồ sơ bắt buộc mặc định không được xóa. Hãy tải tệp mới để thay thế.' }, { status: 409 })
     }
 
     const { error } = await supabase

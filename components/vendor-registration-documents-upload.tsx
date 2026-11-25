@@ -1,60 +1,77 @@
 'use client'
 
-import { ChangeEvent, useRef, useState } from 'react'
+import { ChangeEvent, useMemo, useState } from 'react'
 import { FileText, Plus, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-export type VendorRegistrationDocument = { name: string; url?: string; documentType: string; file: File }
+export type VendorRegistrationDocument = { name: string; url?: string; documentType: string; file: File; slotId?: string }
+
+const REQUIRED_DOCUMENTS = [
+  { slotId: 'business-license', title: 'Giấy phép kinh doanh' },
+  { slotId: 'bank-account-proof', title: 'Chứng minh tài khoản ngân hàng chính chủ' },
+]
+const CONDITIONAL_DOCUMENT = { slotId: 'regulated-business-license', title: 'Giấy phép/chứng nhận ngành nghề kinh doanh có điều kiện' }
 
 export function VendorRegistrationDocumentsUpload({
   documents,
   onChange,
+  regulatedBusiness,
   disabled = false,
 }: {
   documents: VendorRegistrationDocument[]
   onChange: (documents: VendorRegistrationDocument[]) => void
+  regulatedBusiness: boolean
   disabled?: boolean
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [documentType, setDocumentType] = useState('')
-  const [error, setError] = useState('')
+  const [customSlots, setCustomSlots] = useState<Array<{ slotId: string; title: string }>>([])
+  const visibleDocuments = useMemo(() => [...REQUIRED_DOCUMENTS, ...(regulatedBusiness ? [CONDITIONAL_DOCUMENT] : [])], [regulatedBusiness])
 
-  const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const setSlotFile = (slotId: string, title: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    if (!documentType.trim()) { setError('Vui lòng nhập tên tài liệu trước khi tải tệp.'); return }
-    setError('')
-    onChange([...documents, { name: file.name, documentType: documentType.trim(), file }])
-    setDocumentType('')
+    const nextDocument: VendorRegistrationDocument = { name: file.name, documentType: title, file, slotId }
+    onChange([...documents.filter((document) => document.slotId !== slotId), nextDocument])
   }
 
-  return (
+  const addCustomSlot = () => setCustomSlots((slots) => [...slots, { slotId: `optional-${crypto.randomUUID()}`, title: '' }])
+  const updateCustomTitle = (slotId: string, title: string) => {
+    setCustomSlots((slots) => slots.map((slot) => slot.slotId === slotId ? { ...slot, title } : slot))
+    onChange(documents.map((document) => document.slotId === slotId ? { ...document, documentType: title } : document))
+  }
+  const removeCustomSlot = (slotId: string) => {
+    setCustomSlots((slots) => slots.filter((slot) => slot.slotId !== slotId))
+    onChange(documents.filter((document) => document.slotId !== slotId))
+  }
+
+  return <div className="space-y-3">
     <div className="space-y-3">
-      {documents.length > 0 && (
-        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-          <p className="text-sm font-semibold text-emerald-900">Hồ sơ đã ghi nhận ({documents.length})</p>
-          {documents.map((document, index) => (
-            <div key={`${document.name}-${index}`} className="flex items-center gap-3 rounded-md bg-white p-3">
-              <FileText className="h-5 w-5 shrink-0 text-emerald-600" />
-              <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{document.documentType}</p><p className="truncate text-xs text-muted-foreground">{document.name}</p><p className="mt-0.5 text-xs font-medium text-amber-700">Sẽ tải lên khi gửi đăng ký</p></div>
-              <Button type="button" variant="ghost" size="icon" onClick={() => onChange(documents.filter((_, itemIndex) => itemIndex !== index))} disabled={disabled} aria-label={`Xóa ${document.name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-            </div>
-          ))}
+      {visibleDocuments.map((slot) => {
+        const uploaded = documents.find((document) => document.slotId === slot.slotId)
+        return <div key={slot.slotId} className={`rounded-lg border p-4 ${uploaded ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0"><p className="text-sm font-semibold">{slot.title}<span className="ml-1 text-destructive">*</span></p><p className="text-xs text-muted-foreground">Tên tài liệu đã điền sẵn, chỉ cần chọn tệp.</p></div>
+            <label className="inline-flex cursor-pointer items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"><Upload className="mr-2 h-4 w-4" />{uploaded ? 'Đổi tệp' : 'Chọn tệp'}<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="sr-only" disabled={disabled} onChange={(event) => setSlotFile(slot.slotId, slot.title, event)} /></label>
+          </div>
+          {uploaded && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-800"><FileText className="h-4 w-4 shrink-0" /><span className="font-semibold">{slot.title}</span><span className="truncate text-emerald-700/80">· {uploaded.name}</span></p>}
         </div>
-      )}
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <label className="mb-2 block text-sm font-medium">Tên tài liệu *</label>
-        <Input value={documentType} onChange={(event) => setDocumentType(event.target.value)} placeholder="Ví dụ: Giấy phép kinh doanh" disabled={disabled} />
-        <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={selectFile} className="sr-only" disabled={disabled} />
-        <Button type="button" variant="outline" className="mt-3 w-full" onClick={() => inputRef.current?.click()} disabled={disabled}>
-          <Upload className="mr-2 h-4 w-4" /> Chọn hồ sơ
-        </Button>
-        <p className="mt-2 text-xs text-muted-foreground">PDF, DOC, DOCX, JPG hoặc PNG · tối đa 10MB · chỉ tải lên khi gửi đăng ký</p>
-        {error && <p role="alert" className="mt-2 text-xs font-medium text-destructive">{error}</p>}
-      </div>
-      {documents.length === 0 && <p className="text-xs font-medium text-destructive">Cần tải lên ít nhất một hồ sơ.</p>}
+      })}
     </div>
-  )
+
+    {customSlots.length > 0 && <div className="space-y-3 border-t pt-3"><p className="text-sm font-semibold">Tài liệu bổ sung</p>{customSlots.map((slot) => {
+      const uploaded = documents.find((document) => document.slotId === slot.slotId)
+      return <div key={slot.slotId} className="rounded-lg border border-slate-200 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex-1 text-sm font-medium">Tên tài liệu<Input className="mt-1" value={slot.title} onChange={(event) => updateCustomTitle(slot.slotId, event.target.value)} placeholder="Nhập tên tài liệu" disabled={disabled} /></label>
+          <label className="inline-flex cursor-pointer items-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"><Upload className="mr-2 h-4 w-4" />{uploaded ? 'Đổi tệp' : 'Chọn tệp'}<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="sr-only" disabled={disabled || !slot.title.trim()} onChange={(event) => setSlotFile(slot.slotId, slot.title.trim(), event)} /></label>
+          <Button type="button" variant="ghost" size="icon" aria-label="Xóa tài liệu bổ sung" disabled={disabled} onClick={() => removeCustomSlot(slot.slotId)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+        </div>
+        {uploaded && <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><FileText className="h-4 w-4 shrink-0" /><span className="font-medium">{slot.title || 'Tài liệu bổ sung'}</span><span className="truncate">· {uploaded.name}</span></p>}
+      </div>
+    })}</div>}
+
+    <Button type="button" variant="outline" onClick={addCustomSlot} disabled={disabled}><Plus className="mr-2 h-4 w-4" />Thêm tài liệu</Button>
+    <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, JPG hoặc PNG · tối đa 10MB mỗi tệp.</p>
+  </div>
 }

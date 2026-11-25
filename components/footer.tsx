@@ -44,26 +44,17 @@ export function Footer({ compact = false }: { compact?: boolean }) {
           <div>
             <h3 className="font-bold text-lg mb-4">Chính sách</h3>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li>
-                <Link href="/api/legal-documents/view/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-                  Bảo mật thông tin
-                </Link>
-              </li>
-              <li>
-                <Link href="/api/legal-documents/view/terms-of-service" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-                  Điều khoản dịch vụ
-                </Link>
-              </li>
-              <li>
-                <Link href="/api/legal-documents/view/website-operating-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-                  Điều kiện hoạt động
-                </Link>
-              </li>
-              <li>
-                <Link href="/api/legal-documents/view/dispute-resolution" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-                  Cơ chế giải quyết tranh chấp
-                </Link>
-              </li>
+              {[
+                ['operating-regulations', 'Quy chế hoạt động'],
+                ['privacy-policy', 'Chính sách bảo mật'],
+                ['dispute-resolution', 'Phương thức tiếp nhận và giải quyết phản ánh, yêu cầu, khiếu nại'],
+                ['pricing-policy', 'Chính sách về giá'],
+                ['goods-restrictions', 'Các điều kiện hoặc hạn chế trong việc cung cấp hàng hóa'],
+                ['payment-policy', 'Chính sách về thanh toán'],
+                ['shipping-policy', 'Chính sách về giao hàng'],
+                ['returns-refunds-policy', 'Chính sách về đổi trả hàng và hoàn tiền'],
+                ['rights-and-obligations', 'Quyền và nghĩa vụ của các bên'],
+              ].map(([code, title]) => <li key={code}><Link href={`/api/legal-documents/view/${code}`} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">{title}</Link></li>)}
             </ul>
           </div>
 

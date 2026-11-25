@@ -14,6 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { VendorApprovalBanner } from "@/components/vendor-approval-banner"
 import { useToast } from "@/hooks/use-toast"
 import { useLoading } from "@/hooks/use-loading"
+import { ChangePasswordCard } from "@/components/auth/change-password-card"
 
 interface ShopData {
   shopName: string
@@ -767,6 +768,7 @@ export default function SellerSettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      <div className="mt-6 max-w-2xl"><ChangePasswordCard /></div>
     </main>
   )
 }

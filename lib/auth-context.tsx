@@ -12,6 +12,8 @@ interface User {
   status?: string
   avatar?: string
   vendorId?: number
+  permissions?: string[]
+  accountScope?: 'admin' | 'seller'
 }
 
 interface AuthContextType {

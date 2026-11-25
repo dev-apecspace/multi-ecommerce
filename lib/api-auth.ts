@@ -6,6 +6,8 @@ export interface AuthPayload {
   vendorId?: number
   role: string
   status: string
+  permissions?: string[]
+  accountScope?: 'admin' | 'seller'
 }
 
 export async function getAuthFromRequest(request: NextRequest): Promise<AuthPayload | null> {
@@ -27,15 +29,24 @@ export async function getAuthFromRequest(request: NextRequest): Promise<AuthPayl
     vendorId: decoded.vendorId,
     role: decoded.role,
     status: decoded.status,
+    permissions: Array.isArray(decoded.permissions) ? decoded.permissions : undefined,
+    accountScope: decoded.accountScope === 'admin' || decoded.accountScope === 'seller' ? decoded.accountScope : undefined,
   }
 }
 
 export function isVendor(auth: AuthPayload | null): boolean {
-  return auth?.role === 'vendor' && !!auth.vendorId
+  return auth?.role === 'vendor' && !!auth.vendorId && !['inactive', 'rejected'].includes(String(auth.status).toLowerCase())
 }
 
 export function isAdmin(auth: AuthPayload | null): boolean {
   return auth?.role === 'admin'
+}
+
+export function hasPermission(auth: AuthPayload | null, permission: string): boolean {
+  if (!auth) return false
+  const scope = auth.role === 'admin' ? 'admin' : auth.role === 'vendor' ? 'seller' : null
+  if (!scope || (auth.accountScope && auth.accountScope !== scope)) return false
+  return auth.permissions === undefined || auth.permissions.includes(permission)
 }
 
 export function unauthorizedResponse() {

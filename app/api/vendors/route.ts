@@ -122,6 +122,22 @@ export async function GET(request: NextRequest) {
             shopDetail = detailData || {}
           }
 
+          // Chỉ công khai giấy phép/hồ sơ pháp lý đã được duyệt; tuyệt đối không
+          // đưa chứng từ ngân hàng hoặc giấy tờ định danh vào dữ liệu công khai.
+          let publicLegalDocuments: Array<{ name: string; type: string; url: string }> = []
+          try {
+            const { data: documents } = await supabase
+              .from('VendorDocument')
+              .select('documentName, documentType, documentUrl')
+              .eq('vendorId', vendor.id)
+              .eq('status', 'approved')
+            publicLegalDocuments = (documents || [])
+              .filter((document: any) => /giấy phép|pháp lý|đăng ký kinh doanh|kinh doanh|chứng nhận/i.test(document.documentType || ''))
+              .map((document: any) => ({ name: document.documentName, type: document.documentType, url: document.documentUrl }))
+          } catch {
+            // Giữ tương thích với môi trường chưa có bảng VendorDocument.
+          }
+
           // Thông tin liên hệ có thể nằm ở hồ sơ shop mới hoặc dữ liệu Vendor/User
           // của các shop cũ. Luôn trả về một cấu trúc thống nhất cho Client.
           let userContact: { email?: string | null; phone?: string | null } | null = null
@@ -134,8 +150,9 @@ export async function GET(request: NextRequest) {
             userContact = userData
           }
           
+          const { bankAccount: _bankAccount, bankName: _bankName, bankAccountHolder: _bankAccountHolder, bankBranch: _bankBranch, bankCode: _bankCode, bankBin: _bankBin, walletAccount: _walletAccount, walletQrUrl: _walletQrUrl, ...publicVendor } = vendor
           return {
-            ...vendor,
+            ...publicVendor,
             logo: avatar,
             avatar: avatar,
             image: coverImage,
@@ -149,6 +166,9 @@ export async function GET(request: NextRequest) {
             email: (shopDetail as any)?.email || userContact?.email || vendor.email || null,
             phone: (shopDetail as any)?.phone || userContact?.phone || vendor.phone || null,
             address: (shopDetail as any)?.address || vendor.businessAddress || vendor.address || null,
+            taxId: vendor.taxId || (shopDetail as any)?.taxId || null,
+            businessLicense: vendor.businessLicense || (shopDetail as any)?.businessLicense || null,
+            publicLegalDocuments,
             Shop: shop ? {
               ...shop,
               ShopDetail: shopDetail,
