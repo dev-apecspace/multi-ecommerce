@@ -92,6 +92,7 @@ export function middleware(request: NextRequest) {
     }
 
     if (user.role !== 'vendor' && user.role !== 'admin') {
+      if (user.role === 'customer' && pathname === '/seller') return NextResponse.next()
       return isApiRequest
         ? NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         : NextResponse.redirect(new URL('/client', request.url))

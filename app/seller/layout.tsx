@@ -30,6 +30,7 @@ export default function SellerLayout({
   const [commitChecked, setCommitChecked] = useState(false)
   const [savingAcceptance, setSavingAcceptance] = useState(false)
   const [rejectedShop, setRejectedShop] = useState(false)
+  const customerApplyingForShop = !authLoading && user?.role === 'customer'
 
   useEffect(() => {
     if (!hasRefreshed.current) {
@@ -100,12 +101,13 @@ export default function SellerLayout({
     finally { setSavingAcceptance(false) }
   }
 
-  const isBlocked = authLoading || (user?.role === 'vendor' && (!gateLoaded || !accepted))
+  const isBlocked = authLoading || customerApplyingForShop || (user?.role === 'vendor' && (!gateLoaded || !accepted))
   const showWarningDialog = !authLoading && user?.role === 'vendor' && gateLoaded && !accepted && !rejectedShop
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-clip bg-background dark:bg-slate-950">
       <div inert={isBlocked ? true : undefined}>
+        {customerApplyingForShop ? <main>{children}</main> : <>
         <SellerTopBar />
         <div className="flex min-w-0 flex-1 overflow-hidden pt-16 md:pt-0">
           <SellerSidebar />
@@ -115,7 +117,19 @@ export default function SellerLayout({
           </div>
         </div>
         <ExperimentalModeModal />
+        </>}
       </div>
+      {customerApplyingForShop && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="customer-seller-title">
+        <section className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-700"><AlertTriangle className="h-6 w-6"/></div>
+          <h1 id="customer-seller-title" className="text-xl font-bold text-slate-950">Đăng ký trở thành nhà bán hàng</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Bạn đang dùng tài khoản khách hàng. Hãy bổ sung hồ sơ cửa hàng để đăng ký bán hàng; thông tin cá nhân hiện tại sẽ được tự điền vào biểu mẫu.</p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <Button className="bg-orange-600 hover:bg-orange-700" onClick={() => router.push('/auth/vendor-register?step=shop')}>Tiếp tục đăng ký shop</Button>
+            <Button variant="outline" onClick={() => router.push('/client')}>Quay lại mua sắm</Button>
+          </div>
+        </section>
+      </div>}
       {showWarningDialog && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="seller-warning-title">
         <section className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
           <header className="flex items-center gap-3 bg-red-700 px-5 py-4 text-white"><AlertTriangle className="h-6 w-6 shrink-0" /><div><h2 id="seller-warning-title" className="font-bold uppercase">{warning?.title || 'Cảnh báo quy định dành cho nhà bán hàng'}</h2><p className="text-xs text-red-100">Cần xác nhận để tiếp tục sử dụng khu vực nhà bán hàng</p></div></header>
