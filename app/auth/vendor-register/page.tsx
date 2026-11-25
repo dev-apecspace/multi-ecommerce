@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
@@ -20,7 +20,7 @@ type AdministrativeProvince = { id: string; name: string; wards: { id: string; n
 
 const required = <span className="text-destructive"> *</span>
 
-export default function VendorRegisterPage() {
+function VendorRegisterContent() {
   const router = useRouter()
   const { user, vendorSignup, loading, error, clearError } = useAuth()
   const searchParams = useSearchParams()
@@ -282,4 +282,10 @@ export default function VendorRegisterPage() {
       </section>
     </main>
   )
+}
+
+export default function VendorRegisterPage() {
+  return <Suspense fallback={<main className="grid min-h-screen place-items-center"><Loader2 className="h-7 w-7 animate-spin text-orange-600" aria-label="Đang tải biểu mẫu đăng ký" /></main>}>
+    <VendorRegisterContent />
+  </Suspense>
 }
