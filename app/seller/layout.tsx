@@ -107,13 +107,13 @@ export default function SellerLayout({
   const showWarningDialog = !authLoading && user?.role === 'vendor' && gateLoaded && !accepted && !rejectedShop
 
   return (
-    <div className="flex h-screen min-w-0 flex-col overflow-hidden bg-background dark:bg-slate-950">
-      <div inert={isBlocked ? true : undefined}>
+    <div className="flex h-dvh min-w-0 flex-col overflow-hidden bg-background dark:bg-slate-950">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" inert={isBlocked ? true : undefined}>
         {customerApplyingForShop ? <main>{children}</main> : <>
         <SellerTopBar />
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden pt-16 md:pt-0">
           <SellerSidebar />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto md:ml-64">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain md:ml-64">
             <main className="min-w-0 flex-1">{children}</main>
             <Footer compact />
           </div>
