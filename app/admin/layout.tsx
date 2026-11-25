@@ -9,11 +9,11 @@ export default function AdminLayout({
   children: React.ReactNode
 }>) {
   return (
-    <div className="flex flex-col min-h-screen bg-background dark:bg-slate-950">
+    <div className="flex h-screen flex-col overflow-hidden bg-background dark:bg-slate-950">
       <AdminTopBar />
-      <div className="flex flex-1 overflow-hidden pt-16 md:pt-0">
+      <div className="flex min-h-0 flex-1 overflow-hidden pt-16 md:pt-0">
         <AdminSidebar />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto md:ml-64">{children}</main>
       </div>
       <ExperimentalModeModal />
     </div>

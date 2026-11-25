@@ -95,7 +95,7 @@ export function AdminSidebar() {
   const logout = <Link href="/" className="block"><Button variant="ghost" className="w-full justify-start gap-3 rounded-lg px-4 text-sm text-slate-600"><LogOut className="h-4 w-4"/><span>Về trang chủ</span></Button></Link>
 
   return <>
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+    <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
       {brand}<p className="px-5 pb-2 text-xs text-slate-500">Quản trị nền tảng</p>{renderNavigation()}<div className="border-t border-slate-100 p-3">{logout}</div>
     </aside>
     <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-3 md:hidden">
