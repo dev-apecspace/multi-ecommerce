@@ -8,6 +8,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
       <footer className="mt-16 border-t border-border bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
         <div className="container-viewport py-8">
           <CompanyInformation className="text-center text-slate-600 dark:text-gray-300" />
+          <div className="mt-4 text-center"><Link href="/client/ho-tro" className="text-sm font-medium text-orange-700 hover:underline dark:text-orange-400">Hỗ trợ / Khiếu nại</Link></div>
         </div>
       </footer>
     )
@@ -33,7 +34,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
                 </Link>
               </li>
               <li>
-                <Link href="/client/lien-he" className="hover:text-white transition">
+                <Link href="/client/ho-tro" className="hover:text-white transition">
                   Liên hệ
                 </Link>
               </li>
@@ -107,15 +108,16 @@ export function Footer({ compact = false }: { compact?: boolean }) {
 
           {/* Contact */}
           <div>
-            <h3 className="font-bold text-lg mb-4">Liên hệ</h3>
+            <h3 className="font-bold text-lg mb-4">Hỗ trợ & liên hệ</h3>
             <ul className="space-y-2 text-sm text-gray-300">
+              <li><Link href="/client/ho-tro" className="hover:text-white transition">Hỗ trợ / Khiếu nại</Link></li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                1900.123.456
+                <a href="tel:0888012153" className="hover:text-white transition">0888012153</a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                support@sanmdt.vn
+                <a href="mailto:apecspace@ecoop.vn" className="hover:text-white transition">apecspace@ecoop.vn</a>
               </li>
             </ul>
           </div>

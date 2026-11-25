@@ -127,8 +127,8 @@ export function MobileMenu({ onClose, onLogin }: MobileMenuProps) {
           <Link href="/client/shop" onClick={onClose} className="block text-sm hover:text-orange-600 dark:hover:text-orange-500">
             Ghé shop
           </Link>
-          <Link href="/client/help" onClick={onClose} className="block text-sm hover:text-orange-600 dark:hover:text-orange-500">
-            Trợ giúp
+          <Link href="/client/ho-tro" onClick={onClose} className="block text-sm hover:text-orange-600 dark:hover:text-orange-500">
+            Hỗ trợ / Khiếu nại
           </Link>
         </div>
       </div>

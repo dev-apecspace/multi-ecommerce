@@ -1,6 +1,7 @@
 "use client"
 
 import { Search, ChevronDown, MessageSquare, Phone, Mail } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -25,6 +26,10 @@ export default function HelpPage() {
           <div className="relative">
             <Input placeholder="Tìm kiếm câu trả lời..." className="pl-10 h-12 text-base" />
             <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="mt-5 flex flex-col items-center gap-2 text-center">
+            <p className="text-sm text-muted-foreground">Cần trao đổi với đội ngũ hỗ trợ hoặc theo dõi yêu cầu đã gửi?</p>
+            <Button asChild className="bg-orange-600 hover:bg-orange-700"><Link href="/client/ho-tro"><MessageSquare className="mr-2 h-4 w-4" />Gửi phản ánh / khiếu nại</Link></Button>
           </div>
         </div>
       </div>

@@ -160,11 +160,8 @@ export function Navbar() {
               <Link href="/client/shop" className="hover:underline">
                 Ghé shop
               </Link>
-              <Link href="/client/help" className="hover:underline">
-                Trợ giúp
-              </Link>
-              <Link href="/client/khieu-nai" className="hover:underline">
-                Phản ánh / Khiếu nại
+              <Link href="/client/ho-tro" className="hover:underline">
+                Hỗ trợ / Khiếu nại
               </Link>
             </div>
           </div>
