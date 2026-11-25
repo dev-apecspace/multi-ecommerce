@@ -61,7 +61,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (user?.role === 'vendor' && pathname === '/api/seller/registration-state') return NextResponse.next()
-  if (user?.role === 'vendor' && pathname === '/api/seller/vendor-warning-acceptance' && (user.status === 'active' || user.status === 'approved')) return NextResponse.next()
+  if (user?.role === 'vendor' && pathname === '/api/seller/vendor-warning-acceptance') return NextResponse.next()
 
   if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
     if (!user || user.role !== 'admin') {

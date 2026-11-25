@@ -56,7 +56,8 @@ export default function SellerLayout({
     setRejectedShop(false)
     fetch('/api/seller/registration-state', { cache: 'no-store' })
       .then(async (response) => {
-        const data = await response.json()
+        const data = await response.json().catch(() => null)
+        if (!data) throw new Error('Máy chủ không trả về trạng thái shop hợp lệ. Vui lòng thử lại.')
         if (!response.ok) throw new Error(data.error || 'Không tải được trạng thái shop.')
         if (!active) return
         if (data.rejected) {
@@ -65,7 +66,8 @@ export default function SellerLayout({
           return
         }
         const warningResponse = await fetch('/api/seller/vendor-warning-acceptance', { cache: 'no-store' })
-        const warningData = await warningResponse.json()
+        const warningData = await warningResponse.json().catch(() => null)
+        if (!warningData) throw new Error('Máy chủ không trả về dữ liệu xác nhận cảnh báo hợp lệ. Vui lòng thử lại.')
         if (!warningResponse.ok) throw new Error(warningData.error || 'Không tải được cảnh báo nhà bán hàng.')
         if (!active) return
         setWarning(warningData.warning)
