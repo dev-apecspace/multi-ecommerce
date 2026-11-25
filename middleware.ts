@@ -101,17 +101,20 @@ export function middleware(request: NextRequest) {
     if (user.role === 'vendor' && user.status !== 'active' && user.status !== 'approved') {
       const allowedPendingRoutes = [
         '/seller/documents',
-        '/seller/profile',
-        '/seller/settings',
         '/seller/pending-approval',
       ]
       
       const isAllowedRoute = allowedPendingRoutes.some(route => 
         pathname === route || pathname.startsWith(route + '/')
       )
+      const isAllowedPendingApi =
+        (pathname === '/api/seller/documents' && ['GET', 'POST', 'DELETE'].includes(request.method)) ||
+        (pathname === '/api/seller/upload' && request.method === 'POST')
 
-      if (!isAllowedRoute && pathname !== '/seller') {
-        return NextResponse.redirect(new URL('/seller/pending-approval', request.url))
+      if (!isAllowedRoute && !isAllowedPendingApi && pathname !== '/seller') {
+        return isApiRequest
+          ? NextResponse.json({ error: 'Chức năng này dùng được sau khi hồ sơ shop được duyệt.' }, { status: 403 })
+          : NextResponse.redirect(new URL('/seller/pending-approval', request.url))
       }
     }
 

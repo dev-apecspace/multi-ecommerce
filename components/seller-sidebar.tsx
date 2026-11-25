@@ -59,9 +59,9 @@ export function SellerSidebar() {
   }, [activeGroup])
 
   const renderNavigation = (mobile = false) => <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-3">
-    {permitted(overview) && <Link href={overview.href} onClick={() => mobile && setMobileOpen(false)} className="block">
-      <Button variant="ghost" className={cn('w-full justify-start gap-3 rounded-lg px-3', isActive(overview) && 'bg-orange-50 font-semibold text-orange-700 hover:bg-orange-50')}><LayoutGrid className="h-4 w-4"/><span>{overview.label}</span></Button>
-    </Link>}
+    {permitted(overview) && (isPending
+      ? <Button disabled title="Shop đang chờ duyệt; hiện chỉ truy cập được Tài liệu shop" variant="ghost" className="w-full justify-start gap-3 rounded-lg px-3 opacity-50"><LayoutGrid className="h-4 w-4"/><span className="flex-1 text-left">{overview.label}</span><Lock className="h-3.5 w-3.5 text-amber-600"/></Button>
+      : <Link href={overview.href} onClick={() => mobile && setMobileOpen(false)} className="block"><Button variant="ghost" className={cn('w-full justify-start gap-3 rounded-lg px-3', isActive(overview) && 'bg-orange-50 font-semibold text-orange-700 hover:bg-orange-50')}><LayoutGrid className="h-4 w-4"/><span>{overview.label}</span></Button></Link>)}
     {isPending && <p className="mx-3 my-2 rounded-md bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Hồ sơ đang chờ duyệt</p>}
     {groups.map((group) => {
       const links = group.links.filter(permitted)
@@ -74,9 +74,9 @@ export function SellerSidebar() {
         {open && <div className="space-y-0.5 pb-1">{links.map((link) => {
           const Icon = link.icon
           const active = isActive(link)
-          const disabled = isPending && link.restricted
+          const disabled = isPending && link.href !== '/seller/documents'
           const content = <Button variant="ghost" disabled={disabled} className={cn('h-9 w-full justify-start gap-3 rounded-lg px-3 pl-5 text-sm text-slate-600', active && 'bg-orange-50 font-semibold text-orange-700 hover:bg-orange-50', disabled && 'cursor-not-allowed opacity-50')}><Icon className="h-4 w-4 shrink-0"/><span className="min-w-0 flex-1 truncate text-left">{link.label}</span>{link.unread && <UnreadBadge count={unreadMessages} />}{disabled && <Lock className="h-3.5 w-3.5 text-amber-600"/>}</Button>
-          return disabled ? <div key={link.href} title="Chỉ dùng được sau khi hồ sơ shop được duyệt">{content}</div> : <Link key={link.href} href={link.href} onClick={() => mobile && setMobileOpen(false)} className="block">{content}</Link>
+          return disabled ? <div key={link.href} title={link.href === '/seller/pending-approval' ? 'Trạng thái xét duyệt hồ sơ' : 'Shop đang chờ duyệt; hiện chỉ truy cập được Tài liệu shop'}>{content}</div> : <Link key={link.href} href={link.href} onClick={() => mobile && setMobileOpen(false)} className="block">{content}</Link>
         })}</div>}
       </section>
     })}
