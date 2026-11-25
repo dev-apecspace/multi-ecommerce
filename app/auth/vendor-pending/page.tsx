@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/lib/auth-context'
 import { useRouter } from 'next/navigation'
-import { Clock, LogOut, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
+import { Clock, LogOut, CheckCircle, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function VendorPendingPage() {
@@ -50,6 +51,13 @@ export default function VendorPendingPage() {
             </p>
           </div>
 
+          <Button asChild className="mb-3 w-full bg-orange-600 hover:bg-orange-700">
+            <Link href="/seller">
+              <Store className="h-4 w-4 mr-2" />
+              Vào trang nhà bán hàng
+            </Link>
+          </Button>
+
           <Button onClick={handleLogout} variant="outline" className="w-full">
             <LogOut className="h-4 w-4 mr-2" />
             Đăng xuất
@@ -57,8 +65,8 @@ export default function VendorPendingPage() {
 
           <p className="text-xs text-muted-foreground mt-6">
             Có câu hỏi? Liên hệ{' '}
-            <a href="mailto:support@example.com" className="text-primary hover:underline">
-              support@example.com
+            <a href="mailto:apecspace@ecoop.vn" className="text-primary hover:underline">
+              apecspace@ecoop.vn
             </a>
           </p>
         </div>
