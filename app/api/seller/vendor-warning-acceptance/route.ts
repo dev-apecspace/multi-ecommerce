@@ -13,12 +13,18 @@ export async function GET(request: NextRequest) {
   if (!auth || !isVendor(auth)) return unauthorizedResponse()
   const { data: warning, error: warningError } = await getCurrentWarning()
   if (warningError) return NextResponse.json({ error: warningError.message }, { status: 400 })
-  const { data: currentAcceptance, error } = await supabase.from('VendorWarningAcceptance')
-    .select('id, warningVersion, acceptedAt')
+  const { data: acceptances, error } = await supabase.from('VendorWarningAcceptance')
+    .select('id, warningVersion, warningTitle, warningContent, acceptedAt')
     .eq('vendorId', auth.vendorId!)
-    .eq('warningVersion', warning.version)
-    .maybeSingle()
+    .order('acceptedAt', { ascending: false })
+    .limit(100)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  // Admin saves can advance the version without changing the actual warning.
+  // Treat that as already accepted, while real text changes still require consent.
+  const currentAcceptance = acceptances?.find((acceptance) =>
+    acceptance.warningVersion === warning.version ||
+    (acceptance.warningTitle === warning.title && acceptance.warningContent === warning.content)
+  ) || null
   return NextResponse.json({ warning, acceptance: currentAcceptance || null })
 }
 
@@ -33,12 +39,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cảnh báo đã thay đổi hoặc chưa được xác nhận. Vui lòng đọc lại.' }, { status: 409 })
     }
 
-    const { data: existing, error: existingError } = await supabase.from('VendorWarningAcceptance')
-      .select('id, acceptedAt')
+    const { data: existingRecords, error: existingError } = await supabase.from('VendorWarningAcceptance')
+      .select('id, warningVersion, warningTitle, warningContent, acceptedAt')
       .eq('vendorId', auth.vendorId!)
-      .eq('warningVersion', warning.version)
-      .maybeSingle()
+      .order('acceptedAt', { ascending: false })
+      .limit(100)
     if (existingError) return NextResponse.json({ error: existingError.message }, { status: 400 })
+    const existing = existingRecords?.find((acceptance) =>
+      acceptance.warningVersion === warning.version ||
+      (acceptance.warningTitle === warning.title && acceptance.warningContent === warning.content)
+    )
     if (existing) return NextResponse.json({ accepted: true, acceptance: existing })
 
     const [{ data: user, error: userError }, { data: vendor, error: vendorError }] = await Promise.all([

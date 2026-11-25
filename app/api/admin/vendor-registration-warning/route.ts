@@ -30,9 +30,13 @@ export async function PATCH(request: NextRequest) {
     if (!title || !content || !Number.isInteger(minReadSeconds) || minReadSeconds < 0 || minReadSeconds > 600) {
       return NextResponse.json({ error: 'Vui lòng nhập tiêu đề, nội dung và thời gian đọc từ 0 đến 600 giây.' }, { status: 400 })
     }
-    const { data: current } = await supabase.from('VendorRegistrationWarning').select('version').eq('id', 1).maybeSingle()
+    const { data: current } = await supabase.from('VendorRegistrationWarning')
+      .select('title, content, version, minReadSeconds')
+      .eq('id', 1)
+      .maybeSingle()
+    const hasChanged = !current || current.title !== title || current.content !== content || current.minReadSeconds !== minReadSeconds
     const { data, error } = await supabase.from('VendorRegistrationWarning').upsert({
-      id: 1, title, content, minReadSeconds, version: (current?.version || 0) + 1,
+      id: 1, title, content, minReadSeconds, version: hasChanged ? (current?.version || 0) + 1 : current.version,
       updatedBy: auth?.userId || null, updatedAt: new Date().toISOString(),
     }).select('id, title, content, version, minReadSeconds, updatedAt').single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
